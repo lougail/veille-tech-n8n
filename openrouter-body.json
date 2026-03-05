@@ -1,0 +1,9 @@
+{
+  "model": "google/gemma-3-27b-it:free",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Tu es un analyste tech senior. Genere un rapport de veille strategique sur les dernieres actualites (dernieres 24h) en IA, Data Engineering, MLOps et Cloud. Structure ta reponse avec maximum 5 sujets. Pour chaque sujet : un niveau de priorite [CRITIQUE], [IMPORTANT] ou [VEILLE], un titre court, un resume en 2-3 phrases, le lien source. Reponds en francais."
+    }
+  ]
+}
