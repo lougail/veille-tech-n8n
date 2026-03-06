@@ -1,0 +1,49 @@
+{
+  "name": "Error Handler - Discord Alert",
+  "nodes": [
+    {
+      "id": "err-trigger",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "parameters": {}
+    },
+    {
+      "id": "err-format",
+      "name": "Format Error Embed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0],
+      "parameters": {
+        "jsCode": "const errorData = $input.first().json;\nconst workflowName = errorData.workflow?.name || 'Unknown';\nconst errorMessage = errorData.execution?.error?.message || 'Erreur inconnue';\nconst executionId = errorData.execution?.id || 'N/A';\n\nreturn [{\n  json: {\n    content: \"\",\n    embeds: [{\n      title: \"⚠️ Erreur Workflow\",\n      description: `**Workflow:** ${workflowName}\\n**Erreur:** ${errorMessage}\\n**Execution ID:** ${executionId}`,\n      color: 15548997,\n      footer: { text: \"N8N Error Handler\" },\n      timestamp: new Date().toISOString()\n    }]\n  }\n}];"
+      }
+    },
+    {
+      "id": "err-discord",
+      "name": "Discord Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [440, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DISCORD_WEBHOOK_STATUS }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [[{"node": "Format Error Embed", "type": "main", "index": 0}]]
+    },
+    "Format Error Embed": {
+      "main": [[{"node": "Discord Alert", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

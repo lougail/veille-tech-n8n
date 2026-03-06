@@ -1,0 +1,106 @@
+{
+  "name": "Veille Pro - Digest Hebdomadaire",
+  "nodes": [
+    {
+      "id": "sched-hebdo",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [0, 0],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 20 * * 0"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "collect-week",
+      "name": "Collect Week Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0],
+      "parameters": {
+        "jsCode": "const now = new Date();\nconst weekStart = new Date(now);\nweekStart.setDate(now.getDate() - 7);\n\nconst prompt = `Tu es un analyste tech senior. Génère un digest hebdomadaire de veille technologique pour la semaine du ${weekStart.toLocaleDateString('fr-FR')} au ${now.toLocaleDateString('fr-FR')}.\n\nStructure ton rapport en 3 sections :\n1. **Tendances clés** (3-5 tendances majeures de la semaine en IA, Data, Cloud, DevOps, Sécurité)\n2. **Top articles** (5 articles les plus impactants avec titre + résumé 1 phrase)\n3. **Statistiques** (résumé des domaines les plus actifs)\n\nSois concis et factuel. Réponds en français.`;\n\nreturn [{ json: { prompt } }];"
+      }
+    },
+    {
+      "id": "llm-hebdo",
+      "name": "Basic LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [440, 0],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}",
+        "batching": {}
+      }
+    },
+    {
+      "id": "openrouter-hebdo",
+      "name": "OpenRouter Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [440, 208],
+      "parameters": {
+        "model": "mistralai/mistral-small-3.1-24b-instruct:free",
+        "options": {}
+      },
+      "credentials": {
+        "openRouterApi": {
+          "id": "__CREDENTIAL_ID__",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "id": "format-hebdo",
+      "name": "Format Hebdo Embed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 0],
+      "parameters": {
+        "jsCode": "const text = $input.first().json.text;\nconst now = new Date();\nconst weekStart = new Date(now);\nweekStart.setDate(now.getDate() - 7);\n\nconst description = text.length > 4000 ? text.substring(0, 4000) + '...' : text;\n\nreturn [{\n  json: {\n    content: '',\n    embeds: [{\n      title: `📊 Digest Hebdomadaire — ${weekStart.toLocaleDateString('fr-FR')} au ${now.toLocaleDateString('fr-FR')}`,\n      description: description,\n      color: 5793266,\n      footer: { text: 'Veille Pro - Digest Hebdo' },\n      timestamp: new Date().toISOString()\n    }]\n  }\n}];"
+      }
+    },
+    {
+      "id": "discord-hebdo",
+      "name": "Discord Webhook Hebdo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [880, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DISCORD_WEBHOOK_HEBDO }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [[{"node": "Collect Week Data", "type": "main", "index": 0}]]
+    },
+    "Collect Week Data": {
+      "main": [[{"node": "Basic LLM Chain", "type": "main", "index": 0}]]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [[{"node": "Basic LLM Chain", "type": "ai_languageModel", "index": 0}]]
+    },
+    "Basic LLM Chain": {
+      "main": [[{"node": "Format Hebdo Embed", "type": "main", "index": 0}]]
+    },
+    "Format Hebdo Embed": {
+      "main": [[{"node": "Discord Webhook Hebdo", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
