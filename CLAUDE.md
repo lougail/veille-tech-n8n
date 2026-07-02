@@ -31,9 +31,13 @@ Automatisation de veille technologique avec N8N (self-hosted) et Discord.
 | Workflow | ID | État |
 |----------|----|------|
 | Veille Pro v2 — Stories & Tendances (45 nœuds) | `VeilleProV2story` | **actif** — 8h/13h/18h30 Paris, hebdo dimanche |
+| Veille Stack (26 nœuds) | `VeilleStackHlmr1` | **actif** — 9h30 Paris, digest lundi ; org via `GITHUB_STACK_ORG`, token `GITHUB_STACK_TOKEN`, sortie `DISCORD_WEBHOOK_STACK` |
 | Error Handler - Discord Alert | `yrUX1IcjTyIwpWqG` | actif |
 | Veille Pro v1 | `OfUjCc9fcrInTX3M` | désactivé (rollback) |
 | Brief Simplon phases 1-2 | — | désactivés (archive) |
+
+⚠️ Veille Stack : `workflows/src-stack/config-stack.js` et les JSON générés contiennent des détails
+internes de la plateforme surveillée → **gitignorés** (le repo est public). Template : `config-stack.example.js`.
 
 ## Discord
 

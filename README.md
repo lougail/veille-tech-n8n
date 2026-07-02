@@ -47,8 +47,19 @@ Schedule (8h, 13h, 18h30 — Europe/Paris)
 | Workflow | Description | Schedule |
 |----------|-------------|----------|
 | **Veille Pro v2 — Stories & Tendances** (45 nodes) | Collecte multi-sources + clustering + classification + distribution + digests | 8h, 13h, 18h30 (+ hebdo dimanche) |
+| **Veille Stack** (26 nodes) | Veille de dépendances d'une org GitHub : manifestes → OSV.dev (CVE) → alertes #stack, + digest hebdo (releases sous contrainte, EOL via endoflife.date) | 9h30 (+ hebdo lundi) |
 | **Veille Pro v1** (34 nodes, désactivé) | Ancien pipeline par articles (rollback possible) | — |
 | **Error Handler** (3 nodes) | Alerte Discord si un workflow crash | Sur erreur |
+
+### Veille Stack (générique, réutilisable)
+
+Scanne les manifestes (`requirements.txt`, `package.json`, `pubspec.yaml`/`.lock`, `Dockerfile`)
+de tous les repos d'une org GitHub (token fine-grained **lecture seule**, org via `GITHUB_STACK_ORG`),
+déduplique les dépendances à l'échelle de la plateforme, interroge **OSV.dev** (gratuit, sans clé)
+et n'alerte que sur les **nouvelles** vulnérabilités HIGH/CRITICAL — avec la liste des repos touchés.
+Le lundi : digest des dernières versions des paquets sous contrainte + échéances EOL.
+La configuration (watchlists) est locale et non versionnée : copier
+`workflows/src-stack/config-stack.example.js` vers `config-stack.js` puis `python3 workflows/build_stack.py`.
 
 ## Le workflow est GÉNÉRÉ, pas édité à la main
 

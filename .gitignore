@@ -5,3 +5,7 @@ n8n-data/
 # variantes generees pour les tests (rebuild via build_v2.py --test / --preprod)
 workflows/veille-pro-v2.test.json
 workflows/veille-pro-v2.preprod.json
+# veille de stack : config et artefacts contenant des details internes de la plateforme surveillee
+workflows/src-stack/config-stack.js
+workflows/veille-stack.json
+workflows/veille-stack.test.json
