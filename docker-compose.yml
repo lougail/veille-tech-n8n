@@ -2,7 +2,7 @@ services:
   n8n:
     image: n8nio/n8n:2.10.3
     ports:
-      - "5678:5678"
+      - "127.0.0.1:5678:5678"
     volumes:
       - ./n8n-data:/home/node/.n8n
     env_file:
