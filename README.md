@@ -1,70 +1,89 @@
-# Veille Tech Automatisee — N8N + Discord
+# Veille Tech Automatisée — N8N + Discord
 
-Systeme de veille technologique automatise qui collecte, classifie et distribue des articles tech via Discord.
+Système de veille technologique automatisé qui collecte, regroupe en **stories**, classifie par LLM et distribue sur Discord — avec détection des **sujets chauds** par corrélation multi-sources et signaux de popularité.
 
-## Architecture
+> **v2 (juillet 2026)** : refonte complète orientée stories/tendances. Détails et rationale : [docs/veille-pro-v2.md](docs/veille-pro-v2.md)
+
+## Architecture (Veille Pro v2)
 
 ```
-61 RSS feeds (IA, Cloud, DevOps, Securite, Data...)
-        |
-    [n8n] (Docker, self-hosted)
-        |
-    Deduplication + Filtre 24h (Static Data)
-        |
-    Pre-filtre par mots-cles (top 50, quota/categorie)
-        |
-    Jina AI Reader (extraction texte complet)
-        |
-    LLM Mistral Small (classification + scoring 1-10)
-        |
-    Routage par categorie
-        |
-    Discord (6 canaux thematiques)
-     + Digest quotidien (apres-midi)
-     + Digest hebdomadaire (dimanche, base sur les vrais articles)
-     + Alertes erreurs (#bot-status)
+Schedule (8h, 13h, 18h30 — Europe/Paris)
+  ├── 73 feeds RSS curés (labs IA, blogs, newsletters, releases GitHub, YouTube, Reddit, HN…)
+  ├── Hugging Face Daily Papers API (upvotes)
+  ├── Hugging Face Trending Models API (trendingScore)
+  ├── Lobsters hottest.json (score)
+  └── GitHub Search API (nouveaux repos qui explosent)
+        │
+  Normalisation + extraction de signaux (points HN, rang Reddit, upvotes, stars)
+        │
+  Remove Duplicates natif (URL canonique, mémoire cross-runs 20 000 entrées)
+        │
+  Pré-ranking multi-signaux → top 130 (mots-clés 2026 + popularité + poids source + récence)
+        │
+  CLUSTERING EN STORIES (union-find : URL + similarité de titres)
+   → chaleur = nb de sources + engagement · anti-répétition 72h · détection "ça monte"
+        │
+  Classification LLM (Mistral Small 3.2, batchs de 10, profil éditorial personnalisé)
+   → score /10, catégorie, titre + résumé FR, "pourquoi ça compte", tags
+        │
+  Discord (Components V2) :
+   #ia #dev #cloud #securite — cartes riches + liste compacte (silencieux)
+   #tendances — 🔥 sujets chauds multi-sources + 📈 escalades
+   #critique — score ≥ 9, embed rouge + @here (seul canal qui notifie)
+   #digest — digest éditorial quotidien 18h30 (toute la journée, continuité avec la veille)
+   #hebdo — bilan du dimanche (tendances montantes/descendantes, signaux faibles)
+   #status — métriques du funnel + feeds en erreur
 ```
 
 ## Stack
 
-- **N8N** v2.10.3 — orchestration des workflows (Docker)
-- **OpenRouter** — acces LLM gratuit (Mistral Small 3.1 24B)
-- **Jina AI Reader** — extraction texte complet des articles
-- **Discord Webhooks** — distribution multi-canaux
-- **JavaScript** — code nodes pour le scoring, parsing, formatage
+- **N8N** 2.10.3 self-hosted (Docker) — orchestration
+- **OpenRouter** — Mistral Small 3.2 (classification, $0.075/M) + Mistral Large 2512 (digests) — ~0,60 $/mois
+- **Discord Webhooks** — messages Components V2 (containers, boutons-liens, flags silencieux)
+- **JavaScript** — 18 Code nodes versionnés dans `workflows/src/`
 
 ## Workflows
 
 | Workflow | Description | Schedule |
 |----------|-------------|----------|
-| **Veille Pro** (34 nodes) | Collecte + Classification + Distribution | 8h + 14h |
+| **Veille Pro v2 — Stories & Tendances** (45 nodes) | Collecte multi-sources + clustering + classification + distribution + digests | 8h, 13h, 18h30 (+ hebdo dimanche) |
+| **Veille Pro v1** (34 nodes, désactivé) | Ancien pipeline par articles (rollback possible) | — |
 | **Error Handler** (3 nodes) | Alerte Discord si un workflow crash | Sur erreur |
 
-### Pipeline detaille (Veille Pro)
+## Le workflow est GÉNÉRÉ, pas édité à la main
 
-1. **Schedule Trigger** — 8h et 14h
-2. **RSS Feed URLs** — 61 feeds organises par categorie
-3. **Loop Over Feeds** — parcourt chaque feed
-4. **RSS Read** — lit les articles du feed
-5. **Tag Category** — tag la categorie RSS d'origine
-6. **Dedup + Filter 24h** — filtre doublons (Static Data) + articles > 24h
-7. **Pre-filtre Keywords** — scoring par mots-cles, quota 10/categorie, top 50
-8. **Fetch Full Text** — Jina AI Reader pour le texte complet
-9. **Batch pour LLM** — lots de 5 articles
-10. **Classification LLM** — Mistral Small classifie (score, priorite, categorie, resume)
-11. **Save Week Articles** — accumule dans Static Data pour le digest hebdo
-12. **Route par Categorie** — dirige vers le bon canal Discord
-13. **Discord Send** — envoie les embeds
-14. **Digest quotidien** — resume LLM de la journee (apres-midi)
-15. **Digest hebdomadaire** — resume LLM de la semaine (dimanche)
+```
+workflows/
+├── build_v2.py          # Builder : assemble le JSON n8n depuis src/
+├── src/*.js             # Code source des 18 Code nodes (la vraie logique)
+├── veille-pro-v2.json   # Sortie du builder (import n8n)
+└── veille-pro.json      # v1 (archive)
+```
+
+Modifier la veille = éditer `workflows/src/*.js` puis :
+
+```bash
+python3 workflows/build_v2.py
+docker cp workflows/veille-pro-v2.json veille-tech-n8n-n8n-1:/tmp/v2.json
+docker exec veille-tech-n8n-n8n-1 n8n import:workflow --input=/tmp/v2.json
+```
+
+Mode test (envois Discord désactivés, digest forcé, Manual Trigger pour le CLI) :
+
+```bash
+python3 workflows/build_v2.py --test
+# puis import, et :
+docker exec -e N8N_RUNNERS_BROKER_PORT=5699 -e N8N_PORT=5698 \
+  veille-tech-n8n-n8n-1 n8n execute --id VeilleProV2story
+```
 
 ## Installation
 
-### Prerequis
+### Prérequis
 
 - Docker + Docker Compose
-- Compte Discord avec webhooks configures
-- Cle API OpenRouter (gratuit)
+- Serveur Discord avec 9 webhooks (voir `.env.example`)
+- Clé API OpenRouter (~0,60 $/mois pour tout le pipeline)
 
 ### Setup
 
@@ -72,30 +91,13 @@ Systeme de veille technologique automatise qui collecte, classifie et distribue 
 git clone https://github.com/lougail/veille-tech-n8n.git
 cd veille-tech-n8n
 cp .env.example .env
-# Editer .env avec vos webhooks Discord et cle OpenRouter
+# Éditer .env avec vos webhooks Discord
 docker compose up -d
 ```
 
-Acceder a n8n sur `http://localhost:5678`, importer les workflows depuis `workflows/`.
+Accéder à n8n sur `http://localhost:5678`, créer la credential OpenRouter, importer `workflows/veille-pro-v2.json` et `workflows/error-handler.json`, activer.
 
-## Structure du projet
+## Historique
 
-```
-.
-├── docker-compose.yml          # N8N self-hosted
-├── .env.example                # Variables d'environnement (template)
-├── workflows/
-│   ├── veille-pro.json         # Workflow principal (34 nodes)
-│   ├── error-handler.json      # Error handler Discord
-│   ├── rss-discord.json        # Phase 1 brief (RSS simple)
-│   ├── llm-veille-discord.json # Phase 2 brief (LLM simple)
-│   └── digest-hebdomadaire.json# Backup digest hebdo
-├── docs/
-│   └── screenshots/            # Captures d'ecran
-├── code-node-openrouter.js     # Reference code node OpenRouter
-└── openrouter-body.json        # Reference body API OpenRouter
-```
-
-## Cout
-
-0 EUR — Mistral Small gratuit (OpenRouter), Jina AI gratuit (10M tokens), n8n self-hosted, Discord gratuit.
+- **v2** (juillet 2026) — stories multi-sources, signaux de popularité (HN/Reddit/Lobsters/HF/GitHub), clustering, sujets chauds, digests avec mémoire, Components V2, sources auditées une à une, coût LLM divisé par 3.
+- **v1** (mars 2026) — pipeline articles : 61 feeds → filtre mots-clés → Mistral Small 3.1 → embeds Discord. Brief Simplon : phases 1 & 2 dans `workflows/rss-discord.json` et `workflows/llm-veille-discord.json`.

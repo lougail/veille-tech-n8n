@@ -2,3 +2,6 @@ n8n-data/
 .mcp.json
 .env
 .claude/
+# variantes generees pour les tests (rebuild via build_v2.py --test / --preprod)
+workflows/veille-pro-v2.test.json
+workflows/veille-pro-v2.preprod.json

@@ -1,6 +1,6 @@
 services:
   n8n:
-    image: n8nio/n8n
+    image: n8nio/n8n:2.10.3
     ports:
       - "5678:5678"
     volumes:
@@ -17,4 +17,6 @@ services:
       - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
       - EXECUTIONS_TIMEOUT=900
       - EXECUTIONS_TIMEOUT_MAX=1800
+      - GENERIC_TIMEZONE=Europe/Paris
+      - TZ=Europe/Paris
     restart: unless-stopped

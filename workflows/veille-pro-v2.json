@@ -1,0 +1,1357 @@
+[
+ {
+  "id": "VeilleProV2story",
+  "name": "Veille Pro v2 — Stories & Tendances",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+   {
+    "parameters": {
+     "rule": {
+      "interval": [
+       {
+        "field": "cronExpression",
+        "expression": "0 0 8,13 * * *"
+       },
+       {
+        "field": "cronExpression",
+        "expression": "0 30 18 * * *"
+       }
+      ]
+     }
+    },
+    "id": "schedule-v2",
+    "name": "Schedule 8h-13h-18h30",
+    "type": "n8n-nodes-base.scheduleTrigger",
+    "typeVersion": 1.3,
+    "position": [
+     0,
+     300
+    ]
+   },
+   {
+    "parameters": {
+     "jsCode": "// Sources RSS v2 — 73 feeds curés (audit de santé du 2026-07-02, URLs finales post-redirect)\n// u: url | s: source | c: catégorie (ia|dev|data|cloud|securite|tendances|fr)\n// w: poids éditorial (0.7-1.5) | k: kind (blog|news|newsletter|release|youtube|podcast|hn|reddit|ghtrend|papers)\n// a: alwaysConsider (passe le pré-ranking quoi qu'il arrive)\nconst FEEDS = [\n  // ---- IA : labs ----\n  { u: 'https://openai.com/news/rss.xml', s: 'OpenAI', c: 'ia', w: 1.3, k: 'blog' },\n  { u: 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_news.xml', s: 'Anthropic', c: 'ia', w: 1.4, k: 'blog' },\n  { u: 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_engineering.xml', s: 'Anthropic Engineering', c: 'ia', w: 1.4, k: 'blog' },\n  { u: 'https://blog.google/technology/ai/rss/', s: 'Google AI', c: 'ia', w: 1.1, k: 'blog' },\n  { u: 'https://deepmind.google/blog/rss.xml', s: 'DeepMind', c: 'ia', w: 1.2, k: 'blog' },\n  { u: 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_meta_ai.xml', s: 'Meta AI', c: 'ia', w: 1.1, k: 'blog' },\n  { u: 'https://mistral.ai/rss.xml', s: 'Mistral AI', c: 'ia', w: 1.3, k: 'blog' },\n  { u: 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_xainews.xml', s: 'xAI', c: 'ia', w: 1.0, k: 'blog' },\n  { u: 'https://huggingface.co/blog/feed.xml', s: 'Hugging Face', c: 'ia', w: 1.1, k: 'blog' },\n  // ---- IA : curation, newsletters, blogs ----\n  { u: 'https://news.smol.ai/rss.xml', s: 'AINews (smol.ai)', c: 'ia', w: 1.2, k: 'newsletter' },\n  { u: 'https://www.reddit.com/r/LocalLLaMA/top/.rss?t=day', s: 'r/LocalLLaMA', c: 'ia', w: 1.0, k: 'reddit' },\n  { u: 'https://www.latent.space/feed', s: 'Latent Space', c: 'ia', w: 1.1, k: 'newsletter' },\n  { u: 'https://www.interconnects.ai/feed', s: 'Interconnects', c: 'ia', w: 1.2, k: 'newsletter' },\n  { u: 'https://importai.substack.com/feed', s: 'Import AI', c: 'ia', w: 1.1, k: 'newsletter' },\n  { u: 'https://magazine.sebastianraschka.com/feed', s: 'Ahead of AI', c: 'ia', w: 1.1, k: 'newsletter' },\n  { u: 'https://simonwillison.net/atom/everything/', s: 'Simon Willison', c: 'ia', w: 1.3, k: 'blog' },\n  { u: 'https://lilianweng.github.io/index.xml', s: 'Lil\\'Log', c: 'ia', w: 1.2, k: 'blog' },\n  { u: 'https://eugeneyan.com/rss/', s: 'Eugene Yan', c: 'ia', w: 1.0, k: 'blog' },\n  { u: 'https://hamel.dev/index.xml', s: 'Hamel Husain', c: 'ia', w: 1.0, k: 'blog' },\n  { u: 'https://karpathy.bearblog.dev/feed/?type=rss', s: 'Andrej Karpathy', c: 'ia', w: 1.4, k: 'blog' },\n  // ---- IA : vidéo / podcast ----\n  { u: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCNJ1Ymd5yFuUPtn21xtRbbw', s: 'AI Explained', c: 'ia', w: 1.1, k: 'youtube' },\n  { u: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCgfe2ooZD3VJPB6aJAnuQng', s: 'bycloud', c: 'ia', w: 0.9, k: 'youtube' },\n  { u: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCXUPKJO5MZQN11PqgIvyuvQ', s: 'Karpathy (YouTube)', c: 'ia', w: 1.3, k: 'youtube' },\n  { u: 'https://www.dwarkesh.com/feed', s: 'Dwarkesh Podcast', c: 'ia', w: 1.0, k: 'podcast' },\n  // ---- Tendances : agrégateurs à signaux ----\n  { u: 'https://hnrss.org/newest?points=150&count=100', s: 'Hacker News', c: 'tendances', w: 1.2, k: 'hn' },\n  { u: 'https://mshibanami.github.io/GitHubTrendingRSS/daily/all.xml', s: 'GitHub Trending', c: 'tendances', w: 1.0, k: 'ghtrend' },\n  // ---- Dev : news / agrégateurs ----\n  { u: 'https://feed.infoq.com/', s: 'InfoQ', c: 'dev', w: 0.9, k: 'news' },\n  { u: 'https://newsletter.pragmaticengineer.com/feed', s: 'Pragmatic Engineer', c: 'dev', w: 1.1, k: 'newsletter' },\n  { u: 'https://tldr.tech/api/rss/tech', s: 'TLDR Tech', c: 'tendances', w: 0.9, k: 'newsletter' },\n  { u: 'https://github.blog/feed/', s: 'GitHub Blog', c: 'dev', w: 1.0, k: 'blog' },\n  // ---- Dev : newsletters hebdo ----\n  { u: 'https://javascriptweekly.com/rss/', s: 'JavaScript Weekly', c: 'dev', w: 1.0, k: 'newsletter' },\n  { u: 'https://nodeweekly.com/rss/', s: 'Node Weekly', c: 'dev', w: 0.9, k: 'newsletter' },\n  { u: 'https://thisweekinreact.com/newsletter/rss.xml', s: 'This Week in React', c: 'dev', w: 1.0, k: 'newsletter' },\n  { u: 'https://pycoders.com/feed', s: 'Pycoder\\'s Weekly', c: 'dev', w: 1.0, k: 'newsletter' },\n  // ---- Dev : blogs officiels ----\n  { u: 'https://blog.rust-lang.org/feed.xml', s: 'Rust Blog', c: 'dev', w: 0.9, k: 'blog' },\n  { u: 'https://developer.chrome.com/static/blog/feed.xml', s: 'Chrome for Developers', c: 'dev', w: 0.9, k: 'blog' },\n  { u: 'https://nodejs.org/en/feed/blog.xml', s: 'Node.js', c: 'dev', w: 1.1, k: 'blog' },\n  { u: 'https://deno.com/feed', s: 'Deno', c: 'dev', w: 0.9, k: 'blog' },\n  { u: 'https://bun.com/rss.xml', s: 'Bun', c: 'dev', w: 1.0, k: 'blog' },\n  { u: 'https://code.visualstudio.com/feed.xml', s: 'VS Code', c: 'dev', w: 1.0, k: 'blog' },\n  { u: 'https://blog.jetbrains.com/ai/feed/', s: 'JetBrains AI', c: 'dev', w: 0.8, k: 'blog' },\n  // ---- Dev-IA : outils & releases ----\n  { u: 'https://cursor.com/changelog/rss.xml', s: 'Cursor', c: 'dev', w: 1.1, k: 'release' },\n  { u: 'https://github.com/anthropics/claude-code/releases.atom', s: 'Claude Code', c: 'dev', w: 1.2, k: 'release' },\n  { u: 'https://github.com/openai/codex/releases.atom', s: 'OpenAI Codex', c: 'dev', w: 1.0, k: 'release' },\n  { u: 'https://github.com/ollama/ollama/releases.atom', s: 'Ollama', c: 'ia', w: 1.0, k: 'release' },\n  { u: 'https://github.com/microsoft/TypeScript/releases.atom', s: 'TypeScript', c: 'dev', w: 1.1, k: 'release' },\n  { u: 'https://github.com/python/cpython/releases.atom', s: 'CPython', c: 'dev', w: 1.0, k: 'release' },\n  { u: 'https://github.com/facebook/react/releases.atom', s: 'React', c: 'dev', w: 1.1, k: 'release' },\n  { u: 'https://github.com/vitejs/vite/releases.atom', s: 'Vite', c: 'dev', w: 0.9, k: 'release' },\n  { u: 'https://github.com/astral-sh/uv/releases.atom', s: 'uv (Astral)', c: 'dev', w: 1.0, k: 'release' },\n  // ---- Cloud / DevOps ----\n  { u: 'https://aws.amazon.com/about-aws/whats-new/recent/feed/', s: 'AWS', c: 'cloud', w: 0.7, k: 'news' },\n  { u: 'https://docs.cloud.google.com/feeds/gcp-release-notes.xml', s: 'GCP', c: 'cloud', w: 0.7, k: 'news' },\n  { u: 'https://www.microsoft.com/releasecommunications/api/v2/azure/rss', s: 'Azure', c: 'cloud', w: 0.7, k: 'news' },\n  { u: 'https://blog.cloudflare.com/rss/', s: 'Cloudflare', c: 'cloud', w: 1.1, k: 'blog' },\n  { u: 'https://vercel.com/atom', s: 'Vercel', c: 'cloud', w: 1.0, k: 'blog' },\n  { u: 'https://www.docker.com/feed/', s: 'Docker', c: 'cloud', w: 0.9, k: 'blog' },\n  { u: 'https://kubernetes.io/feed.xml', s: 'Kubernetes', c: 'cloud', w: 0.8, k: 'blog' },\n  { u: 'https://www.hashicorp.com/blog/feed.xml', s: 'HashiCorp', c: 'cloud', w: 0.7, k: 'blog' },\n  // ---- Sécurité ----\n  { u: 'https://www.cert.ssi.gouv.fr/alerte/feed/', s: 'CERT-FR Alertes', c: 'securite', w: 1.5, k: 'news', a: true },\n  { u: 'https://www.cert.ssi.gouv.fr/avis/feed/', s: 'CERT-FR Avis', c: 'securite', w: 1.0, k: 'news' },\n  { u: 'https://feeds.feedburner.com/TheHackersNews', s: 'The Hacker News', c: 'securite', w: 1.0, k: 'news' },\n  { u: 'https://www.bleepingcomputer.com/feed/', s: 'BleepingComputer', c: 'securite', w: 1.0, k: 'news' },\n  { u: 'https://krebsonsecurity.com/feed/', s: 'Krebs on Security', c: 'securite', w: 1.0, k: 'blog' },\n  // ---- Data ----\n  { u: 'https://www.databricks.com/feed', s: 'Databricks', c: 'data', w: 0.7, k: 'blog' },\n  { u: 'https://www.getdbt.com/blog/feed.xml', s: 'dbt', c: 'data', w: 0.7, k: 'blog' },\n  { u: 'https://www.dataengineeringweekly.com/feed', s: 'Data Eng Weekly', c: 'data', w: 1.0, k: 'newsletter' },\n  // ---- Communauté ML (éloigné de r/LocalLLaMA dans la liste pour espacer les requêtes reddit) ----\n  { u: 'https://old.reddit.com/r/MachineLearning/top/.rss?t=day', s: 'r/MachineLearning', c: 'ia', w: 0.9, k: 'reddit' },\n  // ---- Tendances / FR ----\n  { u: 'https://feeds.arstechnica.com/arstechnica/index', s: 'Ars Technica', c: 'tendances', w: 0.8, k: 'news' },\n  { u: 'https://next.ink/feed/', s: 'Next.ink', c: 'fr', w: 0.9, k: 'news' },\n  { u: 'https://www.numerama.com/feed/', s: 'Numerama', c: 'fr', w: 0.8, k: 'news' },\n  // ---- YouTube dev ----\n  { u: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCsBjURrPoezykLs9EqgamOA', s: 'Fireship', c: 'tendances', w: 1.0, k: 'youtube' },\n  { u: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCUyeluBRhGPCW4rPe_UvBZQ', s: 'ThePrimeTime', c: 'tendances', w: 0.8, k: 'youtube' },\n  { u: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCbRP3c757lWg9M-U7TyEkXA', s: 'Theo (t3.gg)', c: 'tendances', w: 0.8, k: 'youtube' },\n];\nreturn FEEDS.map(f => ({ json: f }));\n"
+    },
+    "id": "sources-rss",
+    "name": "Sources RSS",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     220,
+     0
+    ]
+   },
+   {
+    "parameters": {
+     "options": {}
+    },
+    "id": "loop-feeds",
+    "name": "Loop Feeds",
+    "type": "n8n-nodes-base.splitInBatches",
+    "typeVersion": 3,
+    "position": [
+     440,
+     0
+    ]
+   },
+   {
+    "parameters": {
+     "url": "={{ $json.u }}",
+     "options": {}
+    },
+    "id": "rss-read",
+    "name": "RSS Read",
+    "type": "n8n-nodes-base.rssFeedRead",
+    "typeVersion": 1.2,
+    "position": [
+     660,
+     -160
+    ],
+    "continueOnFail": true,
+    "alwaysOutputData": true
+   },
+   {
+    "parameters": {
+     "jsCode": "// Attache les métadonnées du feed courant à chaque item lu\nconst feed = $('Loop Feeds').first().json;\nreturn $input.all().map(item => {\n  item.json._feed = { u: feed.u, s: feed.s, c: feed.c, w: feed.w, k: feed.k, a: feed.a || false };\n  return item;\n});\n"
+    },
+    "id": "tag-source",
+    "name": "Tag Source",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     880,
+     -160
+    ]
+   },
+   {
+    "parameters": {
+     "url": "https://huggingface.co/api/daily_papers?limit=30",
+     "options": {
+      "timeout": 15000
+     }
+    },
+    "id": "hf-papers-api",
+    "name": "HF Papers API",
+    "type": "n8n-nodes-base.httpRequest",
+    "typeVersion": 4.4,
+    "position": [
+     220,
+     240
+    ],
+    "continueOnFail": true,
+    "alwaysOutputData": true,
+    "retryOnFail": true,
+    "maxTries": 2,
+    "waitBetweenTries": 2000
+   },
+   {
+    "parameters": {
+     "jsCode": "// Hugging Face Daily Papers (API JSON publique) -> pseudo-articles avec upvotes\nconst out = [];\nfor (const it of $input.all()) {\n  let arr = it.json;\n  if (!arr || arr.error) continue;\n  if (!Array.isArray(arr)) arr = [arr];\n  for (const j of arr) {\n    const p = j && j.paper;\n    if (!p || !p.title) continue;\n    out.push({ json: {\n      title: p.title,\n      link: 'https://huggingface.co/papers/' + p.id,\n      contentSnippet: (p.ai_summary || p.summary || '').replace(/\\s+/g, ' ').substring(0, 500),\n      isoDate: j.publishedAt || p.publishedAt || new Date().toISOString(),\n      _signals: { hfUpvotes: (p.upvotes || 0), comments: (j.numComments || 0), ghStars: (p.githubStars || 0) },\n      _feed: { u: 'hf-daily-papers', s: 'HF Daily Papers', c: 'ia', w: 1.2, k: 'papers' }\n    }});\n  }\n}\nif (!out.length) return [{ json: { _skip: true } }];\nreturn out;\n"
+    },
+    "id": "map-hf-papers",
+    "name": "Map HF Papers",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     440,
+     240
+    ]
+   },
+   {
+    "parameters": {
+     "url": "https://huggingface.co/api/models?sort=trendingScore&limit=20",
+     "options": {
+      "timeout": 15000
+     }
+    },
+    "id": "hf-models-api",
+    "name": "HF Models API",
+    "type": "n8n-nodes-base.httpRequest",
+    "typeVersion": 4.4,
+    "position": [
+     220,
+     400
+    ],
+    "continueOnFail": true,
+    "alwaysOutputData": true,
+    "retryOnFail": true,
+    "maxTries": 2,
+    "waitBetweenTries": 2000
+   },
+   {
+    "parameters": {
+     "jsCode": "// Hugging Face Trending Models (API JSON publique) -> alertes \"modèle qui monte\"\nconst out = [];\nfor (const it of $input.all()) {\n  let arr = it.json;\n  if (!arr || arr.error) continue;\n  if (!Array.isArray(arr)) arr = [arr];\n  for (const m of arr) {\n    if (!m || !m.id || (m.trendingScore || 0) < 150) continue;\n    const info = [m.pipeline_tag, m.library_name].filter(Boolean).join(', ');\n    out.push({ json: {\n      title: 'Modèle en tendance sur Hugging Face : ' + m.id,\n      link: 'https://huggingface.co/' + m.id,\n      contentSnippet: `trendingScore ${m.trendingScore}, ${m.likes || 0} likes, ${m.downloads || 0} téléchargements. ${info}`,\n      isoDate: new Date().toISOString(),\n      _signals: { trendingScore: m.trendingScore || 0, likes: m.likes || 0 },\n      _feed: { u: 'hf-trending-models', s: 'HF Trending', c: 'ia', w: 1.0, k: 'papers' }\n    }});\n  }\n}\nif (!out.length) return [{ json: { _skip: true } }];\nreturn out;\n"
+    },
+    "id": "map-hf-models",
+    "name": "Map HF Models",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     440,
+     400
+    ]
+   },
+   {
+    "parameters": {
+     "url": "https://lobste.rs/hottest.json",
+     "options": {
+      "timeout": 15000
+     }
+    },
+    "id": "lobsters-api",
+    "name": "Lobsters API",
+    "type": "n8n-nodes-base.httpRequest",
+    "typeVersion": 4.4,
+    "position": [
+     220,
+     560
+    ],
+    "continueOnFail": true,
+    "alwaysOutputData": true,
+    "retryOnFail": true,
+    "maxTries": 2,
+    "waitBetweenTries": 2000
+   },
+   {
+    "parameters": {
+     "jsCode": "// Lobsters hottest.json -> articles avec score communautaire\nconst out = [];\nfor (const it of $input.all()) {\n  let arr = it.json;\n  if (!arr || arr.error) continue;\n  if (!Array.isArray(arr)) arr = [arr];\n  for (const st of arr) {\n    if (!st || !st.title || (st.score || 0) < 10) continue;\n    out.push({ json: {\n      title: st.title,\n      link: st.url || st.short_id_url,\n      contentSnippet: 'Tags : ' + (st.tags || []).join(', '),\n      isoDate: st.created_at,\n      _signals: { lobsters: st.score || 0, comments: st.comment_count || 0, lobstersUrl: st.comments_url },\n      _feed: { u: 'lobsters-hottest', s: 'Lobsters', c: 'dev', w: 1.1, k: 'hn' }\n    }});\n  }\n}\nif (!out.length) return [{ json: { _skip: true } }];\nreturn out;\n"
+    },
+    "id": "map-lobsters",
+    "name": "Map Lobsters",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     440,
+     560
+    ]
+   },
+   {
+    "parameters": {
+     "url": "=https://api.github.com/search/repositories?q=created:%3E{{ $now.minus({days: 7}).toISODate() }}&sort=stars&order=desc&per_page=20",
+     "options": {
+      "timeout": 15000
+     },
+     "sendHeaders": true,
+     "headerParameters": {
+      "parameters": [
+       {
+        "name": "User-Agent",
+        "value": "n8n-veille (self-hosted)"
+       },
+       {
+        "name": "Accept",
+        "value": "application/vnd.github+json"
+       }
+      ]
+     }
+    },
+    "id": "github-new-repos-api",
+    "name": "GitHub New Repos API",
+    "type": "n8n-nodes-base.httpRequest",
+    "typeVersion": 4.4,
+    "position": [
+     220,
+     720
+    ],
+    "continueOnFail": true,
+    "alwaysOutputData": true,
+    "retryOnFail": true,
+    "maxTries": 2,
+    "waitBetweenTries": 2000
+   },
+   {
+    "parameters": {
+     "jsCode": "// GitHub Search API : nouveaux repos (<7 jours) qui explosent en stars\nconst out = [];\nfor (const it of $input.all()) {\n  const j = it.json;\n  if (!j || j.error) continue;\n  const repos = Array.isArray(j) ? j : (j.items || []);\n  for (const r of repos) {\n    if (!r || !r.full_name || (r.stargazers_count || 0) < 200) continue;\n    const desc = [r.description, r.language, (r.topics || []).slice(0, 5).join(', ')].filter(Boolean).join(' — ');\n    out.push({ json: {\n      title: `Nouveau repo GitHub qui décolle : ${r.full_name} (${r.stargazers_count} stars en <7j)`,\n      link: r.html_url,\n      contentSnippet: desc.substring(0, 400),\n      isoDate: new Date().toISOString(),\n      _signals: { ghStars: r.stargazers_count || 0 },\n      _feed: { u: 'github-new-repos', s: 'GitHub (nouveaux repos)', c: 'tendances', w: 1.0, k: 'ghtrend' }\n    }});\n  }\n}\nif (!out.length) return [{ json: { _skip: true } }];\nreturn out.slice(0, 10);\n"
+    },
+    "id": "map-github-repos",
+    "name": "Map GitHub Repos",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     440,
+     720
+    ]
+   },
+   {
+    "parameters": {
+     "mode": "append"
+    },
+    "id": "fusion-a",
+    "name": "Fusion A",
+    "type": "n8n-nodes-base.merge",
+    "typeVersion": 3,
+    "position": [
+     680,
+     120
+    ]
+   },
+   {
+    "parameters": {
+     "mode": "append"
+    },
+    "id": "fusion-b",
+    "name": "Fusion B",
+    "type": "n8n-nodes-base.merge",
+    "typeVersion": 3,
+    "position": [
+     860,
+     200
+    ]
+   },
+   {
+    "parameters": {
+     "mode": "append"
+    },
+    "id": "fusion-c",
+    "name": "Fusion C",
+    "type": "n8n-nodes-base.merge",
+    "typeVersion": 3,
+    "position": [
+     1040,
+     280
+    ]
+   },
+   {
+    "parameters": {
+     "mode": "append"
+    },
+    "id": "fusion-d",
+    "name": "Fusion D",
+    "type": "n8n-nodes-base.merge",
+    "typeVersion": 3,
+    "position": [
+     1220,
+     360
+    ]
+   },
+   {
+    "parameters": {
+     "jsCode": "// Normalisation : schéma unifié + extraction des signaux de popularité + fenêtre 24h\nconst sd = $getWorkflowStaticData('global');\nconst now = Date.now();\nconst WINDOW_MS = 24 * 60 * 60 * 1000;\nconst stats = { collected: 0, feedErrors: [], kept: 0 };\n\n// NB : new URL() n'est pas disponible dans la sandbox du task runner n8n -> regex.\n// La query est CONSERVÉE (hors params de tracking) : l'identité vit dedans pour\n// YouTube (watch?v=ID), Azure (updates?id=N)... Le fragment aussi (GCP release notes).\nconst TRACKING = /^(utm_|ref$|ref_|fbclid|gclid|si$|s$|feature$|source$|mc_|cmpid|igshid)/;\nfunction canonical(raw) {\n  const m = /^https?:\\/\\/([^/?#]+)([^?#]*)(\\?[^#]*)?(#.*)?$/i.exec(String(raw || '').trim());\n  if (!m) return null;\n  const host = m[1].toLowerCase().replace(/^(www|m|mobile|amp)\\./, '');\n  const path = m[2].toLowerCase().replace(/\\/amp$/, '').replace(/\\/+$/, '');\n  let query = '';\n  if (m[3]) {\n    const keep = m[3].slice(1).split('&').filter(p => !TRACKING.test(p.split('=')[0].toLowerCase())).sort();\n    if (keep.length) query = '?' + keep.join('&');\n  }\n  const frag = m[4] && m[4].length > 1 ? m[4] : '';\n  return host + path + query + frag;\n}\nfunction stripHtml(s) {\n  return String(s || '').replace(/<[^>]*>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\\s+/g, ' ').trim();\n}\n\nconst out = [];\nconst redditRank = {};\n\nfor (const item of $input.all()) {\n  const j = item.json;\n  if (!j || j._skip) continue;\n  stats.collected++;\n  if (j.error) {\n    const src = (j._feed && j._feed.s) || String(j.error).substring(0, 60);\n    if (!stats.feedErrors.includes(src)) stats.feedErrors.push(src);\n    continue;\n  }\n  const f = j._feed || {};\n  let title = String(j.title || '').replace(/\\s+/g, ' ').trim();\n  const url = j.link || j.url;\n  if (!title || !url) continue;\n  // les titres de releases GitHub (\"v1.0.55\") sont ambigus : préfixer par la source\n  if (f.k === 'release' && !title.toLowerCase().includes(String(f.s || '').toLowerCase().split(' ')[0])) {\n    title = `${f.s} — ${title}`;\n  }\n  // cross-posts AINews dans Latent Space (même auteur)\n  if (f.s === 'Latent Space' && /^\\[AINews\\]/i.test(title)) continue;\n\n  const pubRaw = j.isoDate || j.pubDate || j.date || j.published || j.updated;\n  let pub = pubRaw ? new Date(pubRaw).getTime() : 0;\n  if (Number.isNaN(pub)) pub = 0;\n  if (f.k === 'ghtrend') pub = now; // GitHub Trending n'a pas de pubDate\n  if (pub > 0 && pub < now - WINDOW_MS) continue; // fenêtre 24h (items non datés conservés)\n\n  const desc = j.content || j.contentSnippet || j.description || j.summary || '';\n  const signals = Object.assign({}, j._signals || {});\n  if (f.k === 'hn' && f.s === 'Hacker News') {\n    const pts = /Points:\\s*(\\d+)/.exec(desc);\n    if (pts) signals.hnPoints = parseInt(pts[1], 10);\n    const cm = /#\\s*Comments:\\s*(\\d+)/.exec(desc);\n    if (cm) signals.hnComments = parseInt(cm[1], 10);\n    signals.hnUrl = j.comments || j.guid || null;\n  }\n  if (f.k === 'reddit') {\n    // le feed top?t=day est trié par score : le rang est un proxy du score\n    redditRank[f.s] = (redditRank[f.s] || 0) + 1;\n    signals.redditRank = redditRank[f.s];\n    signals.redditUrl = j.link;\n  }\n\n  const key = canonical(url);\n  if (!key) continue;\n\n  out.push({ json: {\n    title,\n    url,\n    canonicalKey: key,\n    source: f.s || 'inconnu',\n    cat: f.c || 'tendances',\n    weight: f.w || 1.0,\n    kind: f.k || 'blog',\n    always: !!f.a,\n    publishedAt: pub ? new Date(pub).toISOString() : new Date(now).toISOString(),\n    snippet: stripHtml(desc).substring(0, 400),\n    signals,\n  }});\n  stats.kept++;\n}\n\nsd._runStats = stats;\nif (!out.length) return [{ json: { _none: true, canonicalKey: 'none-' + now } }];\nreturn out;\n"
+    },
+    "id": "normaliser-p-signaux",
+    "name": "Normaliser + Signaux",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     1400,
+     360
+    ]
+   },
+   {
+    "parameters": {
+     "jsCode": "// Dedup cross-runs en staticData (TTL 7 jours).\n// Remplace le node Remove Duplicates natif : pas de plafond qui crashe (historySize),\n// et les clés ne sont persistées QUE si l'exécution réussit (sémantique \"vu = traité\").\n// Les items d'engagement (HN, Lobsters, Reddit) ne sont PAS dédupliqués ici : ils doivent\n// pouvoir revenir avec plus de points pour alimenter la détection d'escalade (\"ça monte\") —\n// l'anti-répétition se fait pour eux au niveau du registre de stories (cluster.js).\nconst sd = $getWorkflowStaticData('global');\nif (!sd.seen) sd.seen = {};\nconst now = Date.now();\nconst TTL = 7 * 24 * 3600 * 1000;\nfor (const [k, ts] of Object.entries(sd.seen)) {\n  if (now - ts > TTL) delete sd.seen[k];\n}\n\nconst out = [];\nfor (const item of $input.all()) {\n  const j = item.json;\n  if (j._none) { out.push(item); continue; }\n  const k = j.canonicalKey;\n  if (!k) continue;\n  if (j.kind === 'hn' || j.kind === 'reddit') { out.push(item); continue; }\n  if (sd.seen[k]) continue;\n  sd.seen[k] = now;\n  out.push(item);\n}\n\nif (!out.length) return [{ json: { _none: true } }];\nreturn out;\n"
+    },
+    "id": "dedup-7-jours",
+    "name": "Dedup 7 Jours",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     1580,
+     360
+    ]
+   },
+   {
+    "parameters": {
+     "jsCode": "// Pré-ranking multi-signaux : mots-clés 2026 + popularité + poids source + récence\n// Remplace le cap brutal \"top 50 par mots-clés\" de la v1 : top 130 par score composite\nconst sd = $getWorkflowStaticData('global');\nconst KEEP = 130;\n\nconst HOT3 = ['claude', 'gpt-', 'gemini', 'llama', 'mistral', 'deepseek', 'qwen', 'open-weights', 'open weights',\n  'nouveau modèle', 'new model', 'benchmark', 'sota', 'state of the art', 'agent', 'agentic', 'mcp',\n  'model context protocol', 'claude code', 'cursor', 'copilot', 'codex', 'fine-tun', 'rag', 'inference',\n  'reasoning', 'multimodal', 'release', 'released', 'launch', 'v2.', 'v3.', 'v4.', 'v5.', 'breaking change',\n  'cve-', 'zero-day', '0-day', 'rce', 'critical vulnerability', 'supply chain', 'faille', 'exploit',\n  'typescript', 'javascript', 'python', 'rust', 'react', 'node.js', 'bun', 'deno', 'vite', 'open source', 'open-source'];\nconst HOT2 = ['llm', 'ia', ' ai ', 'embedding', 'transformer', 'training', 'gpu', 'context window', 'prompt',\n  'eval', 'hallucination', 'distillation', 'quantization', 'framework', 'compiler', 'runtime', 'api',\n  'sdk', 'cli', 'devtools', 'docker', 'kubernetes', 'serverless', 'postgres', 'sqlite', 'self-host',\n  'paper', 'research', 'étude', 'browser', 'webassembly', 'wasm'];\nconst HOT1 = ['cloud', 'database', 'tool', 'outil', 'update', 'version', 'performance', 'sécurité', 'security', 'data'];\nconst NEG = ['webinar', 'sponsored', 'partenariat', 'case study', 'hiring', 'recrut', 'black friday', 'promo',\n  'horoscope', 'bon plan', 'soldes', 'forfait', 'raises $', 'series a', 'series b', 'series c', 'funding round',\n  'ipo', 'valuation', 'netflix', 'disney', 'gaming console', 'iphone 1', 'galaxy s'];\n\nfunction kwScore(text) {\n  let s = 0;\n  for (const w of HOT3) if (text.includes(w)) s += 3;\n  for (const w of HOT2) if (text.includes(w)) s += 2;\n  for (const w of HOT1) if (text.includes(w)) s += 1;\n  for (const w of NEG) if (text.includes(w)) s -= 4;\n  return Math.min(s, 12);\n}\nfunction popScore(sig) {\n  let p = 0;\n  if (sig.hnPoints) p = Math.max(p, Math.min(1, sig.hnPoints / 500));\n  if (sig.lobsters) p = Math.max(p, Math.min(1, sig.lobsters / 40));\n  if (sig.hfUpvotes) p = Math.max(p, Math.min(1, sig.hfUpvotes / 80));\n  if (sig.trendingScore) p = Math.max(p, Math.min(1, sig.trendingScore / 600));\n  if (sig.ghStars) p = Math.max(p, Math.min(1, sig.ghStars / 800));\n  if (sig.redditRank) p = Math.max(p, Math.max(0, (15 - sig.redditRank) / 15) * 0.7);\n  return p;\n}\n\nconst now = Date.now();\nconst items = $input.all().filter(i => !i.json._none);\nif (!items.length) return [{ json: { _none: true } }];\n\nfor (const it of items) {\n  const j = it.json;\n  const text = (j.title + ' ' + (j.snippet || '')).toLowerCase();\n  const ageH = Math.max(0, (now - new Date(j.publishedAt).getTime()) / 3600000);\n  j.preScore = Math.round((\n    kwScore(text) * 0.8 +\n    popScore(j.signals || {}) * 6 +\n    ((j.weight || 1) - 1) * 3 +\n    (ageH < 6 ? 0.5 : 0)\n  ) * 10) / 10;\n}\n\nitems.sort((a, b) => b.json.preScore - a.json.preScore);\nconst selected = [];\nconst seen = new Set();\nfor (const it of items) {\n  if (it.json.always && !seen.has(it.json.canonicalKey)) { selected.push(it); seen.add(it.json.canonicalKey); }\n}\nconst alwaysCount = selected.length;\nfor (const it of items) {\n  if (selected.length >= KEEP + alwaysCount) break;\n  if (!seen.has(it.json.canonicalKey)) { selected.push(it); seen.add(it.json.canonicalKey); }\n}\n\nsd._runStats = Object.assign(sd._runStats || {}, { ranked: selected.length });\nreturn selected;\n"
+    },
+    "id": "pre-ranking",
+    "name": "Pre-Ranking",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     1760,
+     360
+    ]
+   },
+   {
+    "parameters": {
+     "jsCode": "// Clustering en STORIES : regroupe les articles qui couvrent le même sujet\n// (URL canonique identique OU titres similaires), calcule la \"chaleur\" (heat),\n// et filtre les sujets déjà publiés dans les 72 dernières heures (anti-répétition).\nconst sd = $getWorkflowStaticData('global');\nif (!sd.stories) sd.stories = [];\nconst now = Date.now();\nconst DAY = 24 * 3600 * 1000;\n\n// purge du registre : > 7 jours\nsd.stories = sd.stories.filter(st => now - new Date(st.l || st.f).getTime() < 7 * DAY);\n\nconst items = $input.all().map(i => i.json).filter(j => !j._none);\nif (!items.length) return [{ json: { _none: true } }];\n\n// ---- tokens de titre ----\nconst STOP = new Set(['the', 'a', 'an', 'of', 'to', 'in', 'for', 'and', 'on', 'with', 'is', 'are', 'at', 'its', 'it',\n  'how', 'why', 'what', 'de', 'la', 'le', 'les', 'du', 'des', 'un', 'une', 'et', 'pour', 'sur', 'avec', 'dans',\n  'new', 'now', 'your', 'you', 'we', 'our', 'this', 'that', 'from', 'by', 'as', 'be', 'not', 'no', 'via']);\nfunction tokens(t) {\n  return new Set(\n    String(t)\n      .replace(/^(show hn|ask hn|tell hn)\\s*:\\s*/i, '')\n      .replace(/^\\[[a-z]{1,12}\\]\\s*/i, '')\n      .toLowerCase()\n      .normalize('NFD').replace(/[̀-ͯ]/g, '')\n      .replace(/[^a-z0-9.+#-]+/g, ' ')\n      .split(' ')\n      .filter(w => w.length >= 2 && !STOP.has(w))\n  );\n}\nfunction overlap(a, b) { let n = 0; for (const x of a) if (b.has(x)) n++; return n; }\nfunction jaccard(a, b) { const i = overlap(a, b); return i / (a.size + b.size - i || 1); }\nfunction containment(a, b) { const [s, l] = a.size <= b.size ? [a, b] : [b, a]; return s.size ? overlap(s, l) / s.size : 0; }\nfunction hashId(str) { let h = 5381; for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) >>> 0; return h.toString(36); }\n\nconst toks = items.map(it => tokens(it.title));\n\n// ---- union-find ----\nconst parent = items.map((_, i) => i);\nfunction find(i) { return parent[i] === i ? i : (parent[i] = find(parent[i])); }\nfunction union(i, j) { parent[find(j)] = find(i); }\n\nfor (let i = 0; i < items.length; i++) {\n  for (let j = i + 1; j < items.length; j++) {\n    if (items[i].canonicalKey === items[j].canonicalKey) { union(i, j); continue; }\n    // similarité de titres : exige au moins 3 tokens de chaque côté (évite les faux positifs sur titres courts)\n    if (toks[i].size >= 3 && toks[j].size >= 3 &&\n        (jaccard(toks[i], toks[j]) >= 0.5 || containment(toks[i], toks[j]) >= 0.75)) union(i, j);\n  }\n}\n\nconst groups = {};\nfor (let i = 0; i < items.length; i++) (groups[find(i)] = groups[find(i)] || []).push(i);\n\n// ---- construction des stories ----\nconst stories = [];\nfor (const idxs of Object.values(groups)) {\n  const members = idxs.map(i => items[i]);\n  // membre principal : source la plus pondérée, puis snippet le plus riche\n  members.sort((a, b) => (b.weight - a.weight) || ((b.snippet || '').length - (a.snippet || '').length));\n  const main = members[0];\n  const srcNames = [...new Set(members.map(m => m.source))];\n  const domains = [...new Set(members.map(m => (m.canonicalKey || '').split('/')[0]))];\n  const sig = {};\n  for (const m of members) {\n    for (const [k, v] of Object.entries(m.signals || {})) {\n      if (typeof v === 'number') sig[k] = Math.max(sig[k] || 0, v);\n      else if (!sig[k]) sig[k] = v;\n    }\n  }\n  let heat = srcNames.length;\n  if ((sig.hnPoints || 0) >= 150) heat++;\n  if ((sig.hnPoints || 0) >= 400) heat++;\n  if ((sig.lobsters || 0) >= 20) heat++;\n  if ((sig.hfUpvotes || 0) >= 50) heat++;\n  if ((sig.trendingScore || 0) >= 300) heat++;\n  if ((sig.redditRank || 99) <= 3) heat++;\n\n  // tokens du titre PRINCIPAL uniquement (l'union du cluster crée des \"soupes de tokens\"\n  // qui matchent tout dans l'anti-répétition)\n  const mainToks = tokens(main.title);\n\n  stories.push({\n    id: hashId(main.canonicalKey + '|' + main.title),\n    title: main.title,\n    url: main.url,\n    snippet: main.snippet,\n    cat: main.cat,\n    always: members.some(m => m.always),\n    publishedAt: main.publishedAt,\n    sources: members.slice(0, 6).map(m => ({ s: m.source, u: m.url, t: m.title })),\n    sourceCount: srcNames.length,\n    domains: domains.length,\n    heat,\n    signals: sig,\n    preScore: Math.max(...members.map(m => m.preScore || 0)),\n    _tokens: [...mainToks],\n    isUpdate: false,\n  });\n}\n\n// ---- anti-répétition vs registre (72h) + détection d'escalade ----\nconst recent = sd.stories.filter(st => now - new Date(st.l || st.f).getTime() < 3 * DAY);\nconst recentToks = recent.map(st => new Set((st.k || '').split(' ').filter(Boolean)));\nconst kept = [];\nlet skippedRepeats = 0;\n\nfor (const story of stories) {\n  const stoks = new Set(story._tokens);\n  let matched = null;\n  for (let i = 0; i < recent.length; i++) {\n    // containment ET au moins 3 tokens communs (évite les faux \"déjà couvert\")\n    if (stoks.size >= 3 && recentToks[i].size >= 3 &&\n        overlap(stoks, recentToks[i]) >= 3 && containment(stoks, recentToks[i]) >= 0.7) { matched = recent[i]; break; }\n  }\n  if (!matched) { kept.push(story); continue; }\n  // sujet déjà connu : mise à jour du registre\n  matched.l = new Date(now).toISOString();\n  const heatJump = story.heat - (matched.h || 0);\n  const bigEngagement = (story.signals.hnPoints || 0) >= 300;\n  if (!matched.e && (heatJump >= 2 || (bigEngagement && story.heat >= 3))) {\n    matched.e = true;\n    matched.h = Math.max(matched.h || 0, story.heat);\n    story.isUpdate = true;\n    kept.push(story); // repasse une fois, routé vers #tendances comme \"ça monte\"\n  } else {\n    matched.h = Math.max(matched.h || 0, story.heat);\n    skippedRepeats++;\n  }\n}\n\nsd._runStats = Object.assign(sd._runStats || {}, { stories: kept.length, skippedRepeats });\nif (!kept.length) return [{ json: { _none: true } }];\nkept.sort((a, b) => (b.preScore + b.heat) - (a.preScore + a.heat));\nreturn kept.map(s => ({ json: s }));\n"
+    },
+    "id": "clusteriser-stories",
+    "name": "Clusteriser Stories",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     1940,
+     360
+    ]
+   },
+   {
+    "parameters": {
+     "conditions": {
+      "options": {
+       "caseSensitive": true,
+       "leftValue": "",
+       "typeValidation": "loose",
+       "version": 3
+      },
+      "conditions": [
+       {
+        "id": "stories-?-cond",
+        "leftValue": "={{ $json._none ? 1 : 0 }}",
+        "rightValue": 0,
+        "operator": {
+         "type": "number",
+         "operation": "equals"
+        }
+       }
+      ],
+      "combinator": "and"
+     },
+     "options": {}
+    },
+    "id": "stories-q",
+    "name": "Stories ?",
+    "type": "n8n-nodes-base.if",
+    "typeVersion": 2.2,
+    "position": [
+     2120,
+     360
+    ]
+   },
+   {
+    "parameters": {
+     "batchSize": 10,
+     "options": {}
+    },
+    "id": "batch-stories",
+    "name": "Batch Stories",
+    "type": "n8n-nodes-base.splitInBatches",
+    "typeVersion": 3,
+    "position": [
+     2300,
+     240
+    ]
+   },
+   {
+    "parameters": {
+     "jsCode": "// Construit le prompt de classification pour un batch de stories\nconst stories = $input.all().map(i => i.json).filter(j => !j._none);\nif (!stories.length) return [];\n\nfunction signalLine(st) {\n  const parts = [`${st.sourceCount} source(s)`];\n  const sig = st.signals || {};\n  if (sig.hnPoints) parts.push(`HN ${sig.hnPoints} pts / ${sig.hnComments || 0} comm.`);\n  if (sig.lobsters) parts.push(`Lobsters ${sig.lobsters} pts`);\n  if (sig.hfUpvotes) parts.push(`HF ${sig.hfUpvotes} upvotes`);\n  if (sig.trendingScore) parts.push(`HF trending ${sig.trendingScore}`);\n  if (sig.ghStars) parts.push(`${sig.ghStars} stars GitHub`);\n  if (sig.redditRank) parts.push(`top ${sig.redditRank} Reddit du jour`);\n  return parts.join(' · ');\n}\n\nconst blocks = stories.map(st => {\n  const others = st.sources.slice(1, 4).map(s => `${s.s}: \"${s.t}\"`).join(' | ');\n  return `--- STORY id=${st.id} ---\nTitre: ${st.title}\nSource principale: ${st.sources[0].s} (catégorie flux: ${st.cat})\nSignaux: ${signalLine(st)}${others ? `\\nAutres couvertures: ${others}` : ''}\nExtrait: ${st.snippet || 'N/A'}`;\n}).join('\\n\\n');\n\nconst prompt = `Tu es l'analyste de veille personnel de Louis : développeur fullstack (JavaScript/TypeScript, Python), spécialisation data/IA, francophone, qui self-hoste ses outils.\n\nCE QUI L'INTÉRESSE (scores hauts) :\n- Nouveaux modèles IA, benchmarks sérieux, open-weights\n- Outils de dev IA : agents de code (Claude Code, Cursor, Codex), MCP, frameworks d'agents\n- Releases majeures : langages (TypeScript, Python, Rust), runtimes (Node, Bun, Deno), frameworks (React, Vite), tooling (uv)\n- Recherche IA vulgarisable, ingénierie LLM (RAG, fine-tuning, evals, inference, agents)\n- Sécurité actionnable pour un dev (CVE sur technos répandues, supply chain)\n- Open source notable, self-hosting, écosystème tech français\n- Tendances de fond du métier de dev\n\nCE QUI NE L'INTÉRESSE PAS (scores bas) :\n- Marketing produit, communiqués creux, webinars, case studies corporate\n- Levées de fonds / business sans impact technique concret\n- Tutoriels basiques, listicles, contenu SEO, gadgets grand public, crypto spéculatif\n\nBARÈME (sois exigeant, un article correct vaut 5) :\n- 9-10 EXCEPTIONNEL : change la pratique du métier ou l'état de l'art ; faille critique à patcher ; release majeure d'un outil clé\n- 7-8 IMPORTANT : release notable, outil prometteur, paper marquant, excellente analyse de fond\n- 5-6 INTÉRESSANT : bon à savoir, incrémental mais pertinent\n- 3-4 FAIBLE : périphérique, redondant, hors profil\n- 0-2 BRUIT : marketing, hors sujet, clickbait\n\nLes signaux fournis (nombre de sources, points HN, upvotes, stars) indiquent l'ampleur du buzz : une forte couverture multi-sources est un vrai indicateur d'importance, mais un sujet hors périmètre dev/IA reste hors périmètre.\n\nAnalyse les ${stories.length} stories suivantes :\n\n${blocks}\n\nRéponds UNIQUEMENT avec un JSON valide, sans texte autour :\n{\"stories\": [{\"id\": \"<id exact fourni>\", \"score\": 7, \"categorie\": \"ia|dev|data|cloud|securite|tendances\", \"titre\": \"titre en français, concis et factuel\", \"resume\": \"résumé factuel en 2 phrases max, en français\", \"pourquoi\": \"1 phrase : pourquoi ça compte pour un dev IA\", \"tags\": [\"tag1\", \"tag2\"], \"type\": \"release|recherche|outil|secu|actu|analyse\", \"hot\": false}]}\nLe champ \"hot\" est true si le sujet buzz ou va buzzer. Un objet par story, ids exactement repris.`;\n\nreturn [{ json: { prompt, _stories: stories } }];\n"
+    },
+    "id": "prompt-classification",
+    "name": "Prompt Classification",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     2480,
+     80
+    ]
+   },
+   {
+    "parameters": {
+     "promptType": "define",
+     "text": "={{ $json.prompt }}",
+     "batching": {}
+    },
+    "id": "classification-llm",
+    "name": "Classification LLM",
+    "type": "@n8n/n8n-nodes-langchain.chainLlm",
+    "typeVersion": 1.9,
+    "position": [
+     2660,
+     80
+    ],
+    "continueOnFail": true,
+    "retryOnFail": true,
+    "maxTries": 3,
+    "waitBetweenTries": 5000
+   },
+   {
+    "parameters": {
+     "model": "mistralai/mistral-small-3.2-24b-instruct",
+     "options": {
+      "temperature": 0.2
+     }
+    },
+    "id": "openrouter-classification",
+    "name": "OpenRouter Classification",
+    "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+    "typeVersion": 1,
+    "position": [
+     2660,
+     280
+    ],
+    "credentials": {
+     "openRouterApi": {
+      "id": "w6TWAQpgn7TIxlYq",
+      "name": "OpenRouter account"
+     }
+    }
+   },
+   {
+    "parameters": {
+     "jsCode": "// Parse la réponse LLM et mappe par id (robuste : fallback règle si échec LLM)\nconst input = $input.first().json;\nconst batch = $('Prompt Classification').first().json._stories || [];\n\nfunction fallback(st) {\n  return { json: {\n    ...st,\n    score: Math.max(3, Math.min(7, Math.round(3 + (st.preScore || 0) / 3))),\n    categorie: ['ia', 'dev', 'data', 'cloud', 'securite', 'tendances'].includes(st.cat) ? st.cat : 'tendances',\n    titre: st.title,\n    resume: (st.snippet || '').substring(0, 200),\n    pourquoi: '',\n    tags: [],\n    type: 'actu',\n    hot: st.heat >= 3,\n    _fallback: true,\n  }};\n}\n\nconst text = input.text || input.output || '';\nif (!text || input.error) return batch.map(fallback);\n\ntry {\n  let jsonStr = text;\n  const fence = text.match(/```(?:json)?\\s*([\\s\\S]*?)```/);\n  if (fence) jsonStr = fence[1];\n  // isole le premier bloc JSON, que ce soit un OBJET ou un TABLEAU\n  // (le modèle renvoie parfois [...] au lieu de {\"stories\": [...]})\n  const iObj = jsonStr.indexOf('{');\n  const iArr = jsonStr.indexOf('[');\n  const start = (iArr !== -1 && (iObj === -1 || iArr < iObj)) ? iArr : iObj;\n  const end = Math.max(jsonStr.lastIndexOf('}'), jsonStr.lastIndexOf(']'));\n  if (start !== -1 && end > start) jsonStr = jsonStr.substring(start, end + 1);\n  const parsed = JSON.parse(jsonStr);\n  const arr = Array.isArray(parsed) ? parsed : (parsed.stories || parsed.articles);\n  if (!Array.isArray(arr)) throw new Error('stories manquant');\n\n  const byId = {};\n  for (const a of arr) if (a && a.id != null) byId[String(a.id)] = a;\n\n  return batch.map(st => {\n    const a = byId[String(st.id)];\n    if (!a) return fallback(st);\n    return { json: {\n      ...st,\n      score: Math.max(0, Math.min(10, Math.round(Number(a.score) || 0))),\n      categorie: ['ia', 'dev', 'data', 'cloud', 'securite', 'tendances'].includes(a.categorie) ? a.categorie : (st.cat || 'tendances'),\n      titre: String(a.titre || st.title).substring(0, 220),\n      resume: String(a.resume || st.snippet || '').substring(0, 400),\n      pourquoi: String(a.pourquoi || '').substring(0, 250),\n      tags: Array.isArray(a.tags) ? a.tags.slice(0, 3).map(String) : [],\n      type: ['release', 'recherche', 'outil', 'secu', 'actu', 'analyse'].includes(a.type) ? a.type : 'actu',\n      hot: !!a.hot,\n    }};\n  });\n} catch (e) {\n  return batch.map(fallback);\n}\n"
+    },
+    "id": "parse-classification",
+    "name": "Parse Classification",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     2840,
+     80
+    ]
+   },
+   {
+    "parameters": {
+     "amount": 4
+    },
+    "id": "wait-4s",
+    "name": "Wait 4s",
+    "type": "n8n-nodes-base.wait",
+    "typeVersion": 1.1,
+    "position": [
+     3020,
+     80
+    ],
+    "webhookId": "wait-llm-v2"
+   },
+   {
+    "parameters": {
+     "jsCode": "// Filtre de publication (score >= 6) + registre persistant des stories\n// (anti-répétition 72h, digest du jour, bilan hebdo)\nconst sd = $getWorkflowStaticData('global');\nif (!sd.stories) sd.stories = [];\nconst nowIso = new Date().toISOString();\n\nconst items = $input.all().map(i => i.json).filter(j => !j._none && !j._statusOnly && j.title);\nconst stats = sd._runStats || {};\n\nif (!items.length) {\n  stats.published = 0;\n  sd._runStats = stats;\n  return [{ json: { _statusOnly: true } }];\n}\n\nlet fallbacks = 0;\nconst publish = [];\nfor (const st of items) {\n  if (st._fallback) fallbacks++;\n  const posted = st.score >= 6;\n  if (!st.isUpdate) {\n    sd.stories.push({\n      k: (st._tokens || []).join(' '),\n      t: st.titre || st.title,\n      u: st.url,\n      c: st.categorie,\n      s: st.score,\n      h: st.heat,\n      n: st.sourceCount,\n      f: nowIso,\n      l: nowIso,\n      p: posted,\n      e: false,\n      sm: posted ? (st.resume || '').substring(0, 220) : '',\n    });\n  }\n  if (posted) publish.push(st);\n}\n\npublish.sort((a, b) => b.score - a.score);\nstats.published = publish.length;\nstats.fallbacks = fallbacks;\nstats.classified = items.length;\nsd._runStats = stats;\n\nif (!publish.length) return [{ json: { _statusOnly: true } }];\nreturn publish.map(s => ({ json: s }));\n"
+    },
+    "id": "filtre-p-registre",
+    "name": "Filtre + Registre",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     2520,
+     460
+    ]
+   },
+   {
+    "parameters": {
+     "jsCode": "// Router Discord : cartes CV2 par story, listes compactes, sujets chauds, alertes critiques\nconst sd = $getWorkflowStaticData('global');\nconst stats = sd._runStats || {};\n\nconst CHANNEL = { ia: 'IA', dev: 'DEV', data: 'DEV', cloud: 'CLOUD', securite: 'SECURITE', tendances: 'TENDANCES', fr: 'TENDANCES' };\nconst COLOR = { ia: 5793266, dev: 5763719, data: 5763719, cloud: 16705372, securite: 15548997, tendances: 15418782, fr: 15418782 };\nconst EMOJI = { ia: '🤖', dev: '💻', data: '📊', cloud: '☁️', securite: '🔒', tendances: '📰', fr: '🇫🇷' };\nconst TYPE_LABEL = { release: 'Release', recherche: 'Recherche', outil: 'Outil', secu: 'Sécurité', actu: 'Actu', analyse: 'Analyse' };\nconst USERNAME = { IA: 'Veille · IA', DEV: 'Veille · Dev', CLOUD: 'Veille · Cloud', SECURITE: 'Veille · Sécu', TENDANCES: 'Veille · Tendances', CRITIQUE: 'Veille · Alerte', STATUS: 'Veille · Status' };\n\nfunction mdSafe(s) {\n  return String(s || '')\n    .replace(/[\\[\\]]/g, ' ')\n    .replace(/@(everyone|here)/gi, '@​$1') // neutralise les mentions injectées via titres RSS\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n// encode les caractères qui cassent les liens markdown [label](url)\nfunction mdUrl(u) { return String(u || '').replace(/\\(/g, '%28').replace(/\\)/g, '%29').replace(/ /g, '%20'); }\nfunction heatBadge(st) {\n  if (st.heat >= 5) return ' · 🔥🔥';\n  if (st.heat >= 3) return ' · 🔥';\n  return '';\n}\nfunction isHot(st) { return st.hot || st.heat >= 3 || (st.signals && (st.signals.hnPoints || 0) >= 300); }\n\nfunction storyCard(st) {\n  const emoji = EMOJI[st.categorie] || '📰';\n  const sig = st.signals || {};\n  const srcParts = [`via ${mdSafe(st.sources[0].s)}`];\n  if (st.sourceCount > 1) srcParts.push(`+${st.sourceCount - 1} source(s)`);\n  const head = `## ${emoji} ${mdSafe(st.titre)}\\n-# ${TYPE_LABEL[st.type] || 'Actu'} · \\`${st.score}/10\\`${heatBadge(st)} · ${srcParts.join(' · ')}`;\n  let body = (st.resume || '').trim();\n  if (st.pourquoi) body += `${body ? '\\n' : ''}*${st.pourquoi}*`;\n  const comps = [{ type: 10, content: head }];\n  // un Text Display avec content vide = 400 Bad Request\n  if (body) comps.push({ type: 10, content: body.substring(0, 800) });\n  const others = (st.sources || []).slice(1, 4)\n    .filter(s => s.u && s.u !== st.url && s.u.length < 400)\n    .map(s => `[${mdSafe(s.s)}](${mdUrl(s.u)})`);\n  if (others.length) comps.push({ type: 10, content: `-# Aussi couvert par : ${others.join(' · ')}` });\n  const buttons = [];\n  if (st.url && st.url.length < 500) buttons.push({ type: 2, style: 5, label: 'Lire', url: st.url });\n  if (sig.hnUrl && String(sig.hnUrl).length < 500) buttons.push({ type: 2, style: 5, label: `HN · ${sig.hnPoints || '?'} pts`, url: sig.hnUrl });\n  else if (sig.lobstersUrl && String(sig.lobstersUrl).length < 500) buttons.push({ type: 2, style: 5, label: `Lobsters · ${sig.lobsters} pts`, url: sig.lobstersUrl });\n  if (buttons.length) comps.push({ type: 1, components: buttons });\n  return { type: 17, accent_color: COLOR[st.categorie] || 5793266, components: comps };\n}\nfunction cardSize(card) {\n  let n = 0;\n  for (const c of card.components) if (c.type === 10) n += (c.content || '').length;\n  return n;\n}\nfunction compactLine(st) {\n  return `- [**${mdSafe(st.titre).substring(0, 90)}**](${mdUrl(st.url)}) · \\`${st.score}/10\\`${heatBadge(st)}`;\n}\n\nconst items = $input.all().map(i => i.json);\nconst statusOnly = items.every(j => j._statusOnly || j._none);\nconst messages = [];\n\nif (!statusOnly) {\n  const stories = items.filter(j => j.title && !j._statusOnly && !j._none);\n\n  // ---- groupes par canal (les escalades \"ça monte\" vont uniquement en tendances) ----\n  const groups = {};\n  for (const st of stories) {\n    if (st.isUpdate) continue;\n    const ch = CHANNEL[st.categorie] || 'TENDANCES';\n    (groups[ch] = groups[ch] || []).push(st);\n  }\n\n  const byChannel = {};\n  for (const [ch, sts] of Object.entries(groups)) {\n    sts.sort((a, b) => b.score - a.score);\n    const cards = sts.filter(s => s.score >= 7).slice(0, 4);\n    const cardKeys = new Set(cards.map(c => c.id));\n    const compact = sts.filter(s => !cardKeys.has(s.id)).slice(0, 8);\n    byChannel[ch] = sts.length;\n\n    // cartes riches : max 3 containers / message, budget 3600 chars\n    let cur = [], curChars = 0;\n    for (const st of cards) {\n      const card = storyCard(st);\n      const size = cardSize(card);\n      if (cur.length >= 3 || (curChars + size > 3400 && cur.length)) {\n        messages.push({ channelKey: ch, payload: { username: USERNAME[ch], flags: 36864, allowed_mentions: { parse: [] }, components: cur } });\n        cur = []; curChars = 0;\n      }\n      cur.push(card); curChars += size;\n    }\n    if (cur.length) messages.push({ channelKey: ch, payload: { username: USERNAME[ch], flags: 36864, allowed_mentions: { parse: [] }, components: cur } });\n\n    // liste compacte\n    if (compact.length) {\n      let lines = [];\n      let chars = 0;\n      for (const st of compact) {\n        const l = compactLine(st);\n        if (chars + l.length > 3500) break;\n        lines.push(l); chars += l.length + 1;\n      }\n      const emoji = EMOJI[Object.keys(CHANNEL).find(c => CHANNEL[c] === ch)] || '📰';\n      messages.push({ channelKey: ch, payload: {\n        username: USERNAME[ch], flags: 36864, allowed_mentions: { parse: [] },\n        components: [{ type: 17, components: [{ type: 10, content: `### ${emoji} Aussi à noter\\n${lines.join('\\n')}` }] }],\n      }});\n    }\n  }\n\n  // ---- sujets chauds -> #tendances ----\n  const hot = stories.filter(st => !st.isUpdate && isHot(st) && (CHANNEL[st.categorie] || 'TENDANCES') !== 'TENDANCES');\n  const updates = stories.filter(st => st.isUpdate);\n  if (hot.length || updates.length) {\n    const lines = [];\n    for (const st of hot.slice(0, 8)) {\n      const sig = st.signals || {};\n      const extra = [`${st.sourceCount} source(s)`];\n      if (sig.hnPoints) extra.push(`HN ${sig.hnPoints} pts`);\n      lines.push(`- [**${mdSafe(st.titre).substring(0, 90)}**](${mdUrl(st.url)}) — ${extra.join(' · ')} · \\`${st.score}/10\\``);\n    }\n    let content = lines.length ? `## 🔥 Sujets chauds\\n${lines.join('\\n')}` : '';\n    if (updates.length) {\n      const ul = updates.slice(0, 5).map(st => `- [**${mdSafe(st.titre).substring(0, 90)}**](${mdUrl(st.url)}) — chaleur ${st.heat}, ${st.sourceCount} source(s)`);\n      content += `${content ? '\\n\\n' : ''}### 📈 Ça monte (déjà signalé, le buzz s'amplifie)\\n${ul.join('\\n')}`;\n    }\n    messages.push({ channelKey: 'TENDANCES', payload: {\n      username: USERNAME.TENDANCES, flags: 36864, allowed_mentions: { parse: [] },\n      components: [{ type: 17, accent_color: 15418782, components: [{ type: 10, content: content.substring(0, 3800) }] }],\n    }});\n    stats.hot = hot.length + updates.length;\n  }\n\n  // ---- alertes critiques (score >= 9) : embed classique + notification ----\n  const critiques = stories.filter(st => st.score >= 9);\n  for (const st of critiques.slice(0, 5)) {\n    messages.push({ channelKey: 'CRITIQUE', payload: {\n      username: USERNAME.CRITIQUE,\n      content: `@here 🚨 **${mdSafe(st.titre)}**`,\n      allowed_mentions: { parse: ['everyone'] },\n      embeds: [{\n        title: mdSafe(st.titre).substring(0, 256),\n        url: st.url,\n        description: `${st.resume || ''}${st.pourquoi ? `\\n\\n**Pourquoi c'est important** — ${st.pourquoi}` : ''}`.substring(0, 3000),\n        color: 15548997,\n        fields: [\n          { name: 'Score', value: `\\`${st.score}/10\\``, inline: true },\n          { name: 'Sources', value: String(st.sourceCount), inline: true },\n          { name: 'Catégorie', value: st.categorie, inline: true },\n        ],\n        footer: { text: 'Veille Pro v2 — Alerte' },\n        timestamp: new Date().toISOString(),\n      }],\n      components: st.url && st.url.length < 500 ? [{ type: 1, components: [{ type: 2, style: 5, label: 'Lire', url: st.url }] }] : [],\n    }});\n  }\n  stats.byChannel = byChannel;\n  stats.critiques = critiques.length;\n}\n\nsd._runStats = stats;\nif (!messages.length) {\n  messages.push({ channelKey: 'STATUS', payload: {\n    username: USERNAME.STATUS, flags: 4096, allowed_mentions: { parse: [] },\n    content: 'ℹ️ Run terminé — aucune story à publier ce cycle.',\n  }});\n}\nreturn messages.map(m => ({ json: m }));\n"
+    },
+    "id": "router-discord",
+    "name": "Router Discord",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     2700,
+     460
+    ]
+   },
+   {
+    "parameters": {
+     "method": "POST",
+     "url": "={{ ($json.channelKey === 'IA' ? $env.DISCORD_WEBHOOK_IA : $json.channelKey === 'DEV' ? $env.DISCORD_WEBHOOK_DEV : $json.channelKey === 'CLOUD' ? $env.DISCORD_WEBHOOK_CLOUD : $json.channelKey === 'SECURITE' ? $env.DISCORD_WEBHOOK_SECURITE : $json.channelKey === 'CRITIQUE' ? $env.DISCORD_WEBHOOK_CRITIQUE : $json.channelKey === 'STATUS' ? $env.DISCORD_WEBHOOK_STATUS : $env.DISCORD_WEBHOOK_TENDANCES) + '?wait=true&with_components=true' }}",
+     "sendBody": true,
+     "specifyBody": "json",
+     "jsonBody": "={{ JSON.stringify($json.payload) }}",
+     "options": {
+      "timeout": 15000,
+      "batching": {
+       "batch": {
+        "batchSize": 1,
+        "batchInterval": 2500
+       }
+      }
+     }
+    },
+    "id": "discord-send",
+    "name": "Discord Send",
+    "type": "n8n-nodes-base.httpRequest",
+    "typeVersion": 4.4,
+    "position": [
+     2880,
+     460
+    ],
+    "continueOnFail": true,
+    "retryOnFail": true,
+    "maxTries": 3,
+    "waitBetweenTries": 5000
+   },
+   {
+    "parameters": {
+     "jsCode": "// Message de statut : métriques du funnel + observabilité feeds/LLM/envois\nconst sd = $getWorkflowStaticData('global');\nconst s = sd._runStats || {};\nconst t = new Date().toISOString().replace('T', ' ').substring(0, 16);\n\n// l'input = sortie de Discord Send (continueOnFail) : compter les envois en échec\nconst sendFails = $input.all().filter(i => i.json && i.json.error).length;\n\nconst lines = [\n  `**Veille Pro v2** — ${t} UTC`,\n  `📥 ${s.collected || 0} collectés → 🆕 ${s.kept || 0} dans la fenêtre → 🏷️ ${s.ranked || 0} pré-classés → 🧩 ${s.stories || 0} stories → ✅ ${s.published || 0} publiées`,\n];\nconst extras = [];\nif (s.hot) extras.push(`🔥 ${s.hot} sujets chauds`);\nif (s.critiques) extras.push(`🚨 ${s.critiques} critiques`);\nif (s.skippedRepeats) extras.push(`🔁 ${s.skippedRepeats} déjà couverts (72h)`);\nif (s.fallbacks) extras.push(`⚠️ ${s.fallbacks} classés en fallback (LLM KO)`);\nif (sendFails) extras.push(`❌ ${sendFails} envoi(s) Discord en échec`);\nif (extras.length) lines.push(extras.join(' · '));\nif (s.byChannel && Object.keys(s.byChannel).length) {\n  lines.push('📂 ' + Object.entries(s.byChannel).map(([k, v]) => `${k}: ${v}`).join(', '));\n}\nif (s.feedErrors && s.feedErrors.length) {\n  lines.push(`📡 ${s.feedErrors.length} feed(s) en erreur : ${s.feedErrors.slice(0, 6).join(', ')}${s.feedErrors.length > 6 ? '…' : ''}`);\n}\n\nreturn [{ json: { payload: {\n  username: 'Veille · Status',\n  content: lines.join('\\n').substring(0, 1900),\n  flags: 4096,\n  allowed_mentions: { parse: [] },\n}}}];\n"
+    },
+    "id": "message-status",
+    "name": "Message Status",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     3060,
+     300
+    ]
+   },
+   {
+    "parameters": {
+     "method": "POST",
+     "url": "={{ $env.DISCORD_WEBHOOK_STATUS + '?wait=true' }}",
+     "sendBody": true,
+     "specifyBody": "json",
+     "jsonBody": "={{ JSON.stringify($json.payload) }}",
+     "options": {
+      "timeout": 15000,
+      "batching": {
+       "batch": {
+        "batchSize": 1,
+        "batchInterval": 2500
+       }
+      }
+     }
+    },
+    "id": "discord-status",
+    "name": "Discord Status",
+    "type": "n8n-nodes-base.httpRequest",
+    "typeVersion": 4.4,
+    "position": [
+     3240,
+     300
+    ],
+    "continueOnFail": true,
+    "retryOnFail": true,
+    "maxTries": 3,
+    "waitBetweenTries": 5000
+   },
+   {
+    "parameters": {
+     "conditions": {
+      "options": {
+       "caseSensitive": true,
+       "leftValue": "",
+       "typeValidation": "loose",
+       "version": 3
+      },
+      "conditions": [
+       {
+        "id": "soir-?-cond",
+        "leftValue": "={{ $now.hour }}",
+        "rightValue": 17,
+        "operator": {
+         "type": "number",
+         "operation": "gte"
+        }
+       }
+      ],
+      "combinator": "and"
+     },
+     "options": {}
+    },
+    "id": "soir-q",
+    "name": "Soir ?",
+    "type": "n8n-nodes-base.if",
+    "typeVersion": 2.2,
+    "position": [
+     3060,
+     620
+    ]
+   },
+   {
+    "parameters": {
+     "jsCode": "// Digest quotidien : relit les stories publiées AUJOURD'HUI depuis le registre\n// (couvre les 3 runs de la journée, pas seulement le run courant — corrige la v1)\nconst sd = $getWorkflowStaticData('global');\nconst today = $now.toISODate();\nconst todays = (sd.stories || []).filter(st => st.p && st.f && st.f.startsWith(today));\nif (!todays.length) return [];\n\ntodays.sort((a, b) => (b.s + (b.h || 0) * 0.5) - (a.s + (a.h || 0) * 0.5));\nconst list = todays.slice(0, 30).map(st =>\n  `- [${st.c}] \"${st.t}\" (score ${st.s}/10, chaleur ${st.h || 1}, ${st.n || 1} source(s)) ${st.u}\\n  ${st.sm || ''}`\n).join('\\n');\n\nconst prev = sd.lastDigest && sd.lastDigest.d !== today && sd.lastDigest.text\n  ? `\\nDIGEST D'HIER (pour repérer ce qui évolue, ne le répète pas) :\\n${sd.lastDigest.text.substring(0, 1200)}\\n`\n  : '';\n\nconst prompt = `Tu rédiges le digest quotidien de veille de Louis, développeur fullstack (JS/TS, Python) spécialisé data/IA.\n\nSTORIES PUBLIÉES AUJOURD'HUI (${todays.length} au total, top 30 listées) :\n${list}\n${prev}\nRédige le digest en français, en markdown Discord, MAXIMUM 2500 caractères, sans titre principal (déjà géré) et sans phrase d'introduction :\n**🎯 L'essentiel** — 2-3 phrases sur ce qui compte vraiment aujourd'hui.\n**🤖 IA** / **💻 Dev** / **☁️ Cloud** / **🔒 Sécu** — sections uniquement si contenu pertinent, 2-4 items max chacune au format \"- **[titre](url)** — pourquoi ça compte (1 ligne)\". Les liens markdown sont OBLIGATOIRES (reprends les URLs fournies).\n**💎 La découverte** — 1 pépite moins visible du jour.\n**📈 À suivre** — 1-2 sujets qui montent (appuie-toi sur la chaleur et la continuité avec hier).\nTon factuel et dense, zéro remplissage.`;\n\nreturn [{ json: { prompt, count: todays.length } }];\n"
+    },
+    "id": "prompt-digest",
+    "name": "Prompt Digest",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     3240,
+     620
+    ]
+   },
+   {
+    "parameters": {
+     "promptType": "define",
+     "text": "={{ $json.prompt }}",
+     "batching": {}
+    },
+    "id": "llm-digest",
+    "name": "LLM Digest",
+    "type": "@n8n/n8n-nodes-langchain.chainLlm",
+    "typeVersion": 1.9,
+    "position": [
+     3420,
+     620
+    ],
+    "continueOnFail": true,
+    "retryOnFail": true,
+    "maxTries": 3,
+    "waitBetweenTries": 5000
+   },
+   {
+    "parameters": {
+     "model": "mistralai/mistral-large-2512",
+     "options": {
+      "temperature": 0.4
+     }
+    },
+    "id": "openrouter-digest",
+    "name": "OpenRouter Digest",
+    "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+    "typeVersion": 1,
+    "position": [
+     3420,
+     820
+    ],
+    "credentials": {
+     "openRouterApi": {
+      "id": "w6TWAQpgn7TIxlYq",
+      "name": "OpenRouter account"
+     }
+    }
+   },
+   {
+    "parameters": {
+     "jsCode": "// Met en forme le digest quotidien en message Components V2 + mémorise pour la continuité\nconst sd = $getWorkflowStaticData('global');\nconst input = $input.first().json;\nlet text = input.text || input.output || '';\nif (!text) return [];\n\nif (text.length > 3500) {\n  const cut = text.lastIndexOf('\\n', 3500);\n  text = text.substring(0, cut > 2000 ? cut : 3500);\n}\n\nconst today = $now.toISODate();\nconst dateFr = $now.setLocale('fr').toFormat('cccc d LLLL yyyy');\nconst count = $('Prompt Digest').first().json.count || 0;\n\nsd.lastDigest = { d: today, text };\nsd.digestHistory = (sd.digestHistory || []).filter(d => d.d !== today);\nsd.digestHistory.push({ d: today, text: text.substring(0, 1500) });\nsd.digestHistory = sd.digestHistory.slice(-7);\n\nreturn [{ json: { payload: {\n  username: 'Veille · Digest',\n  flags: 36864,\n  allowed_mentions: { parse: [] },\n  components: [{\n    type: 17,\n    accent_color: 15844367,\n    components: [\n      { type: 10, content: `# 📰 Digest — ${dateFr}\\n-# ${count} stories publiées aujourd'hui` },\n      { type: 14, divider: true, spacing: 1 },\n      { type: 10, content: text },\n    ],\n  }],\n}}}];\n"
+    },
+    "id": "digest-cv2",
+    "name": "Digest CV2",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     3600,
+     620
+    ]
+   },
+   {
+    "parameters": {
+     "method": "POST",
+     "url": "={{ $env.DISCORD_WEBHOOK_DIGEST + '?wait=true&with_components=true' }}",
+     "sendBody": true,
+     "specifyBody": "json",
+     "jsonBody": "={{ JSON.stringify($json.payload) }}",
+     "options": {
+      "timeout": 15000,
+      "batching": {
+       "batch": {
+        "batchSize": 1,
+        "batchInterval": 2500
+       }
+      }
+     }
+    },
+    "id": "discord-digest",
+    "name": "Discord Digest",
+    "type": "n8n-nodes-base.httpRequest",
+    "typeVersion": 4.4,
+    "position": [
+     3780,
+     620
+    ],
+    "continueOnFail": true,
+    "retryOnFail": true,
+    "maxTries": 3,
+    "waitBetweenTries": 5000
+   },
+   {
+    "parameters": {
+     "conditions": {
+      "options": {
+       "caseSensitive": true,
+       "leftValue": "",
+       "typeValidation": "loose",
+       "version": 3
+      },
+      "conditions": [
+       {
+        "id": "dimanche-?-cond",
+        "leftValue": "={{ $now.weekday }}",
+        "rightValue": 7,
+        "operator": {
+         "type": "number",
+         "operation": "equals"
+        }
+       }
+      ],
+      "combinator": "and"
+     },
+     "options": {}
+    },
+    "id": "dimanche-q",
+    "name": "Dimanche ?",
+    "type": "n8n-nodes-base.if",
+    "typeVersion": 2.2,
+    "position": [
+     3960,
+     620
+    ]
+   },
+   {
+    "parameters": {
+     "jsCode": "// Bilan hebdomadaire (dimanche soir) : stories fortes de la semaine + mémoire des digests\nconst sd = $getWorkflowStaticData('global');\nconst week = (sd.stories || []).filter(st => st.p && st.s >= 7);\nconst digests = (sd.digestHistory || []).map(d => `[${d.d}]\\n${(d.text || '').substring(0, 700)}`).join('\\n\\n');\nif (!week.length && !digests) return [];\n\nweek.sort((a, b) => (b.s + (b.h || 0)) - (a.s + (a.h || 0)));\nconst list = week.slice(0, 25).map(st =>\n  `- [${st.c}] \"${st.t}\" (score ${st.s}/10, chaleur ${st.h || 1}) ${st.u}`\n).join('\\n');\n\nconst prompt = `Tu rédiges le bilan hebdomadaire de veille de Louis, développeur fullstack (JS/TS, Python) spécialisé data/IA.\n\nSTORIES MARQUANTES DE LA SEMAINE (score >= 7) :\n${list || '(aucune)'}\n\nDIGESTS QUOTIDIENS DE LA SEMAINE (pour repérer les trajectoires) :\n${digests || '(aucun)'}\n\nRédige en français, markdown Discord, MAXIMUM 3300 caractères, sans titre principal ni introduction :\n**📈 Les tendances de la semaine** — 3-5 dynamiques de fond : ce qui monte, ce qui confirme, ce qui retombe (compare les digests entre eux).\n**🏆 Top des immanquables** — 5 à 10 stories au format \"- **[titre](url)** — 1 ligne d'impact\" (liens markdown obligatoires, reprends les URLs fournies).\n**🔍 Signaux faibles** — 2-3 sujets discrets mais prometteurs à surveiller.\n**💡 L'insight de la semaine** — 1 conclusion actionnable pour un dev IA.\nTon analytique et dense, zéro remplissage.`;\n\nreturn [{ json: { prompt, count: week.length } }];\n"
+    },
+    "id": "prompt-hebdo",
+    "name": "Prompt Hebdo",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     4140,
+     620
+    ]
+   },
+   {
+    "parameters": {
+     "promptType": "define",
+     "text": "={{ $json.prompt }}",
+     "batching": {}
+    },
+    "id": "llm-hebdo",
+    "name": "LLM Hebdo",
+    "type": "@n8n/n8n-nodes-langchain.chainLlm",
+    "typeVersion": 1.9,
+    "position": [
+     4320,
+     620
+    ],
+    "continueOnFail": true,
+    "retryOnFail": true,
+    "maxTries": 3,
+    "waitBetweenTries": 5000
+   },
+   {
+    "parameters": {
+     "model": "mistralai/mistral-large-2512",
+     "options": {
+      "temperature": 0.4
+     }
+    },
+    "id": "openrouter-hebdo",
+    "name": "OpenRouter Hebdo",
+    "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+    "typeVersion": 1,
+    "position": [
+     4320,
+     820
+    ],
+    "credentials": {
+     "openRouterApi": {
+      "id": "w6TWAQpgn7TIxlYq",
+      "name": "OpenRouter account"
+     }
+    }
+   },
+   {
+    "parameters": {
+     "jsCode": "// Met en forme le bilan hebdo en message Components V2\nconst input = $input.first().json;\nlet text = input.text || input.output || '';\nif (!text) return [];\n\nif (text.length > 3500) {\n  const cut = text.lastIndexOf('\\n', 3500);\n  text = text.substring(0, cut > 2000 ? cut : 3500);\n}\n\nconst end = $now.setLocale('fr');\nconst start = end.minus({ days: 6 });\nconst range = `${start.toFormat('d LLLL')} → ${end.toFormat('d LLLL yyyy')}`;\nconst count = $('Prompt Hebdo').first().json.count || 0;\n\nreturn [{ json: { payload: {\n  username: 'Veille · Hebdo',\n  flags: 36864,\n  allowed_mentions: { parse: [] },\n  components: [{\n    type: 17,\n    accent_color: 10181046,\n    components: [\n      { type: 10, content: `# 🗓️ Bilan de la semaine — ${range}\\n-# ${count} stories fortes cette semaine` },\n      { type: 14, divider: true, spacing: 1 },\n      { type: 10, content: text },\n    ],\n  }],\n}}}];\n"
+    },
+    "id": "hebdo-cv2",
+    "name": "Hebdo CV2",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     4500,
+     620
+    ]
+   },
+   {
+    "parameters": {
+     "method": "POST",
+     "url": "={{ $env.DISCORD_WEBHOOK_HEBDO + '?wait=true&with_components=true' }}",
+     "sendBody": true,
+     "specifyBody": "json",
+     "jsonBody": "={{ JSON.stringify($json.payload) }}",
+     "options": {
+      "timeout": 15000,
+      "batching": {
+       "batch": {
+        "batchSize": 1,
+        "batchInterval": 2500
+       }
+      }
+     }
+    },
+    "id": "discord-hebdo",
+    "name": "Discord Hebdo",
+    "type": "n8n-nodes-base.httpRequest",
+    "typeVersion": 4.4,
+    "position": [
+     4680,
+     620
+    ],
+    "continueOnFail": true,
+    "retryOnFail": true,
+    "maxTries": 3,
+    "waitBetweenTries": 5000
+   }
+  ],
+  "connections": {
+   "Schedule 8h-13h-18h30": {
+    "main": [
+     [
+      {
+       "node": "Sources RSS",
+       "type": "main",
+       "index": 0
+      },
+      {
+       "node": "HF Papers API",
+       "type": "main",
+       "index": 0
+      },
+      {
+       "node": "HF Models API",
+       "type": "main",
+       "index": 0
+      },
+      {
+       "node": "Lobsters API",
+       "type": "main",
+       "index": 0
+      },
+      {
+       "node": "GitHub New Repos API",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Sources RSS": {
+    "main": [
+     [
+      {
+       "node": "Loop Feeds",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Loop Feeds": {
+    "main": [
+     [
+      {
+       "node": "Fusion A",
+       "type": "main",
+       "index": 0
+      }
+     ],
+     [
+      {
+       "node": "RSS Read",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "RSS Read": {
+    "main": [
+     [
+      {
+       "node": "Tag Source",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Tag Source": {
+    "main": [
+     [
+      {
+       "node": "Loop Feeds",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "HF Papers API": {
+    "main": [
+     [
+      {
+       "node": "Map HF Papers",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Map HF Papers": {
+    "main": [
+     [
+      {
+       "node": "Fusion A",
+       "type": "main",
+       "index": 1
+      }
+     ]
+    ]
+   },
+   "HF Models API": {
+    "main": [
+     [
+      {
+       "node": "Map HF Models",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Map HF Models": {
+    "main": [
+     [
+      {
+       "node": "Fusion B",
+       "type": "main",
+       "index": 1
+      }
+     ]
+    ]
+   },
+   "Lobsters API": {
+    "main": [
+     [
+      {
+       "node": "Map Lobsters",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Map Lobsters": {
+    "main": [
+     [
+      {
+       "node": "Fusion C",
+       "type": "main",
+       "index": 1
+      }
+     ]
+    ]
+   },
+   "GitHub New Repos API": {
+    "main": [
+     [
+      {
+       "node": "Map GitHub Repos",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Map GitHub Repos": {
+    "main": [
+     [
+      {
+       "node": "Fusion D",
+       "type": "main",
+       "index": 1
+      }
+     ]
+    ]
+   },
+   "Fusion A": {
+    "main": [
+     [
+      {
+       "node": "Fusion B",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Fusion B": {
+    "main": [
+     [
+      {
+       "node": "Fusion C",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Fusion C": {
+    "main": [
+     [
+      {
+       "node": "Fusion D",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Fusion D": {
+    "main": [
+     [
+      {
+       "node": "Normaliser + Signaux",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Normaliser + Signaux": {
+    "main": [
+     [
+      {
+       "node": "Dedup 7 Jours",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Dedup 7 Jours": {
+    "main": [
+     [
+      {
+       "node": "Pre-Ranking",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Pre-Ranking": {
+    "main": [
+     [
+      {
+       "node": "Clusteriser Stories",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Clusteriser Stories": {
+    "main": [
+     [
+      {
+       "node": "Stories ?",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Stories ?": {
+    "main": [
+     [
+      {
+       "node": "Batch Stories",
+       "type": "main",
+       "index": 0
+      }
+     ],
+     [
+      {
+       "node": "Filtre + Registre",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Batch Stories": {
+    "main": [
+     [
+      {
+       "node": "Filtre + Registre",
+       "type": "main",
+       "index": 0
+      }
+     ],
+     [
+      {
+       "node": "Prompt Classification",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Prompt Classification": {
+    "main": [
+     [
+      {
+       "node": "Classification LLM",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Classification LLM": {
+    "main": [
+     [
+      {
+       "node": "Parse Classification",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "OpenRouter Classification": {
+    "ai_languageModel": [
+     [
+      {
+       "node": "Classification LLM",
+       "type": "ai_languageModel",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Parse Classification": {
+    "main": [
+     [
+      {
+       "node": "Wait 4s",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Wait 4s": {
+    "main": [
+     [
+      {
+       "node": "Batch Stories",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Filtre + Registre": {
+    "main": [
+     [
+      {
+       "node": "Router Discord",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Router Discord": {
+    "main": [
+     [
+      {
+       "node": "Discord Send",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Discord Send": {
+    "main": [
+     [
+      {
+       "node": "Message Status",
+       "type": "main",
+       "index": 0
+      },
+      {
+       "node": "Soir ?",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Message Status": {
+    "main": [
+     [
+      {
+       "node": "Discord Status",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Soir ?": {
+    "main": [
+     [
+      {
+       "node": "Prompt Digest",
+       "type": "main",
+       "index": 0
+      },
+      {
+       "node": "Dimanche ?",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Prompt Digest": {
+    "main": [
+     [
+      {
+       "node": "LLM Digest",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "LLM Digest": {
+    "main": [
+     [
+      {
+       "node": "Digest CV2",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "OpenRouter Digest": {
+    "ai_languageModel": [
+     [
+      {
+       "node": "LLM Digest",
+       "type": "ai_languageModel",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Digest CV2": {
+    "main": [
+     [
+      {
+       "node": "Discord Digest",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Discord Digest": {
+    "main": []
+   },
+   "Dimanche ?": {
+    "main": [
+     [
+      {
+       "node": "Prompt Hebdo",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Prompt Hebdo": {
+    "main": [
+     [
+      {
+       "node": "LLM Hebdo",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "LLM Hebdo": {
+    "main": [
+     [
+      {
+       "node": "Hebdo CV2",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "OpenRouter Hebdo": {
+    "ai_languageModel": [
+     [
+      {
+       "node": "LLM Hebdo",
+       "type": "ai_languageModel",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Hebdo CV2": {
+    "main": [
+     [
+      {
+       "node": "Discord Hebdo",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   }
+  },
+  "settings": {
+   "executionOrder": "v1",
+   "timezone": "Europe/Paris",
+   "callerPolicy": "workflowsFromSameOwner",
+   "errorWorkflow": "yrUX1IcjTyIwpWqG",
+   "executionTimeout": 1800
+  },
+  "pinData": {},
+  "meta": {},
+  "tags": []
+ }
+]
