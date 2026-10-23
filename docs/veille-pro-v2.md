@@ -138,3 +138,17 @@ docker exec -e N8N_RUNNERS_BROKER_PORT=5699 -e N8N_PORT=5698 \
 - Canal #hebdo en forum Discord (un thread par semaine via `thread_name`).
 - Sondage hebdo « quel sujet creuser ? » (webhook poll).
 - Transcripts YouTube pour résumer les vidéos retenues.
+
+
+## Octobre 2026 : rattrapage, secours et revue des sources
+
+Mesuré le 23 octobre 2026 sur les 14 exécutions gardées par n8n, du 9 au 23 octobre :
+
+| Problème | Conséquence | Correction |
+|---|---|---|
+| Fenêtre fixe de 24 h, alors que le bot ne tourne que Mac allumé | 38 % du temps d'octobre jamais lu ; trois alertes du CERT-FR manquées | La collecte part de la dernière collecte réussie (`lastCollectAt`), entre 24 h et 7 jours ; le pré-classement garde jusqu'à 260 articles après un rattrapage |
+| Résumé lié à une exécution après 17 h, bilan à un dimanche après 17 h | Plus de résumé depuis le 9 octobre ; un seul bilan, le 13 septembre | `planifier-resumes.js` : un résumé ou un bilan manqué part à l'exécution suivante (`lastDigestAt`, `lastHebdoAt`), sur tout ce qui a été publié depuis |
+| OpenRouter refuse Mistral Large (« trop de requêtes », reproduit en test le 23 octobre) | Résumé et bilan perdus même quand l'exécution a lieu | Modèle de secours sur les deux chaînes (`needsFallback`) : Mistral Small 3.2 |
+| r/MachineLearning renvoie une page HTML | 14 échecs sur 14 | Flux retiré |
+
+Tests : `npm install`, puis `npm test` (17 tests). Rendement des sources : `python3 outils/rendement-sources.py`.
