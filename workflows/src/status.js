@@ -11,6 +11,7 @@ const lines = [
   `📥 ${s.collected || 0} collectés → 🆕 ${s.kept || 0} dans la fenêtre → 🏷️ ${s.ranked || 0} pré-classés → 🧩 ${s.stories || 0} stories → ✅ ${s.published || 0} publiées`,
 ];
 const extras = [];
+if (s.windowHours > 26) extras.push(`🕒 rattrapage : ${s.windowHours} h depuis la dernière collecte`);
 if (s.hot) extras.push(`🔥 ${s.hot} sujets chauds`);
 if (s.critiques) extras.push(`🚨 ${s.critiques} critiques`);
 if (s.skippedRepeats) extras.push(`🔁 ${s.skippedRepeats} déjà couverts (72h)`);

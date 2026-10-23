@@ -1,7 +1,9 @@
 // Pré-ranking multi-signaux : mots-clés 2026 + popularité + poids source + récence
-// Remplace le cap brutal "top 50 par mots-clés" de la v1 : top 130 par score composite
+// Remplace le cap brutal "top 50 par mots-clés" de la v1 : top 130 par score composite pour
+// une journée de collecte, jusqu'au double après un rattrapage de plusieurs jours (normalize.js).
 const sd = $getWorkflowStaticData('global');
-const KEEP = 130;
+const joursCollectes = Math.max(1, ((sd._runStats || {}).windowHours || 24) / 24);
+const KEEP = Math.round(130 * Math.min(2, joursCollectes));
 
 const HOT3 = ['claude', 'gpt-', 'gemini', 'llama', 'mistral', 'deepseek', 'qwen', 'open-weights', 'open weights',
   'nouveau modèle', 'new model', 'benchmark', 'sota', 'state of the art', 'agent', 'agentic', 'mcp',

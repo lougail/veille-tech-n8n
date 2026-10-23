@@ -1,8 +1,22 @@
-// Normalisation : schéma unifié + extraction des signaux de popularité + fenêtre 24h
+// Normalisation : schéma unifié + extraction des signaux de popularité
+// + fenêtre de collecte : tout ce qui a été publié depuis la dernière collecte réussie.
+// Le bot ne tourne que Mac allumé. Avec une fenêtre fixe de 24 h, tout ce qui était publié
+// pendant un sommeil de plus d'un jour était perdu : 38 % du temps en octobre 2026.
+// La fenêtre fait au moins 24 h et au plus 7 jours, la mémoire du dédoublonnage
+// (dedup-cross-runs.js). staticData n'est enregistré qu'après une exécution réussie :
+// si l'exécution échoue, la suivante repart de l'ancienne date et ne perd rien.
 const sd = $getWorkflowStaticData('global');
 const now = Date.now();
-const WINDOW_MS = 24 * 60 * 60 * 1000;
-const stats = { collected: 0, feedErrors: [], kept: 0 };
+const HEURE_MS = 60 * 60 * 1000;
+const FENETRE_MIN_MS = 24 * HEURE_MS;
+const FENETRE_MAX_MS = 7 * 24 * HEURE_MS;
+const MARGE_MS = 2 * HEURE_MS; // un article est parfois daté un peu avant sa mise en ligne
+const derniereCollecte = Number(sd.lastCollectAt) || 0;
+const WINDOW_MS = derniereCollecte
+  ? Math.min(FENETRE_MAX_MS, Math.max(FENETRE_MIN_MS, now - derniereCollecte + MARGE_MS))
+  : FENETRE_MIN_MS;
+sd.lastCollectAt = now;
+const stats = { collected: 0, feedErrors: [], kept: 0, windowHours: Math.round(WINDOW_MS / HEURE_MS) };
 
 // NB : new URL() n'est pas disponible dans la sandbox du task runner n8n -> regex.
 // La query est CONSERVÉE (hors params de tracking) : l'identité vit dedans pour
@@ -52,7 +66,7 @@ for (const item of $input.all()) {
   let pub = pubRaw ? new Date(pubRaw).getTime() : 0;
   if (Number.isNaN(pub)) pub = 0;
   if (f.k === 'ghtrend') pub = now; // GitHub Trending n'a pas de pubDate
-  if (pub > 0 && pub < now - WINDOW_MS) continue; // fenêtre 24h (items non datés conservés)
+  if (pub > 0 && pub < now - WINDOW_MS) continue; // hors fenêtre (items non datés conservés)
 
   const desc = j.content || j.contentSnippet || j.description || j.summary || '';
   const signals = Object.assign({}, j._signals || {});
