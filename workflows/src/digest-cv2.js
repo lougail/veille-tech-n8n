@@ -11,9 +11,12 @@ if (text.length > 3500) {
 
 const today = $now.toISODate();
 const dateFr = $now.setLocale('fr').toFormat('cccc d LLLL yyyy');
-const count = $('Prompt Digest').first().json.count || 0;
+const resume = $('Prompt Digest').first().json;
+const count = resume.count || 0;
+const periode = resume.periode || "aujourd'hui";
 
 sd.lastDigest = { d: today, text };
+sd.lastDigestAt = Date.now(); // lu par planifier-resumes.js
 sd.digestHistory = (sd.digestHistory || []).filter(d => d.d !== today);
 sd.digestHistory.push({ d: today, text: text.substring(0, 1500) });
 sd.digestHistory = sd.digestHistory.slice(-7);
@@ -26,7 +29,7 @@ return [{ json: { payload: {
     type: 17,
     accent_color: 15844367,
     components: [
-      { type: 10, content: `# 📰 Digest — ${dateFr}\n-# ${count} stories publiées aujourd'hui` },
+      { type: 10, content: `# 📰 Digest — ${dateFr}\n-# ${count} stories publiées ${periode}` },
       { type: 14, divider: true, spacing: 1 },
       { type: 10, content: text },
     ],

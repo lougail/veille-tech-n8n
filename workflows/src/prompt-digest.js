@@ -1,9 +1,18 @@
-// Digest quotidien : relit les stories publiées AUJOURD'HUI depuis le registre
-// (couvre les 3 runs de la journée, pas seulement le run courant — corrige la v1)
+// Résumé : relit dans le registre les stories publiées depuis le résumé précédent, au plus
+// les trois derniers jours (planifier-resumes.js décide quand il part). Un résumé manqué
+// un soir couvre ainsi, à l'exécution suivante, tout ce qui a été publié depuis.
 const sd = $getWorkflowStaticData('global');
 const today = $now.toISODate();
-const todays = (sd.stories || []).filter(st => st.p && st.f && st.f.startsWith(today));
+const plan = $input.first().json;
+const TROIS_JOURS_MS = 3 * 24 * 3600 * 1000;
+const maintenant = $now.toMillis();
+const depuis = Math.max(Number(plan.depuisResume) || 0, maintenant - TROIS_JOURS_MS);
+const todays = (sd.stories || []).filter(st => st.p && st.f && Date.parse(st.f) > depuis);
 if (!todays.length) return [];
+const debut = $now.minus({ milliseconds: maintenant - depuis }).setLocale('fr');
+const periode = debut.toISODate() === today
+  ? "aujourd'hui"
+  : 'depuis ' + debut.toFormat("cccc d LLLL 'à' H 'h'");
 
 todays.sort((a, b) => (b.s + (b.h || 0) * 0.5) - (a.s + (a.h || 0) * 0.5));
 const list = todays.slice(0, 30).map(st =>
@@ -16,14 +25,14 @@ const prev = sd.lastDigest && sd.lastDigest.d !== today && sd.lastDigest.text
 
 const prompt = `Tu rédiges le digest quotidien de veille de Louis, développeur fullstack (JS/TS, Python) spécialisé data/IA.
 
-STORIES PUBLIÉES AUJOURD'HUI (${todays.length} au total, top 30 listées) :
+STORIES PUBLIÉES ${periode.toUpperCase()} (${todays.length} au total, top 30 listées) :
 ${list}
 ${prev}
 Rédige le digest en français, en markdown Discord, MAXIMUM 2500 caractères, sans titre principal (déjà géré) et sans phrase d'introduction :
-**🎯 L'essentiel** — 2-3 phrases sur ce qui compte vraiment aujourd'hui.
+**🎯 L'essentiel** — 2-3 phrases sur ce qui compte vraiment sur cette période.
 **🤖 IA** / **💻 Dev** / **☁️ Cloud** / **🔒 Sécu** — sections uniquement si contenu pertinent, 2-4 items max chacune au format "- **[titre](url)** — pourquoi ça compte (1 ligne)". Les liens markdown sont OBLIGATOIRES (reprends les URLs fournies).
 **💎 La découverte** — 1 pépite moins visible du jour.
 **📈 À suivre** — 1-2 sujets qui montent (appuie-toi sur la chaleur et la continuité avec hier).
 Ton factuel et dense, zéro remplissage.`;
 
-return [{ json: { prompt, count: todays.length } }];
+return [{ json: { prompt, count: todays.length, periode } }];

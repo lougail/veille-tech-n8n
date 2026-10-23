@@ -1,7 +1,9 @@
 // Met en forme le bilan hebdo en message Components V2
+const sd = $getWorkflowStaticData('global');
 const input = $input.first().json;
 let text = input.text || input.output || '';
 if (!text) return [];
+sd.lastHebdoAt = Date.now(); // lu par planifier-resumes.js
 
 if (text.length > 3500) {
   const cut = text.lastIndexOf('\n', 3500);

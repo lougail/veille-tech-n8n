@@ -1,0 +1,12 @@
+{
+  "name": "veille-tech-n8n",
+  "private": true,
+  "description": "Tests du code des nœuds Code du workflow de veille",
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"workflows/tests/*.test.mjs\""
+  },
+  "devDependencies": {
+    "luxon": "3.7.2"
+  }
+}

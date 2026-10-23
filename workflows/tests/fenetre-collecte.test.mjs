@@ -1,5 +1,5 @@
 // Fenêtre de collecte (normalize.js) et taille du pré-classement (prerank.js).
-// Lance avec : node --test "workflows/tests/*.test.mjs"
+// Lance avec : npm test
 // Les nœuds Code de n8n sont des corps de fonction : on les exécute en fournissant
 // les deux variables qu'ils utilisent, $input et $getWorkflowStaticData.
 import assert from 'node:assert/strict';

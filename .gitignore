@@ -1,5 +1,6 @@
 n8n-data/
 sauvegardes/
+node_modules/
 .mcp.json
 .env
 .claude/
