@@ -1,4 +1,5 @@
 n8n-data/
+sauvegardes/
 .mcp.json
 .env
 .claude/
