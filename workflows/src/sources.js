@@ -1,4 +1,5 @@
-// Sources RSS v2 — 73 feeds curés (audit de santé du 2026-07-02, URLs finales post-redirect)
+// Sources RSS v2 — 72 feeds curés (audit de santé du 2026-07-02, URLs finales post-redirect ;
+// r/MachineLearning retiré le 2026-10-23 : Reddit renvoie une page HTML au lieu du flux, 14 échecs sur 14)
 // u: url | s: source | c: catégorie (ia|dev|data|cloud|securite|tendances|fr)
 // w: poids éditorial (0.7-1.5) | k: kind (blog|news|newsletter|release|youtube|podcast|hn|reddit|ghtrend|papers)
 // a: alwaysConsider (passe le pré-ranking quoi qu'il arrive)
@@ -80,8 +81,6 @@ const FEEDS = [
   { u: 'https://www.databricks.com/feed', s: 'Databricks', c: 'data', w: 0.7, k: 'blog' },
   { u: 'https://www.getdbt.com/blog/feed.xml', s: 'dbt', c: 'data', w: 0.7, k: 'blog' },
   { u: 'https://www.dataengineeringweekly.com/feed', s: 'Data Eng Weekly', c: 'data', w: 1.0, k: 'newsletter' },
-  // ---- Communauté ML (éloigné de r/LocalLLaMA dans la liste pour espacer les requêtes reddit) ----
-  { u: 'https://old.reddit.com/r/MachineLearning/top/.rss?t=day', s: 'r/MachineLearning', c: 'ia', w: 0.9, k: 'reddit' },
   // ---- Tendances / FR ----
   { u: 'https://feeds.arstechnica.com/arstechnica/index', s: 'Ars Technica', c: 'tendances', w: 0.8, k: 'news' },
   { u: 'https://next.ink/feed/', s: 'Next.ink', c: 'fr', w: 0.9, k: 'news' },
