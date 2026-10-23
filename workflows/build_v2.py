@@ -19,6 +19,9 @@ ERROR_WORKFLOW = "yrUX1IcjTyIwpWqG"
 
 MODEL_CLASSIF = "mistralai/mistral-small-3.2-24b-instruct"
 MODEL_DIGEST = "mistralai/mistral-large-2512"
+# Secours du résumé et du bilan : le 23 octobre 2026, OpenRouter refusait Mistral Large
+# (« trop de requêtes ») aux trois tentatives, alors que Mistral Small répondait au tri.
+MODEL_SECOURS = MODEL_CLASSIF
 
 DISCORD_URL_EXPR = (
     "={{ ($json.channelKey === 'IA' ? $env.DISCORD_WEBHOOK_IA : "
@@ -96,8 +99,8 @@ def discord_node(name, url_expr, pos, disabled=False):
     return node
 
 
-def chain_node(name, pos):
-    return {
+def chain_node(name, pos, fallback=False):
+    node = {
         "parameters": {"promptType": "define", "text": "={{ $json.prompt }}", "batching": {}},
         "id": name.lower().replace(" ", "-"),
         "name": name,
@@ -109,6 +112,10 @@ def chain_node(name, pos):
         "maxTries": 3,
         "waitBetweenTries": 5000,
     }
+    if fallback:
+        # second modèle, branché sur l'entrée « Fallback Model » (ai_languageModel, index 1)
+        node["parameters"]["needsFallback"] = True
+    return node
 
 
 def model_node(name, model, temperature, pos):
@@ -241,18 +248,23 @@ def build(mode: str):
         discord_node("Discord Send", DISCORD_URL_EXPR, [2880, 460], disabled=discord_off),
         code_node("Message Status", "status.js", [3060, 300]),
         discord_node("Discord Status", "={{ $env.DISCORD_WEBHOOK_STATUS + '?wait=true' }}", [3240, 300], disabled=discord_off),
-        if_node("Soir ?", "={{ $now.hour }}", "gte", -1 if test_mode else 17, [3060, 620]),
-        code_node("Prompt Digest", "prompt-digest.js", [3240, 620]),
-        chain_node("LLM Digest", [3420, 620]),
-        model_node("OpenRouter Digest", MODEL_DIGEST, 0.4, [3420, 820]),
-        code_node("Digest CV2", "digest-cv2.js", [3600, 620]),
-        discord_node("Discord Digest", "={{ $env.DISCORD_WEBHOOK_DIGEST + '?wait=true&with_components=true' }}", [3780, 620], disabled=discord_off),
-        if_node("Dimanche ?", "={{ $now.weekday }}", "gte" if test_mode else "equals", 1 if test_mode else 7, [3960, 620]),
-        code_node("Prompt Hebdo", "prompt-hebdo.js", [4140, 620]),
-        chain_node("LLM Hebdo", [4320, 620]),
-        model_node("OpenRouter Hebdo", MODEL_DIGEST, 0.4, [4320, 820]),
-        code_node("Hebdo CV2", "hebdo-cv2.js", [4500, 620]),
-        discord_node("Discord Hebdo", "={{ $env.DISCORD_WEBHOOK_HEBDO + '?wait=true&with_components=true' }}", [4680, 620], disabled=discord_off),
+        # Résumé et bilan : envoyés quand ils sont dus, y compris en rattrapage (planifier-resumes.js).
+        # En mode test, les deux conditions sont toujours vraies.
+        code_node("Planifier Resumes", "planifier-resumes.js", [3060, 760]),
+        if_node("Resume du ?", "={{ $json.resumeDu ? 1 : 0 }}", "gte" if test_mode else "equals", 0 if test_mode else 1, [3240, 620]),
+        code_node("Prompt Digest", "prompt-digest.js", [3420, 620]),
+        chain_node("LLM Digest", [3600, 620], fallback=True),
+        model_node("OpenRouter Digest", MODEL_DIGEST, 0.4, [3600, 820]),
+        model_node("OpenRouter Digest Secours", MODEL_SECOURS, 0.4, [3780, 820]),
+        code_node("Digest CV2", "digest-cv2.js", [3960, 620]),
+        discord_node("Discord Digest", "={{ $env.DISCORD_WEBHOOK_DIGEST + '?wait=true&with_components=true' }}", [4140, 620], disabled=discord_off),
+        if_node("Bilan du ?", "={{ $json.bilanDu ? 1 : 0 }}", "gte" if test_mode else "equals", 0 if test_mode else 1, [3240, 1000]),
+        code_node("Prompt Hebdo", "prompt-hebdo.js", [3420, 1000]),
+        chain_node("LLM Hebdo", [3600, 1000], fallback=True),
+        model_node("OpenRouter Hebdo", MODEL_DIGEST, 0.4, [3600, 1200]),
+        model_node("OpenRouter Hebdo Secours", MODEL_SECOURS, 0.4, [3780, 1200]),
+        code_node("Hebdo CV2", "hebdo-cv2.js", [3960, 1000]),
+        discord_node("Discord Hebdo", "={{ $env.DISCORD_WEBHOOK_HEBDO + '?wait=true&with_components=true' }}", [4140, 1000], disabled=discord_off),
     ]
 
     if test_mode:
@@ -299,18 +311,21 @@ def build(mode: str):
         "Wait 4s": {"main": [main_conn("Batch Stories")]},
         "Filtre + Registre": {"main": [main_conn("Router Discord")]},
         "Router Discord": {"main": [main_conn("Discord Send")]},
-        "Discord Send": {"main": [main_conn("Message Status", "Soir ?")]},
+        "Discord Send": {"main": [main_conn("Message Status", "Planifier Resumes")]},
         "Message Status": {"main": [main_conn("Discord Status")]},
-        "Soir ?": {"main": [main_conn("Prompt Digest", "Dimanche ?")]},
+        "Planifier Resumes": {"main": [main_conn("Resume du ?", "Bilan du ?")]},
+        "Resume du ?": {"main": [main_conn("Prompt Digest")]},
         "Prompt Digest": {"main": [main_conn("LLM Digest")]},
         "LLM Digest": {"main": [main_conn("Digest CV2")]},
         "OpenRouter Digest": {"ai_languageModel": [[{"node": "LLM Digest", "type": "ai_languageModel", "index": 0}]]},
+        "OpenRouter Digest Secours": {"ai_languageModel": [[{"node": "LLM Digest", "type": "ai_languageModel", "index": 1}]]},
         "Digest CV2": {"main": [main_conn("Discord Digest")]},
         "Discord Digest": {"main": []},
-        "Dimanche ?": {"main": [main_conn("Prompt Hebdo")]},
+        "Bilan du ?": {"main": [main_conn("Prompt Hebdo")]},
         "Prompt Hebdo": {"main": [main_conn("LLM Hebdo")]},
         "LLM Hebdo": {"main": [main_conn("Hebdo CV2")]},
         "OpenRouter Hebdo": {"ai_languageModel": [[{"node": "LLM Hebdo", "type": "ai_languageModel", "index": 0}]]},
+        "OpenRouter Hebdo Secours": {"ai_languageModel": [[{"node": "LLM Hebdo", "type": "ai_languageModel", "index": 1}]]},
         "Hebdo CV2": {"main": [main_conn("Discord Hebdo")]},
     }
     # Le mapping "HF Papers API" -> Map se fait via Map HF Papers ; corrige la chaîne :

@@ -566,6 +566,19 @@
    },
    {
     "parameters": {
+     "jsCode": "// Décide si le résumé du jour et le bilan de la semaine partent à cette exécution.\n// Le bot ne tourne que Mac allumé : avant, le résumé ne partait qu'à une exécution lancée\n// après 17 h, et le bilan qu'un dimanche après 17 h. Le Mac dormant le soir et le week-end,\n// le résumé ne partait plus depuis le 9 octobre 2026, et le bilan n'était parti qu'une fois.\n// Désormais, un résumé ou un bilan manqué part à l'exécution suivante, même le matin.\n// Les dates d'envoi sont posées par Digest CV2 et Hebdo CV2, seulement si le texte existe :\n// un modèle indisponible ne fait donc rien perdre, l'envoi est retenté à l'exécution suivante.\nconst sd = $getWorkflowStaticData('global');\nconst HEURE_DU_SOIR = 17;\n\nlet dernierResume = Number(sd.lastDigestAt) || 0;\nif (!dernierResume && sd.lastDigest && sd.lastDigest.d) {\n  // ancien format : seule la date du dernier résumé était gardée\n  dernierResume = Date.parse(sd.lastDigest.d + 'T18:30:00+02:00') || 0;\n}\nconst dernierBilan = Number(sd.lastHebdoAt) || 0;\n\n// Le résumé est dû s'il n'est pas parti depuis le dernier passage de 17 h.\nconst soirDuJour = $now.set({ hour: HEURE_DU_SOIR, minute: 0, second: 0, millisecond: 0 });\nconst dernierSoir = $now >= soirDuJour ? soirDuJour : soirDuJour.minus({ days: 1 });\nconst resumeDu = dernierResume < dernierSoir.toMillis();\n\n// Le bilan est dû s'il n'est pas parti depuis le dernier dimanche 17 h.\nconst dimancheSoir = $now.startOf('week').plus({ days: 6, hours: HEURE_DU_SOIR });\nconst dernierDimanche = $now >= dimancheSoir ? dimancheSoir : dimancheSoir.minus({ weeks: 1 });\nconst bilanDu = dernierBilan < dernierDimanche.toMillis();\n\nreturn [{ json: { resumeDu, bilanDu, depuisResume: dernierResume, depuisBilan: dernierBilan } }];\n"
+    },
+    "id": "planifier-resumes",
+    "name": "Planifier Resumes",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     3060,
+     760
+    ]
+   },
+   {
+    "parameters": {
      "conditions": {
       "options": {
        "caseSensitive": true,
@@ -575,12 +588,12 @@
       },
       "conditions": [
        {
-        "id": "soir-?-cond",
-        "leftValue": "={{ $now.hour }}",
-        "rightValue": 17,
+        "id": "resume-du-?-cond",
+        "leftValue": "={{ $json.resumeDu ? 1 : 0 }}",
+        "rightValue": 1,
         "operator": {
          "type": "number",
-         "operation": "gte"
+         "operation": "equals"
         }
        }
       ],
@@ -588,23 +601,10 @@
      },
      "options": {}
     },
-    "id": "soir-q",
-    "name": "Soir ?",
+    "id": "resume-du-q",
+    "name": "Resume du ?",
     "type": "n8n-nodes-base.if",
     "typeVersion": 2.2,
-    "position": [
-     3060,
-     620
-    ]
-   },
-   {
-    "parameters": {
-     "jsCode": "// Digest quotidien : relit les stories publiées AUJOURD'HUI depuis le registre\n// (couvre les 3 runs de la journée, pas seulement le run courant — corrige la v1)\nconst sd = $getWorkflowStaticData('global');\nconst today = $now.toISODate();\nconst todays = (sd.stories || []).filter(st => st.p && st.f && st.f.startsWith(today));\nif (!todays.length) return [];\n\ntodays.sort((a, b) => (b.s + (b.h || 0) * 0.5) - (a.s + (a.h || 0) * 0.5));\nconst list = todays.slice(0, 30).map(st =>\n  `- [${st.c}] \"${st.t}\" (score ${st.s}/10, chaleur ${st.h || 1}, ${st.n || 1} source(s)) ${st.u}\\n  ${st.sm || ''}`\n).join('\\n');\n\nconst prev = sd.lastDigest && sd.lastDigest.d !== today && sd.lastDigest.text\n  ? `\\nDIGEST D'HIER (pour repérer ce qui évolue, ne le répète pas) :\\n${sd.lastDigest.text.substring(0, 1200)}\\n`\n  : '';\n\nconst prompt = `Tu rédiges le digest quotidien de veille de Louis, développeur fullstack (JS/TS, Python) spécialisé data/IA.\n\nSTORIES PUBLIÉES AUJOURD'HUI (${todays.length} au total, top 30 listées) :\n${list}\n${prev}\nRédige le digest en français, en markdown Discord, MAXIMUM 2500 caractères, sans titre principal (déjà géré) et sans phrase d'introduction :\n**🎯 L'essentiel** — 2-3 phrases sur ce qui compte vraiment aujourd'hui.\n**🤖 IA** / **💻 Dev** / **☁️ Cloud** / **🔒 Sécu** — sections uniquement si contenu pertinent, 2-4 items max chacune au format \"- **[titre](url)** — pourquoi ça compte (1 ligne)\". Les liens markdown sont OBLIGATOIRES (reprends les URLs fournies).\n**💎 La découverte** — 1 pépite moins visible du jour.\n**📈 À suivre** — 1-2 sujets qui montent (appuie-toi sur la chaleur et la continuité avec hier).\nTon factuel et dense, zéro remplissage.`;\n\nreturn [{ json: { prompt, count: todays.length } }];\n"
-    },
-    "id": "prompt-digest",
-    "name": "Prompt Digest",
-    "type": "n8n-nodes-base.code",
-    "typeVersion": 2,
     "position": [
      3240,
      620
@@ -612,16 +612,30 @@
    },
    {
     "parameters": {
+     "jsCode": "// Résumé : relit dans le registre les stories publiées depuis le résumé précédent, au plus\n// les trois derniers jours (planifier-resumes.js décide quand il part). Un résumé manqué\n// un soir couvre ainsi, à l'exécution suivante, tout ce qui a été publié depuis.\nconst sd = $getWorkflowStaticData('global');\nconst today = $now.toISODate();\nconst plan = $input.first().json;\nconst TROIS_JOURS_MS = 3 * 24 * 3600 * 1000;\nconst maintenant = $now.toMillis();\nconst depuis = Math.max(Number(plan.depuisResume) || 0, maintenant - TROIS_JOURS_MS);\nconst todays = (sd.stories || []).filter(st => st.p && st.f && Date.parse(st.f) > depuis);\nif (!todays.length) return [];\nconst debut = $now.minus({ milliseconds: maintenant - depuis }).setLocale('fr');\nconst periode = debut.toISODate() === today\n  ? \"aujourd'hui\"\n  : 'depuis ' + debut.toFormat(\"cccc d LLLL 'à' H 'h'\");\n\ntodays.sort((a, b) => (b.s + (b.h || 0) * 0.5) - (a.s + (a.h || 0) * 0.5));\nconst list = todays.slice(0, 30).map(st =>\n  `- [${st.c}] \"${st.t}\" (score ${st.s}/10, chaleur ${st.h || 1}, ${st.n || 1} source(s)) ${st.u}\\n  ${st.sm || ''}`\n).join('\\n');\n\nconst prev = sd.lastDigest && sd.lastDigest.d !== today && sd.lastDigest.text\n  ? `\\nDIGEST D'HIER (pour repérer ce qui évolue, ne le répète pas) :\\n${sd.lastDigest.text.substring(0, 1200)}\\n`\n  : '';\n\nconst prompt = `Tu rédiges le digest quotidien de veille de Louis, développeur fullstack (JS/TS, Python) spécialisé data/IA.\n\nSTORIES PUBLIÉES ${periode.toUpperCase()} (${todays.length} au total, top 30 listées) :\n${list}\n${prev}\nRédige le digest en français, en markdown Discord, MAXIMUM 2500 caractères, sans titre principal (déjà géré) et sans phrase d'introduction :\n**🎯 L'essentiel** — 2-3 phrases sur ce qui compte vraiment sur cette période.\n**🤖 IA** / **💻 Dev** / **☁️ Cloud** / **🔒 Sécu** — sections uniquement si contenu pertinent, 2-4 items max chacune au format \"- **[titre](url)** — pourquoi ça compte (1 ligne)\". Les liens markdown sont OBLIGATOIRES (reprends les URLs fournies).\n**💎 La découverte** — 1 pépite moins visible du jour.\n**📈 À suivre** — 1-2 sujets qui montent (appuie-toi sur la chaleur et la continuité avec hier).\nTon factuel et dense, zéro remplissage.`;\n\nreturn [{ json: { prompt, count: todays.length, periode } }];\n"
+    },
+    "id": "prompt-digest",
+    "name": "Prompt Digest",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     3420,
+     620
+    ]
+   },
+   {
+    "parameters": {
      "promptType": "define",
      "text": "={{ $json.prompt }}",
-     "batching": {}
+     "batching": {},
+     "needsFallback": true
     },
     "id": "llm-digest",
     "name": "LLM Digest",
     "type": "@n8n/n8n-nodes-langchain.chainLlm",
     "typeVersion": 1.9,
     "position": [
-     3420,
+     3600,
      620
     ],
     "continueOnFail": true,
@@ -641,7 +655,7 @@
     "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
     "typeVersion": 1,
     "position": [
-     3420,
+     3600,
      820
     ],
     "credentials": {
@@ -653,14 +667,36 @@
    },
    {
     "parameters": {
-     "jsCode": "// Met en forme le digest quotidien en message Components V2 + mémorise pour la continuité\nconst sd = $getWorkflowStaticData('global');\nconst input = $input.first().json;\nlet text = input.text || input.output || '';\nif (!text) return [];\n\nif (text.length > 3500) {\n  const cut = text.lastIndexOf('\\n', 3500);\n  text = text.substring(0, cut > 2000 ? cut : 3500);\n}\n\nconst today = $now.toISODate();\nconst dateFr = $now.setLocale('fr').toFormat('cccc d LLLL yyyy');\nconst count = $('Prompt Digest').first().json.count || 0;\n\nsd.lastDigest = { d: today, text };\nsd.digestHistory = (sd.digestHistory || []).filter(d => d.d !== today);\nsd.digestHistory.push({ d: today, text: text.substring(0, 1500) });\nsd.digestHistory = sd.digestHistory.slice(-7);\n\nreturn [{ json: { payload: {\n  username: 'Veille · Digest',\n  flags: 36864,\n  allowed_mentions: { parse: [] },\n  components: [{\n    type: 17,\n    accent_color: 15844367,\n    components: [\n      { type: 10, content: `# 📰 Digest — ${dateFr}\\n-# ${count} stories publiées aujourd'hui` },\n      { type: 14, divider: true, spacing: 1 },\n      { type: 10, content: text },\n    ],\n  }],\n}}}];\n"
+     "model": "mistralai/mistral-small-3.2-24b-instruct",
+     "options": {
+      "temperature": 0.4
+     }
+    },
+    "id": "openrouter-digest-secours",
+    "name": "OpenRouter Digest Secours",
+    "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+    "typeVersion": 1,
+    "position": [
+     3780,
+     820
+    ],
+    "credentials": {
+     "openRouterApi": {
+      "id": "w6TWAQpgn7TIxlYq",
+      "name": "OpenRouter account"
+     }
+    }
+   },
+   {
+    "parameters": {
+     "jsCode": "// Met en forme le digest quotidien en message Components V2 + mémorise pour la continuité\nconst sd = $getWorkflowStaticData('global');\nconst input = $input.first().json;\nlet text = input.text || input.output || '';\nif (!text) return [];\n\nif (text.length > 3500) {\n  const cut = text.lastIndexOf('\\n', 3500);\n  text = text.substring(0, cut > 2000 ? cut : 3500);\n}\n\nconst today = $now.toISODate();\nconst dateFr = $now.setLocale('fr').toFormat('cccc d LLLL yyyy');\nconst resume = $('Prompt Digest').first().json;\nconst count = resume.count || 0;\nconst periode = resume.periode || \"aujourd'hui\";\n\nsd.lastDigest = { d: today, text };\nsd.lastDigestAt = Date.now(); // lu par planifier-resumes.js\nsd.digestHistory = (sd.digestHistory || []).filter(d => d.d !== today);\nsd.digestHistory.push({ d: today, text: text.substring(0, 1500) });\nsd.digestHistory = sd.digestHistory.slice(-7);\n\nreturn [{ json: { payload: {\n  username: 'Veille · Digest',\n  flags: 36864,\n  allowed_mentions: { parse: [] },\n  components: [{\n    type: 17,\n    accent_color: 15844367,\n    components: [\n      { type: 10, content: `# 📰 Digest — ${dateFr}\\n-# ${count} stories publiées ${periode}` },\n      { type: 14, divider: true, spacing: 1 },\n      { type: 10, content: text },\n    ],\n  }],\n}}}];\n"
     },
     "id": "digest-cv2",
     "name": "Digest CV2",
     "type": "n8n-nodes-base.code",
     "typeVersion": 2,
     "position": [
-     3600,
+     3960,
      620
     ]
    },
@@ -686,7 +722,7 @@
     "type": "n8n-nodes-base.httpRequest",
     "typeVersion": 4.4,
     "position": [
-     3780,
+     4140,
      620
     ],
     "continueOnFail": true,
@@ -705,9 +741,9 @@
       },
       "conditions": [
        {
-        "id": "dimanche-?-cond",
-        "leftValue": "={{ $now.weekday }}",
-        "rightValue": 7,
+        "id": "bilan-du-?-cond",
+        "leftValue": "={{ $json.bilanDu ? 1 : 0 }}",
+        "rightValue": 1,
         "operator": {
          "type": "number",
          "operation": "equals"
@@ -718,13 +754,13 @@
      },
      "options": {}
     },
-    "id": "dimanche-q",
-    "name": "Dimanche ?",
+    "id": "bilan-du-q",
+    "name": "Bilan du ?",
     "type": "n8n-nodes-base.if",
     "typeVersion": 2.2,
     "position": [
-     3960,
-     620
+     3240,
+     1000
     ]
    },
    {
@@ -736,23 +772,24 @@
     "type": "n8n-nodes-base.code",
     "typeVersion": 2,
     "position": [
-     4140,
-     620
+     3420,
+     1000
     ]
    },
    {
     "parameters": {
      "promptType": "define",
      "text": "={{ $json.prompt }}",
-     "batching": {}
+     "batching": {},
+     "needsFallback": true
     },
     "id": "llm-hebdo",
     "name": "LLM Hebdo",
     "type": "@n8n/n8n-nodes-langchain.chainLlm",
     "typeVersion": 1.9,
     "position": [
-     4320,
-     620
+     3600,
+     1000
     ],
     "continueOnFail": true,
     "retryOnFail": true,
@@ -771,8 +808,8 @@
     "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
     "typeVersion": 1,
     "position": [
-     4320,
-     820
+     3600,
+     1200
     ],
     "credentials": {
      "openRouterApi": {
@@ -783,15 +820,37 @@
    },
    {
     "parameters": {
-     "jsCode": "// Met en forme le bilan hebdo en message Components V2\nconst input = $input.first().json;\nlet text = input.text || input.output || '';\nif (!text) return [];\n\nif (text.length > 3500) {\n  const cut = text.lastIndexOf('\\n', 3500);\n  text = text.substring(0, cut > 2000 ? cut : 3500);\n}\n\nconst end = $now.setLocale('fr');\nconst start = end.minus({ days: 6 });\nconst range = `${start.toFormat('d LLLL')} → ${end.toFormat('d LLLL yyyy')}`;\nconst count = $('Prompt Hebdo').first().json.count || 0;\n\nreturn [{ json: { payload: {\n  username: 'Veille · Hebdo',\n  flags: 36864,\n  allowed_mentions: { parse: [] },\n  components: [{\n    type: 17,\n    accent_color: 10181046,\n    components: [\n      { type: 10, content: `# 🗓️ Bilan de la semaine — ${range}\\n-# ${count} stories fortes cette semaine` },\n      { type: 14, divider: true, spacing: 1 },\n      { type: 10, content: text },\n    ],\n  }],\n}}}];\n"
+     "model": "mistralai/mistral-small-3.2-24b-instruct",
+     "options": {
+      "temperature": 0.4
+     }
+    },
+    "id": "openrouter-hebdo-secours",
+    "name": "OpenRouter Hebdo Secours",
+    "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+    "typeVersion": 1,
+    "position": [
+     3780,
+     1200
+    ],
+    "credentials": {
+     "openRouterApi": {
+      "id": "w6TWAQpgn7TIxlYq",
+      "name": "OpenRouter account"
+     }
+    }
+   },
+   {
+    "parameters": {
+     "jsCode": "// Met en forme le bilan hebdo en message Components V2\nconst sd = $getWorkflowStaticData('global');\nconst input = $input.first().json;\nlet text = input.text || input.output || '';\nif (!text) return [];\nsd.lastHebdoAt = Date.now(); // lu par planifier-resumes.js\n\nif (text.length > 3500) {\n  const cut = text.lastIndexOf('\\n', 3500);\n  text = text.substring(0, cut > 2000 ? cut : 3500);\n}\n\nconst end = $now.setLocale('fr');\nconst start = end.minus({ days: 6 });\nconst range = `${start.toFormat('d LLLL')} → ${end.toFormat('d LLLL yyyy')}`;\nconst count = $('Prompt Hebdo').first().json.count || 0;\n\nreturn [{ json: { payload: {\n  username: 'Veille · Hebdo',\n  flags: 36864,\n  allowed_mentions: { parse: [] },\n  components: [{\n    type: 17,\n    accent_color: 10181046,\n    components: [\n      { type: 10, content: `# 🗓️ Bilan de la semaine — ${range}\\n-# ${count} stories fortes cette semaine` },\n      { type: 14, divider: true, spacing: 1 },\n      { type: 10, content: text },\n    ],\n  }],\n}}}];\n"
     },
     "id": "hebdo-cv2",
     "name": "Hebdo CV2",
     "type": "n8n-nodes-base.code",
     "typeVersion": 2,
     "position": [
-     4500,
-     620
+     3960,
+     1000
     ]
    },
    {
@@ -816,8 +875,8 @@
     "type": "n8n-nodes-base.httpRequest",
     "typeVersion": 4.4,
     "position": [
-     4680,
-     620
+     4140,
+     1000
     ],
     "continueOnFail": true,
     "retryOnFail": true,
@@ -1206,7 +1265,7 @@
        "index": 0
       },
       {
-       "node": "Soir ?",
+       "node": "Planifier Resumes",
        "type": "main",
        "index": 0
       }
@@ -1224,16 +1283,27 @@
      ]
     ]
    },
-   "Soir ?": {
+   "Planifier Resumes": {
     "main": [
      [
       {
-       "node": "Prompt Digest",
+       "node": "Resume du ?",
        "type": "main",
        "index": 0
       },
       {
-       "node": "Dimanche ?",
+       "node": "Bilan du ?",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Resume du ?": {
+    "main": [
+     [
+      {
+       "node": "Prompt Digest",
        "type": "main",
        "index": 0
       }
@@ -1273,6 +1343,17 @@
      ]
     ]
    },
+   "OpenRouter Digest Secours": {
+    "ai_languageModel": [
+     [
+      {
+       "node": "LLM Digest",
+       "type": "ai_languageModel",
+       "index": 1
+      }
+     ]
+    ]
+   },
    "Digest CV2": {
     "main": [
      [
@@ -1287,7 +1368,7 @@
    "Discord Digest": {
     "main": []
    },
-   "Dimanche ?": {
+   "Bilan du ?": {
     "main": [
      [
       {
@@ -1327,6 +1408,17 @@
        "node": "LLM Hebdo",
        "type": "ai_languageModel",
        "index": 0
+      }
+     ]
+    ]
+   },
+   "OpenRouter Hebdo Secours": {
+    "ai_languageModel": [
+     [
+      {
+       "node": "LLM Hebdo",
+       "type": "ai_languageModel",
+       "index": 1
       }
      ]
     ]
