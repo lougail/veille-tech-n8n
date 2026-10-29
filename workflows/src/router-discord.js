@@ -1,4 +1,6 @@
-// Router Discord : cartes CV2 par story, listes compactes, sujets chauds, alertes critiques
+// Router Discord : un canal par rubrique, des cartes pour les sujets importants, une liste pour le reste,
+// les sujets chauds dans #tendances, et les alertes critiques. Les publications des labos ont leur
+// canal, #ia, et passent en carte dès qu'elles sont notées 6.
 const sd = $getWorkflowStaticData('global');
 const stats = sd._runStats || {};
 
@@ -22,13 +24,17 @@ function heatBadge(st) {
   if (st.heat >= 3) return ' · 🔥';
   return '';
 }
-function isHot(st) { return st.hot || st.heat >= 3 || (st.signals && (st.signals.hnPoints || 0) >= 300); }
+function isHot(st) {
+  const sig = st.signals || {};
+  return st.hot || st.heat >= 3 || !!sig.ainews || (sig.hnPoints || 0) >= 300;
+}
 
 function storyCard(st) {
   const emoji = EMOJI[st.categorie] || '📰';
   const sig = st.signals || {};
-  const srcParts = [`via ${mdSafe(st.sources[0].s)}`];
+  const srcParts = [`${st.labo ? '🏛️ ' : ''}via ${mdSafe(st.sources[0].s)}`];
   if (st.sourceCount > 1) srcParts.push(`+${st.sourceCount - 1} source(s)`);
+  if (sig.ainews) srcParts.push('cité par AINews');
   const head = `## ${emoji} ${mdSafe(st.titre)}\n-# ${TYPE_LABEL[st.type] || 'Actu'} · \`${st.score}/10\`${heatBadge(st)} · ${srcParts.join(' · ')}`;
   let body = (st.resume || '').trim();
   if (st.pourquoi) body += `${body ? '\n' : ''}*${st.pourquoi}*`;
@@ -72,8 +78,8 @@ if (!statusOnly) {
 
   const byChannel = {};
   for (const [ch, sts] of Object.entries(groups)) {
-    sts.sort((a, b) => b.score - a.score);
-    const cards = sts.filter(s => s.score >= 7).slice(0, 4);
+    sts.sort((a, b) => (b.score + (b.labo ? 0.5 : 0)) - (a.score + (a.labo ? 0.5 : 0)));
+    const cards = sts.filter(s => s.score >= 8 || (s.labo && s.score >= 6)).slice(0, ch === 'IA' ? 6 : 3);
     const cardKeys = new Set(cards.map(c => c.id));
     const compact = sts.filter(s => !cardKeys.has(s.id)).slice(0, 8);
     byChannel[ch] = sts.length;
@@ -148,7 +154,7 @@ if (!statusOnly) {
           { name: 'Sources', value: String(st.sourceCount), inline: true },
           { name: 'Catégorie', value: st.categorie, inline: true },
         ],
-        footer: { text: 'Veille Pro v2 — Alerte' },
+        footer: { text: 'Veille v3 — Alerte' },
         timestamp: new Date().toISOString(),
       }],
       components: st.url && st.url.length < 500 ? [{ type: 1, components: [{ type: 2, style: 5, label: 'Lire', url: st.url }] }] : [],

@@ -2,40 +2,37 @@
 
 Système de veille technologique automatisé qui collecte, regroupe en **stories**, classifie par LLM et distribue sur Discord — avec détection des **sujets chauds** par corrélation multi-sources et signaux de popularité.
 
-> **v2 (juillet 2026)** : refonte complète orientée stories/tendances. Détails et rationale : [docs/veille-pro-v2.md](docs/veille-pro-v2.md)
+> **v3 (28 octobre 2026)** : les publications de tous les grands labos, ce qui fait du bruit, et un brief par jour. Pourquoi et comment : [docs/veille-v3.md](docs/veille-v3.md). La v2 de juillet (stories, sujets chauds) : [docs/veille-pro-v2.md](docs/veille-pro-v2.md).
 
-## Architecture (Veille Pro v2)
+## Architecture (Veille v3)
 
 ```
-Schedule (8h, 13h, 18h30 — Europe/Paris)
+Toutes les 30 min, de 7 h à 23 h : une collecte est-elle due ? (au plus toutes les 3 h, et avant le brief)
   │   collecte de tout ce qui a été publié depuis la dernière collecte réussie (24 h à 7 jours) :
   │   le Mac qui dort ne fait rien perdre
-  ├── 72 feeds RSS curés (labs IA, blogs, newsletters, releases GitHub, YouTube, Reddit, HN…)
-  ├── Hugging Face Daily Papers API (upvotes)
-  ├── Hugging Face Trending Models API (trendingScore)
-  ├── Lobsters hottest.json (score)
-  └── GitHub Search API (nouveaux repos qui explosent)
+  ├── 79 flux RSS : 23 flux officiels des labos, outils de code IA, AINews (via Latent Space),
+  │   Techmeme, The Decoder, Reddit groupé, des personnes, le dev, le cloud, la sécurité
+  ├── Radar OpenRouter : chaque nouveau modèle de chaque fournisseur, avec son prix ; les retraits annoncés
+  ├── Radar Hugging Face : les nouveaux modèles ouverts de 25 organisations de labos, une annonce par famille
+  ├── Hacker News (API Algolia) : plus de 100 points sur 48 h
+  ├── Hugging Face Daily Papers, Trending Models ; Lobsters ; GitHub (nouveaux dépôts qui décollent)
         │
-  Normalisation + extraction de signaux (points HN, rang Reddit, upvotes, stars)
+  Normalisation (AINews : ses sujets du jour deviennent un capteur de bruit) → dédoublonnage 7 jours
         │
-  Remove Duplicates natif (URL canonique, mémoire cross-runs 20 000 entrées)
+  Pré-classement : 130 articles par jour collecté, 15 % au plus pour une même source
         │
-  Pré-ranking multi-signaux → top 130 par jour collecté, 260 au plus (mots-clés 2026 + popularité + poids source + récence)
+  Regroupement en sujets : même adresse, titres proches, ou même nom de modèle (« GPT-6.1 Terra ») ;
+   la source officielle en tête · chaleur = sources + engagement + citation par AINews · anti-répétition 72 h
         │
-  CLUSTERING EN STORIES (union-find : URL + similarité de titres)
-   → chaleur = nb de sources + engagement · anti-répétition 72h · détection "ça monte"
-        │
-  Classification LLM (Mistral Small 3.2, batchs de 10, profil éditorial personnalisé)
-   → score /10, catégorie, titre + résumé FR, "pourquoi ça compte", tags
+  Notation (Mistral Small 3.2) : les labos et le bruit en tête, la sécurité limitée aux outils de Louis
         │
   Discord (Components V2) :
-   #ia #dev #cloud #securite — cartes riches + liste compacte (silencieux)
-   #tendances — 🔥 sujets chauds multi-sources + 📈 escalades
-   #critique — score ≥ 9, embed rouge + @here (seul canal qui notifie)
-   #digest — résumé éditorial du soir ; manqué (Mac endormi, modèle indisponible), il part à
-             l'exécution suivante, sur tout ce qui a été publié depuis le précédent
-   #hebdo — bilan du dimanche soir (tendances, signaux faibles) ; manqué, il part à l'exécution suivante
-   #status — métriques du funnel + feeds en erreur
+   #ia — les labos en cartes dès 6/10, le reste de l'IA · #dev #cloud #securite — dès 7/10
+   #tendances — 🔥 ce qui fait du bruit + 📈 ce qui monte
+   #critique — score ≥ 9 : un nouveau modèle de pointe, une faille exploitée dans ses outils (@here)
+   #digest — ☕ le brief du matin, après 8 h 30 : une douzaine de sujets en trois rubriques ; manqué, il part
+             à l'exécution suivante. Seul message qui notifie, avec #critique
+   #hebdo — bilan du dimanche soir · #status — métriques de chaque collecte
 ```
 
 ## Stack
@@ -49,7 +46,7 @@ Schedule (8h, 13h, 18h30 — Europe/Paris)
 
 | Workflow | Description | Schedule |
 |----------|-------------|----------|
-| **Veille Pro v2 — Stories & Tendances** (48 nodes) | Collecte multi-sources + clustering + classification + distribution + digests | 8h, 13h, 18h30 (+ hebdo dimanche), avec rattrapage |
+| **Veille v3 — labos, bruit et brief** (59 nodes) | Labos, radars de modèles, capteurs de bruit, regroupement, notation, distribution, brief du matin | Collecte au réveil du Mac (au plus toutes les 3 h, 7 h-23 h), brief après 8 h 30, bilan le dimanche |
 | **Veille Stack** (26 nodes) | Veille de dépendances d'une org GitHub : manifestes → OSV.dev (CVE) → alertes #stack, + digest hebdo (releases sous contrainte, EOL via endoflife.date) | 9h30 (+ hebdo lundi) |
 | **Veille Pro v1** (34 nodes, désactivé) | Ancien pipeline par articles (rollback possible) | — |
 | **Error Handler** (3 nodes) | Alerte Discord si un workflow crash | Sur erreur |

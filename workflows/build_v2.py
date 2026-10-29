@@ -23,6 +23,12 @@ MODEL_DIGEST = "mistralai/mistral-large-2512"
 # (« trop de requêtes ») aux trois tentatives, alors que Mistral Small répondait au tri.
 MODEL_SECOURS = MODEL_CLASSIF
 
+# Les branches de collecte lancées en parallèle à chaque collecte.
+SOURCES_PARALLELES = (
+    "Sources RSS", "HF Papers API", "HF Models API", "Lobsters API", "GitHub New Repos API",
+    "HN Algolia API", "OpenRouter Models API", "Labos HF",
+)
+
 DISCORD_URL_EXPR = (
     "={{ ($json.channelKey === 'IA' ? $env.DISCORD_WEBHOOK_IA : "
     "$json.channelKey === 'DEV' ? $env.DISCORD_WEBHOOK_DEV : "
@@ -171,15 +177,16 @@ def build(mode: str):
     nodes = [
         {
             "parameters": {"rule": {"interval": [
-                {"field": "cronExpression", "expression": "0 0 8,13 * * *"},
-                {"field": "cronExpression", "expression": "0 30 18 * * *"},
+                {"field": "cronExpression", "expression": "0 */30 7-22 * * *"},
             ]}},
             "id": "schedule-v2",
-            "name": "Schedule 8h-13h-18h30",
+            "name": "Toutes les 30 min",
             "type": "n8n-nodes-base.scheduleTrigger",
             "typeVersion": 1.3,
             "position": [0, 300],
         },
+        # Le Mac dort souvent : on vérifie toutes les 30 minutes si une collecte est due (collecte-due.js).
+        code_node("Collecte due ?", "collecte-due.js", [110, 300]),
         code_node("Sources RSS", "sources.js", [220, 0]),
         {
             "parameters": {"options": {}},
@@ -206,6 +213,23 @@ def build(mode: str):
         code_node("Map HF Models", "map-hf-models.js", [440, 400]),
         http_api_node("Lobsters API", "https://lobste.rs/hottest.json", [220, 560]),
         code_node("Map Lobsters", "map-lobsters.js", [440, 560]),
+        # Hacker News : les articles de plus de 100 points des dernières 48 heures, par l'API d'Algolia.
+        http_api_node(
+            "HN Algolia API",
+            "=https://hn.algolia.com/api/v1/search_by_date?tags=story&numericFilters=points%3E100,created_at_i%3E{{ Math.floor(Date.now() / 1000) - 172800 }}&hitsPerPage=100",
+            [220, 880],
+        ),
+        code_node("Map HN", "map-hn.js", [440, 880]),
+        # Radar des nouveaux modèles : le catalogue d'OpenRouter, puis les organisations Hugging Face des labos.
+        http_api_node("OpenRouter Models API", "https://openrouter.ai/api/v1/models", [220, 1040]),
+        code_node("Radar OpenRouter", "radar-openrouter.js", [440, 1040]),
+        code_node("Labos HF", "labos-hf.js", [220, 1200]),
+        http_api_node(
+            "HF Labos API",
+            "=https://huggingface.co/api/models?author={{ $json.org }}&sort=createdAt&direction=-1&limit={{ $json.limite }}",
+            [440, 1200],
+        ),
+        code_node("Map HF Labos", "map-hf-labos.js", [660, 1200]),
         http_api_node(
             "GitHub New Repos API",
             "=https://api.github.com/search/repositories?q=created:%3E{{ $now.minus({days: 7}).toISODate() }}&sort=stars&order=desc&per_page=20",
@@ -217,6 +241,9 @@ def build(mode: str):
         merge_node("Fusion B", [860, 200]),
         merge_node("Fusion C", [1040, 280]),
         merge_node("Fusion D", [1220, 360]),
+        merge_node("Fusion E", [1260, 520]),
+        merge_node("Fusion F", [1300, 680]),
+        merge_node("Fusion G", [1340, 840]),
         code_node("Normaliser + Signaux", "normalize.js", [1400, 360]),
         code_node("Dedup 7 Jours", "dedup-cross-runs.js", [1580, 360]),
         code_node("Pre-Ranking", "prerank.js", [1760, 360]),
@@ -281,7 +308,8 @@ def build(mode: str):
         return [{"node": t, "type": "main", "index": i} for t, i in [(t, index) if isinstance(t, str) else t for t in targets]]
 
     connections = {
-        "Schedule 8h-13h-18h30": {"main": [main_conn("Sources RSS", "HF Papers API", "HF Models API", "Lobsters API", "GitHub New Repos API")]},
+        "Toutes les 30 min": {"main": [main_conn("Collecte due ?")]},
+        "Collecte due ?": {"main": [main_conn(*SOURCES_PARALLELES)]},
         "Sources RSS": {"main": [main_conn("Loop Feeds")]},
         "Loop Feeds": {"main": [main_conn("Fusion A"), main_conn("RSS Read")]},
         "RSS Read": {"main": [main_conn("Tag Source")]},
@@ -294,10 +322,20 @@ def build(mode: str):
         "Map Lobsters": {"main": [main_conn(("Fusion C", 1))]},
         "GitHub New Repos API": {"main": [main_conn("Map GitHub Repos")]},
         "Map GitHub Repos": {"main": [main_conn(("Fusion D", 1))]},
+        "HN Algolia API": {"main": [main_conn("Map HN")]},
+        "Map HN": {"main": [main_conn(("Fusion E", 1))]},
+        "OpenRouter Models API": {"main": [main_conn("Radar OpenRouter")]},
+        "Radar OpenRouter": {"main": [main_conn(("Fusion F", 1))]},
+        "Labos HF": {"main": [main_conn("HF Labos API")]},
+        "HF Labos API": {"main": [main_conn("Map HF Labos")]},
+        "Map HF Labos": {"main": [main_conn(("Fusion G", 1))]},
         "Fusion A": {"main": [main_conn("Fusion B")]},
         "Fusion B": {"main": [main_conn("Fusion C")]},
         "Fusion C": {"main": [main_conn("Fusion D")]},
-        "Fusion D": {"main": [main_conn("Normaliser + Signaux")]},
+        "Fusion D": {"main": [main_conn("Fusion E")]},
+        "Fusion E": {"main": [main_conn("Fusion F")]},
+        "Fusion F": {"main": [main_conn("Fusion G")]},
+        "Fusion G": {"main": [main_conn("Normaliser + Signaux")]},
         "Normaliser + Signaux": {"main": [main_conn("Dedup 7 Jours")]},
         "Dedup 7 Jours": {"main": [main_conn("Pre-Ranking")]},
         "Pre-Ranking": {"main": [main_conn("Clusteriser Stories")]},
@@ -333,7 +371,7 @@ def build(mode: str):
     connections["Map HF Papers"] = {"main": [main_conn(("Fusion A", 1))]}
 
     if test_mode:
-        connections["Test Manuel"] = {"main": [main_conn("Sources RSS", "HF Papers API", "HF Models API", "Lobsters API", "GitHub New Repos API")]}
+        connections["Test Manuel"] = {"main": [main_conn(*SOURCES_PARALLELES)]}
 
     suffix = {"test": " [TEST]", "preprod": " [PREPROD]", "prod": ""}[mode]
     workflow = {

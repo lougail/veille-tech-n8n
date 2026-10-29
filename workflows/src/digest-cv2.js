@@ -1,7 +1,11 @@
-// Met en forme le digest quotidien en message Components V2 + mémorise pour la continuité
+// Met en forme le brief du matin, et le garde pour la continuité (le brief suivant le relit).
+// C'est le seul message qui notifie avec #critique : il est envoyé sans le drapeau « silencieux ».
 const sd = $getWorkflowStaticData('global');
 const input = $input.first().json;
-let text = input.text || input.output || '';
+let text = String(input.text || input.output || '').trim();
+// Certains modèles entourent leur réponse d'un bloc de code (```markdown … ```) : Discord
+// l'afficherait tel quel, astérisques comprises. Le bilan du 28 octobre 2026 est arrivé ainsi.
+if (text.startsWith('```')) text = text.replace(/^```[\w-]*[ \t]*\n?/, '').replace(/\n?```\s*$/, '').trim();
 if (!text) return [];
 
 if (text.length > 3500) {
@@ -22,14 +26,14 @@ sd.digestHistory.push({ d: today, text: text.substring(0, 1500) });
 sd.digestHistory = sd.digestHistory.slice(-7);
 
 return [{ json: { payload: {
-  username: 'Veille · Digest',
-  flags: 36864,
+  username: 'Veille · Brief',
+  flags: 32768,
   allowed_mentions: { parse: [] },
   components: [{
     type: 17,
     accent_color: 15844367,
     components: [
-      { type: 10, content: `# 📰 Digest — ${dateFr}\n-# ${count} stories publiées ${periode}` },
+      { type: 10, content: `# ☕ Brief — ${dateFr}\n-# ${count} sujets publiés ${periode}` },
       { type: 14, divider: true, spacing: 1 },
       { type: 10, content: text },
     ],

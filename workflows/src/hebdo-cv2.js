@@ -1,7 +1,10 @@
 // Met en forme le bilan hebdo en message Components V2
 const sd = $getWorkflowStaticData('global');
 const input = $input.first().json;
-let text = input.text || input.output || '';
+let text = String(input.text || input.output || '').trim();
+// Certains modèles entourent leur réponse d'un bloc de code (```markdown … ```) : Discord
+// l'afficherait tel quel, astérisques comprises. Le bilan du 28 octobre 2026 est arrivé ainsi.
+if (text.startsWith('```')) text = text.replace(/^```[\w-]*[ \t]*\n?/, '').replace(/\n?```\s*$/, '').trim();
 if (!text) return [];
 sd.lastHebdoAt = Date.now(); // lu par planifier-resumes.js
 

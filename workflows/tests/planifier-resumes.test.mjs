@@ -1,4 +1,4 @@
-// Quand le résumé du jour et le bilan de la semaine doivent partir (planifier-resumes.js).
+// Quand le brief du matin et le bilan de la semaine doivent partir (planifier-resumes.js).
 // Lance avec : npm test
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -15,26 +15,25 @@ function plan(maintenant, sd) {
 }
 
 // Le vendredi 23 octobre 2026 ; le dimanche 18 octobre est le dernier dimanche passé.
-test('le résumé parti la veille au soir ne repart pas avant 17 h', () => {
-  assert.equal(plan('2026-10-23T13:00', { lastDigestAt: ms('2026-10-22T18:35') }).resumeDu, false);
+test('le brief parti ce matin ne repart pas avant demain 8 h 30', () => {
+  assert.equal(plan('2026-10-23T13:00', { lastDigestAt: ms('2026-10-23T08:35') }).resumeDu, false);
+  assert.equal(plan('2026-10-24T08:00', { lastDigestAt: ms('2026-10-23T08:35') }).resumeDu, false);
 });
 
-test('le résumé part au premier passage après 17 h', () => {
-  assert.equal(plan('2026-10-23T18:30', { lastDigestAt: ms('2026-10-22T18:35') }).resumeDu, true);
+test('le brief part au premier passage après 8 h 30', () => {
+  assert.equal(plan('2026-10-23T08:30', { lastDigestAt: ms('2026-10-22T09:00') }).resumeDu, true);
 });
 
-test('le résumé manqué la veille au soir part dès le matin', () => {
-  assert.equal(plan('2026-10-23T08:00', { lastDigestAt: ms('2026-10-21T18:35') }).resumeDu, true);
+test('le brief manqué le matin part au passage suivant, même tard', () => {
+  assert.equal(plan('2026-10-23T19:00', { lastDigestAt: ms('2026-10-22T09:00') }).resumeDu, true);
 });
 
-test('après un rattrapage le matin, le résumé du soir part quand même', () => {
-  const sd = { lastDigestAt: ms('2026-10-23T08:05') };
-  assert.equal(plan('2026-10-23T13:00', sd).resumeDu, false);
-  assert.equal(plan('2026-10-23T18:30', sd).resumeDu, true);
+test('avant 8 h 30, le brief de la veille suffit', () => {
+  assert.equal(plan('2026-10-23T07:30', { lastDigestAt: ms('2026-10-22T18:35') }).resumeDu, false);
 });
 
 test("l'ancien format, la seule date du dernier résumé, est encore compris", () => {
-  const r = plan('2026-10-23T08:00', { lastDigest: { d: '2026-10-09', text: '…' } });
+  const r = plan('2026-10-23T08:40', { lastDigest: { d: '2026-10-09', text: '…' } });
   assert.equal(r.resumeDu, true);
   assert.equal(r.depuisResume, Date.parse('2026-10-09T18:30:00+02:00'));
 });
@@ -50,7 +49,7 @@ test('le bilan manqué le dimanche part au passage suivant, puis plus de la sema
   assert.equal(plan('2026-10-27T13:00', { lastHebdoAt: ms('2026-10-26T08:02') }).bilanDu, false);
 });
 
-test('sans aucun envoi enregistré, résumé et bilan sont dus', () => {
+test('sans aucun envoi enregistré, brief et bilan sont dus', () => {
   const r = plan('2026-10-23T13:00', {});
   assert.equal(r.resumeDu, true);
   assert.equal(r.bilanDu, true);

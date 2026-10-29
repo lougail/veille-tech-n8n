@@ -62,9 +62,18 @@ for (const it of items) {
   if (it.json.always && !seen.has(it.json.canonicalKey)) { selected.push(it); seen.add(it.json.canonicalKey); }
 }
 const alwaysCount = selected.length;
+// Une même source ne prend pas plus de 15 % des places : en octobre 2026, un seul forum
+// (r/LocalLLaMA) et un seul site de sécurité faisaient près de la moitié des publications.
+const PAR_SOURCE = Math.max(8, Math.round(KEEP * 0.15));
+const parSource = {};
 for (const it of items) {
   if (selected.length >= KEEP + alwaysCount) break;
-  if (!seen.has(it.json.canonicalKey)) { selected.push(it); seen.add(it.json.canonicalKey); }
+  if (seen.has(it.json.canonicalKey)) continue;
+  const s = it.json.source || '?';
+  if ((parSource[s] || 0) >= PAR_SOURCE) continue;
+  parSource[s] = (parSource[s] || 0) + 1;
+  selected.push(it);
+  seen.add(it.json.canonicalKey);
 }
 
 sd._runStats = Object.assign(sd._runStats || {}, { ranked: selected.length });

@@ -14,6 +14,11 @@ services:
       - N8N_SECURE_COOKIE=false
       - EXECUTIONS_DATA_SAVE_ON_ERROR=all
       - EXECUTIONS_DATA_SAVE_ON_SUCCESS=all
+      # Une exécution réussie de la veille pèse plusieurs dizaines de Mo : on en garde sept jours, assez
+      # pour diagnostiquer et pour la revue des sources (outils/rendement-sources.py). La place libérée
+      # est récupérée au démarrage.
+      - EXECUTIONS_DATA_MAX_AGE=168
+      - DB_SQLITE_VACUUM_ON_STARTUP=true
       - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
       - EXECUTIONS_TIMEOUT=900
       - EXECUTIONS_TIMEOUT_MAX=1800

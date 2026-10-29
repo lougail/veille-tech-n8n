@@ -7,7 +7,7 @@ const t = new Date().toISOString().replace('T', ' ').substring(0, 16);
 const sendFails = $input.all().filter(i => i.json && i.json.error).length;
 
 const lines = [
-  `**Veille Pro v2** — ${t} UTC`,
+  `**Veille v3** — ${t} UTC`,
   `📥 ${s.collected || 0} collectés → 🆕 ${s.kept || 0} dans la fenêtre → 🏷️ ${s.ranked || 0} pré-classés → 🧩 ${s.stories || 0} stories → ✅ ${s.published || 0} publiées`,
 ];
 const extras = [];

@@ -1,7 +1,7 @@
 # Veille Tech N8N + Discord
 
 Automatisation de veille technologique avec N8N (self-hosted) et Discord.
-**v2 en production** : pipeline story-centric avec détection de tendances — architecture complète dans `docs/veille-pro-v2.md`.
+**v3 prête, pas encore en service** (branche `veille/refonte`, essais dans n8n le 28 octobre 2026) : les publications des labos, les radars de nouveaux modèles, les capteurs de bruit et le brief du matin — `docs/veille-v3.md`. Elle remplacera la v2 quand Louis l'aura validée. Architecture de base (stories, chaleur, Components V2) : `docs/veille-pro-v2.md`.
 
 **Stack** : N8N 2.10.3 (Docker, image pinnée, TZ Europe/Paris), Discord Webhooks (Components V2), OpenRouter (Mistral Small 3.2 + Mistral Large), JavaScript
 
@@ -30,7 +30,7 @@ Automatisation de veille technologique avec N8N (self-hosted) et Discord.
 
 | Workflow | ID | État |
 |----------|----|------|
-| Veille Pro v2 — Stories & Tendances (45 nœuds) | `VeilleProV2story` | **actif** — 8h/13h/18h30 Paris, hebdo dimanche |
+| Veille Pro v2, avec le rattrapage du résumé et du bilan | `VeilleProV2story` | **actif** — 8 h, 13 h et 18 h 30, en retard quand le Mac dort ; la v3 (59 nœuds : collecte au réveil du Mac, brief après 8 h 30, bilan le dimanche) la remplacera |
 | Veille Stack (26 nœuds) | `VeilleStackHlmr1` | **actif** — 9h30 Paris, digest lundi ; org via `GITHUB_STACK_ORG`, token `GITHUB_STACK_TOKEN`, sortie `DISCORD_WEBHOOK_STACK` |
 | Error Handler - Discord Alert | `yrUX1IcjTyIwpWqG` | actif |
 | Veille Pro v1 | `OfUjCc9fcrInTX3M` | désactivé (rollback) |

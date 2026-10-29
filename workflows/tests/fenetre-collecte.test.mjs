@@ -59,7 +59,7 @@ test('deux collectes rapprochées gardent une fenêtre de 24 h au moins', () => 
 test('le pré-classement garde 130 articles par jour collecté, 260 au plus', () => {
   const taille = (windowHours) => {
     const items = Array.from({ length: 400 }, (_, i) => ({ json: {
-      title: 't' + i, snippet: '', publishedAt: new Date().toISOString(),
+      title: 't' + i, snippet: '', publishedAt: new Date().toISOString(), source: 'source ' + i,
       canonicalKey: 'k' + i, signals: {}, weight: 1,
     } }));
     return prerank({ all: () => items }, () => ({ _runStats: { windowHours } })).length;
@@ -67,4 +67,14 @@ test('le pré-classement garde 130 articles par jour collecté, 260 au plus', ()
   assert.equal(taille(24), 130);
   assert.equal(taille(36), 195);
   assert.equal(taille(74), 260);
+});
+
+test('une même source ne prend pas plus de 15 % des places du pré-classement', () => {
+  const items = Array.from({ length: 200 }, (_, i) => ({ json: {
+    title: 't' + i, snippet: '', publishedAt: new Date().toISOString(), source: i < 150 ? 'Forum bavard' : 'source ' + i,
+    canonicalKey: 'k' + i, signals: {}, weight: i < 150 ? 1.5 : 1,
+  } }));
+  const gardes = prerank({ all: () => items }, () => ({ _runStats: { windowHours: 24 } }));
+  assert.equal(gardes.filter((x) => x.json.source === 'Forum bavard').length, 20);
+  assert.equal(gardes.length, 70);
 });
