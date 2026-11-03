@@ -76,6 +76,13 @@ test('les notes de séance : lues dans le seul dossier monté, sans écriture, e
   assert.match(parNom['Préparation'].parameters.jsCode, /chemin: '\/home\/node\/\.n8n-files\/parlia\/' \+ nom/);
 });
 
+test("la chaîne LLM : un lot après l'autre, avec Mistral Small 3.2", () => {
+  const tri = parNom['Tri Mistral Small'];
+  assert.deepEqual(tri.parameters.batching, { batchSize: 1 });
+  assert.equal(tri.continueOnFail, true);
+  assert.deepEqual(wf.connections['OpenRouter Mistral Small'].ai_languageModel[0].map((c) => c.node), ['Tri Mistral Small']);
+});
+
 test('Discord et OpenRouter : adresses lues dans les variables d\'environnement, erreurs tolérées, un seul identifiant', () => {
   const discord = wf.nodes.filter((n) => n.name.startsWith('Discord '));
   assert.equal(discord.length, 5);

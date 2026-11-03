@@ -170,9 +170,10 @@ def build(mode: str):
             "parameters": {
                 "promptType": "define",
                 "text": "={{ $json.prompt }}",
-                # Une pause de 3 s entre deux lots, plutôt qu'un nœud « Wait » (enregistré en base à chaque
-                # pause à partir de n8n 2.16).
-                "batching": {"batchSize": 1, "delayBetweenBatches": 3000},
+                # Un lot après l'autre, sans appels en parallèle : une à trois demandes par collecte. n8n 2.10.3
+                # n'applique « delayBetweenBatches » qu'aux lots de plus d'un élément, et un nœud « Wait » serait
+                # enregistré en base à chaque pause à partir de n8n 2.16 : pas de pause, il n'en faut pas ici.
+                "batching": {"batchSize": 1},
             },
             "id": slug("Tri Mistral Small"),
             "name": "Tri Mistral Small",

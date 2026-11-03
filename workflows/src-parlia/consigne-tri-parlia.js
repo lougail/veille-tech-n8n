@@ -1,8 +1,8 @@
 // La consigne de tri : le texte de sources.md, section 5.2, mot pour mot. Mistral Small 3.2 propose, pour chaque
 // article, l'axe, une pertinence sur 10, une hypothèse, la nature de la source, un résumé de deux lignes, ce qu'il
 // faut chercher dans l'original, quatre drapeaux et une date d'effet ; Louis décide en séance.
-// Les articles partent par lots de 12 ; la chaîne LLM attend 3 secondes entre deux lots (option « Batch
-// Processing »), plutôt qu'un nœud « Wait », que n8n 2.16 et suivants enregistrent en base à chaque pause.
+// Les articles partent par lots de 12, un lot après l'autre (option « Batch Processing » de la chaîne LLM, lots
+// d'un élément) : une à trois demandes par collecte, sans appels en parallèle ni nœud « Wait ».
 // Rien à trier : la branche du tri s'arrête ici ; celle du Journal officiel continue.
 const VERSION = 'sources.md 5.2 du 29 octobre 2026';
 const articles = $input.all().map((i) => i.json).filter((a) => a && a.id && !a._rien);
