@@ -5,6 +5,11 @@ services:
       - "127.0.0.1:5678:5678"
     volumes:
       - ./n8n-data:/home/node/.n8n
+      # Veille ParlIA (docs/veille-parlia.md) : le dossier où le bot écrit ses préparations, et celui des notes de
+      # séance, qu'il relit sans pouvoir les modifier. n8n 2.x ne lit et n'écrit que sous ~/.n8n-files. Les vrais
+      # chemins vont dans .env ; sans eux, deux dossiers du dépôt, ignorés par Git.
+      - ${PARLIA_EXPORT_DIR:-./exports/veille-parlia}:/home/node/.n8n-files/parlia
+      - ${PARLIA_NOTES_DIR:-./exports/veille-parlia-notes}:/home/node/.n8n-files/parlia-notes:ro
     env_file:
       - .env
     environment:
