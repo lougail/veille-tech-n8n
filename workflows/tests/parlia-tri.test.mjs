@@ -93,8 +93,8 @@ const trie = (id, tri, extra = {}) => Object.assign(art(id, extra), { tri: Objec
   date_effet: null, secours: '', plafonds: [],
 }, tri) });
 
-test('le registre garde 28 jours, compte les hors thème, et sonne pour un retrait de modèle suivi à moins de 90 jours', async () => {
-  const sd = { registre: [{ id: 'vieux', vu: ms(MAINTENANT) - 29 * JOUR }, { id: 'recent', vu: ms(MAINTENANT) - 2 * JOUR }] };
+test('le registre garde 16 jours, compte les hors thème, et sonne pour un retrait de modèle suivi à moins de 90 jours', async () => {
+  const sd = { registre: [{ id: 'vieux', vu: ms(MAINTENANT) - 17 * JOUR }, { id: 'recent', vu: ms(MAINTENANT) - 2 * JOUR }] };
   const retrait = { retrait_modele: true, changement_prix: false, nouveau_modele_decision: false, echeance_reglementaire: false };
   await executer('registre-parlia.js', { sd, maintenant: MAINTENANT, input: [
     trie('suivi', { drapeaux: retrait, date_effet: '2027-01-14' }, { titre: 'Retiring gpt-4o-mini' }),
@@ -110,4 +110,6 @@ test('le registre garde 28 jours, compte les hors thème, et sonne pour un retra
   const entree = sd.registre.find((a) => a.id === 'suivi');
   assert.equal(entree.de, '2027-01-14');
   assert.equal(entree.f.retrait_modele, true);
+  assert.equal(entree.h, 'h');
+  assert.deepEqual([sd.registre.at(-1).r, sd.registre.at(-1).h], ['', '']); // hors thème : pas de textes longs
 });
