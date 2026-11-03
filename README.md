@@ -3,6 +3,8 @@
 Système de veille technologique automatisé qui collecte, regroupe en **stories**, classifie par LLM et distribue sur Discord — avec détection des **sujets chauds** par corrélation multi-sources et signaux de popularité.
 
 > **v3 (28 octobre 2026)** : les publications de tous les grands labos, ce qui fait du bruit, et un brief par jour. Pourquoi et comment : [docs/veille-v3.md](docs/veille-v3.md). La v2 de juillet (stories, sujets chauds) : [docs/veille-pro-v2.md](docs/veille-pro-v2.md).
+>
+> **Veille ParlIA (novembre 2026)** : un workflow à part prépare chaque semaine la séance de veille du projet ParlIA (32 sources, de 10 à 15 fiches guidées, un fichier de préparation daté, les alertes de remaniement du Journal officiel) : [docs/veille-parlia.md](docs/veille-parlia.md).
 
 ## Architecture (Veille v3)
 
@@ -48,6 +50,7 @@ Toutes les 30 min, de 7 h à 23 h : une collecte est-elle due ? (au plus toutes 
 |----------|-------------|----------|
 | **Veille v3 — labos, bruit et brief** (59 nodes) | Labos, radars de modèles, capteurs de bruit, regroupement, notation, distribution, brief du matin | Collecte au réveil du Mac (au plus toutes les 3 h, 7 h-23 h), brief après 8 h 30, bilan le dimanche |
 | **Veille Stack** (26 nodes) | Veille de dépendances d'une org GitHub : manifestes → OSV.dev (CVE) → alertes #stack, + digest hebdo (releases sous contrainte, EOL via endoflife.date) | 9h30 (+ hebdo lundi) |
+| **Veille ParlIA** (33 nodes, prête, pas encore en service) | Veille du projet ParlIA : flux, pages sans flux et API → tri par Mistral Small 3.2 → de 10 à 15 fiches par semaine, fichier de préparation daté, #veille-parlia, alertes de remaniement | Toutes les 30 min, 7 h 15-22 h 45 : collecte toutes les 4 h au plus, préparation le lundi, rappel le jeudi |
 | **Veille Pro v1** (34 nodes, désactivé) | Ancien pipeline par articles (rollback possible) | — |
 | **Error Handler** (3 nodes) | Alerte Discord si un workflow crash | Sur erreur |
 
@@ -67,6 +70,7 @@ La configuration (watchlists) est locale et non versionnée : copier
 workflows/
 ├── build_v2.py          # Builder : assemble le JSON n8n depuis src/
 ├── src/*.js             # Code source des 19 Code nodes (la vraie logique)
+├── build_parlia.py      # Builder de la veille ParlIA (src-parlia/*.js → veille-parlia.json)
 ├── tests/*.test.mjs     # Tests du code des nœuds : npm install, puis npm test
 ├── veille-pro-v2.json   # Sortie du builder (import n8n)
 └── veille-pro.json      # v1 (archive)

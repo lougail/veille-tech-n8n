@@ -13,6 +13,7 @@ Automatisation de veille technologique avec N8N (self-hosted) et Discord.
 | `n8n-data/` | Volume persistant N8N (non versionné) |
 | `workflows/src/*.js` | **Source de vérité** : code des 18 Code nodes de la v2 |
 | `workflows/build_v2.py` | Builder → génère `veille-pro-v2.json` (`--test` / `--preprod`) |
+| `workflows/src-parlia/*.js`, `workflows/build_parlia.py` | Veille ParlIA : son code et son builder → `veille-parlia.json` (`--test`) — `docs/veille-parlia.md` |
 | `workflows/*.json` | Exports/artefacts d'import n8n |
 | `docs/veille-pro-v2.md` | Architecture v2, sources auditées, pièges connus |
 
@@ -33,6 +34,7 @@ Automatisation de veille technologique avec N8N (self-hosted) et Discord.
 | Veille Pro v2, avec le rattrapage du résumé et du bilan | `VeilleProV2story` | **actif** — 8 h, 13 h et 18 h 30, en retard quand le Mac dort ; la v3 (59 nœuds : collecte au réveil du Mac, brief après 8 h 30, bilan le dimanche) la remplacera |
 | Veille Stack (26 nœuds) | `VeilleStackHlmr1` | **actif** — 9h30 Paris, digest lundi ; org via `GITHUB_STACK_ORG`, token `GITHUB_STACK_TOKEN`, sortie `DISCORD_WEBHOOK_STACK` |
 | Error Handler - Discord Alert | `yrUX1IcjTyIwpWqG` | actif |
+| Veille ParlIA (33 nœuds) | `VeilleParlIAprod` | prête, pas encore importée ; essai : `VeilleParlIAtest` — `docs/veille-parlia.md` |
 | Veille Pro v1 | `OfUjCc9fcrInTX3M` | désactivé (rollback) |
 | Brief Simplon phases 1-2 | — | désactivés (archive) |
 
