@@ -52,8 +52,8 @@ test('le fichier : même plan que la partie « Préparation » de la note de sé
   assert.match(md, /> Écrit par le bot de veille le lundi 2 novembre 2026 à 9 h 15 \(heure de Paris\)/);
   assert.match(md, /> Période lue : du lundi 26 octobre 2026 à 9 h 05 au lundi 2 novembre 2026 à 9 h 15\./);
   const titres = md.split('\n').filter((l) => /^#{2,3} /.test(l));
-  assert.deepEqual(titres.slice(0, 6), ['## Préparation', '### Sources interrogées', '### Candidats, par axe',
-    "### Ce qui n'a pas pu être vérifié", '### Fiches guidées', '### Réserve']);
+  assert.deepEqual(titres.slice(0, 7), ['## Depuis la dernière séance', '## Préparation', '### Sources interrogées',
+    '### Candidats, par axe', "### Ce qui n'a pas pu être vérifié", '### Fiches guidées', '### Réserve']);
   assert.equal(md.split('\n').filter((l) => l === ENTETE).length, 3); // fournisseurs, qualité, conformité
   for (const axe of ['**Fournisseurs et coûts**', "**Qualité de l'étiquetage**", '**Conformité**', '**Exploitation**']) assert.ok(md.includes(axe), axe);
   assert.match(md, /\*\*Exploitation\*\*\n\nAucun candidat cette semaine\./);
@@ -156,4 +156,42 @@ test('une semaine sans candidat : le fichier et le message le disent', async () 
   assert.match(s.markdown, /\*\*La CNIL et le CEPD cette semaine\*\* : aucun texte lu depuis la dernière préparation\./);
   assert.match(s.discord.ouverture.payload.content, /Rien de neuf noté 5 ou plus dans le thème cette semaine\./);
   assert.equal(s.discord.fiches.length, 0);
+});
+
+// Ce que le nœud Notes a lu dans les notes de séance (sd._passage.notes).
+const NOTES = {
+  lisibles: true, motif: '', lues: 2, tenues: 1, seanceSemaine: null,
+  seancePrecedente: { numero: '01', debut: '2026-10-29', fin: '2026-11-02', fichier: '2026-10-28-seance-01.md' },
+  derniere: {
+    numero: '01', debut: '2026-10-29', fin: '2026-11-02', fichier: '2026-10-28-seance-01.md',
+    aSurveiller: [
+      { point: '2', titre: 'Un modèle cent fois moins cher, conçu pour classer', classement: 'à surveiller : le point revient au comparatif' },
+      { point: '3', titre: 'Les scores moyens cachent les échecs', classement: 'à surveiller' },
+      { point: '4', titre: 'Un quatrième point', classement: 'à surveiller' },
+    ],
+    piste: 'Essayer la Decisions API et Jev au comparatif.',
+  },
+};
+const avecNotes = (notes) => Object.assign(SD(), { _passage: { notes } });
+
+test('depuis la dernière séance : les points « à surveiller » et la piste, en tête du fichier et dans l\'ouverture', async () => {
+  const { s } = await preparer(SEL, avecNotes(NOTES));
+  const md = s.markdown;
+  const depuis = md.slice(md.indexOf('## Depuis la dernière séance'), md.indexOf('## Préparation'));
+  assert.match(depuis, /Dernière séance tenue : séance 01, du 29 octobre au 2 novembre 2026 \(2026-10-28-seance-01\.md\)\. La semaine dernière : séance 01, du 29 octobre au 2 novembre 2026\./);
+  assert.match(depuis, /hors quota, jusqu'à ce qu'une séance les classe autrement :\n- Point 2 : Un modèle cent fois moins cher, conçu pour classer — à surveiller : le point revient au comparatif\n- Point 3 : /);
+  assert.match(depuis, /La piste notée pour la suite : « Essayer la Decisions API et Jev au comparatif\. »/);
+  const o = s.discord.ouverture.payload.content;
+  assert.match(o, /🟡 À surveiller depuis la séance 01 : « Un modèle cent fois moins cher, conçu pour classer », « Les scores moyens cachent les échecs » et 1 autre\n/);
+  assert.match(o, /🧭 Piste notée : Essayer la Decisions API et Jev au comparatif\./);
+});
+
+test('depuis la dernière séance : notes illisibles, ou aucune séance tenue, le fichier le dit ; rien dans l\'ouverture', async () => {
+  const illisibles = await preparer(SEL, avecNotes({ lisibles: false, motif: 'aucune note trouvée : dossier des notes non monté, ou vide', lues: 0, tenues: 0, derniere: null }));
+  assert.match(illisibles.s.markdown, /## Depuis la dernière séance\n\nLe bot n'a pas pu lire les notes de séance \(aucune note trouvée : dossier des notes non monté, ou vide\) : reprendre à la main/);
+  assert.doesNotMatch(illisibles.s.discord.ouverture.payload.content, /🟡|🧭/);
+  const aucune = await preparer(SEL, avecNotes({ lisibles: true, motif: '', lues: 1, tenues: 0, seanceSemaine: null, seancePrecedente: null, derniere: null }));
+  assert.match(aucune.s.markdown, /Aucune séance tenue dans les 1 note\(s\) lue\(s\) : rien à reprendre\./);
+  const sansPoint = await preparer(SEL, avecNotes(Object.assign({}, NOTES, { seancePrecedente: null, derniere: Object.assign({}, NOTES.derniere, { aSurveiller: [], piste: '' }) })));
+  assert.match(sansPoint.s.markdown, /La semaine dernière : aucune séance notée\.\n\nAucun point « à surveiller » dans cette séance\.\n\n## Préparation/);
 });

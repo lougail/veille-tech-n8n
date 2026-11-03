@@ -1,7 +1,9 @@
 // La préparation de la semaine : le fichier Markdown daté et les messages Discord, à partir de la sélection.
 // - Le fichier suit la partie « Préparation » de la note de séance du 28 octobre 2026 (« Sources interrogées »,
 //   « Candidats, par axe » en tableaux, « Ce qui n'a pas pu être vérifié »), puis les fiches guidées, la réserve,
-//   les échéances des 90 jours et les alertes. Il est signé et daté : c'est le travail du bot, pas une lecture.
+//   les échéances des 90 jours et les alertes. Avant elle, « Depuis la dernière séance » : les points « à
+//   surveiller » et la piste de la dernière séance tenue, lus dans les notes (nœud Notes ; sources.md, 6.2,
+//   règle 7). Il est signé et daté : c'est le travail du bot, pas une lecture.
 //   Nom : AAAA-MM-JJ-preparation.md, à la date où il est écrit ; « essai- » devant en mode test. Dossier :
 //   /home/node/.n8n-files/parlia dans le conteneur, monté depuis PARLIA_EXPORT_DIR (docs/veille-parlia.md).
 // - Discord : un message d'ouverture qui notifie (la semaine, par où commencer, comment répondre), puis une fiche
@@ -66,6 +68,33 @@ sources += 'Éléments lus : ' + lus + ' ; triés par le modèle : ' + (st.lus |
   + ' ; proposés : ' + total + (sel.reserve && sel.reserve.length ? ', et ' + sel.reserve.length + ' en réserve' : '') + '.';
 if (sansCandidat.length) sources += ' Sans candidat cette semaine : ' + sansCandidat.slice(0, 25).join(', ') + (sansCandidat.length > 25 ? '…' : '') + '.';
 
+// ---- Depuis la dernière séance (les notes de séance, relues en lecture seule par le nœud Notes) ----
+const notes = (sd._passage && sd._passage.notes) || null;
+const derniere = notes && notes.lisibles ? notes.derniere : null;
+const quandSeance = (s) => (s.debut === s.fin ? 'le ' + dateLongue(s.debut) : periode(s.debut, s.fin, true));
+const D = [];
+if (!notes || !notes.lisibles) {
+  D.push("Le bot n'a pas pu lire les notes de séance (" + (notes ? notes.motif : 'notes non lues')
+    + ') : reprendre à la main, dans la dernière note, les points « à surveiller » et la piste notée.');
+} else if (!derniere) {
+  D.push('Aucune séance tenue dans les ' + notes.lues + ' note(s) lue(s) : rien à reprendre.');
+} else {
+  const sp = notes.seancePrecedente;
+  D.push('Dernière séance tenue : séance ' + derniere.numero + ', ' + quandSeance(derniere) + ' (' + derniere.fichier + '). '
+    + 'La semaine dernière : ' + (sp ? 'séance ' + sp.numero + ', ' + quandSeance(sp) : 'aucune séance notée') + '.');
+  D.push('');
+  if (derniere.aSurveiller.length) {
+    D.push("Points « à surveiller », rappelés ici, hors quota, jusqu'à ce qu'une séance les classe autrement :");
+    derniere.aSurveiller.forEach((p) => D.push('- Point ' + p.point + ' : ' + p.titre + ' — ' + p.classement));
+  } else {
+    D.push('Aucun point « à surveiller » dans cette séance.');
+  }
+  if (derniere.piste) {
+    D.push('');
+    D.push('La piste notée pour la suite : « ' + derniere.piste + ' »');
+  }
+}
+
 // ---- Le fichier ----
 const L = [];
 L.push('# ' + (essai ? '[ESSAI] ' : '') + 'Préparation de la veille ParlIA — ' + laSemaine);
@@ -75,6 +104,10 @@ L.push('> Période lue : du ' + instant(depuisDt) + ' au ' + instant($now) + '.'
 L.push("> Les résumés, les « à chercher » et les hypothèses viennent du tri automatique (Mistral Small 3.2) : à vérifier dans l'original, à confirmer ou à écarter en séance.");
 L.push('');
 L.push('Thème : ' + PARLIA.THEME + " Quatre axes : fournisseurs et coûts, qualité de l'étiquetage, conformité, exploitation.");
+L.push('');
+L.push('## Depuis la dernière séance');
+L.push('');
+D.forEach((l) => L.push(l));
 L.push('');
 L.push('## Préparation');
 L.push('');
@@ -196,6 +229,12 @@ if (total) {
 } else {
   O.push("Rien de neuf noté 5 ou plus dans le thème cette semaine. La réserve est ci-dessous s'il y en a une.");
 }
+if (derniere && derniere.aSurveiller.length) {
+  const pts = derniere.aSurveiller;
+  O.push('🟡 À surveiller depuis la séance ' + derniere.numero + ' : ' + pts.slice(0, 2).map((p) => '« ' + md(tronquer(p.titre, 90)) + ' »').join(', ')
+    + (pts.length > 2 ? ' et ' + (pts.length - 2) + ' autre' + (pts.length > 3 ? 's' : '') : ''));
+}
+if (derniere && derniere.piste) O.push('🧭 Piste notée : ' + md(tronquer(derniere.piste, 180)));
 if (sel.cnil) O.push('🛡️ La CNIL et le CEPD cette semaine : ' + (sel.cnil.n ? 'fiche ' + sel.cnil.n + ', ' : '') + '« ' + md(tronquer(sel.cnil.titre, 120)) + ' »');
 if (sel.echeances && sel.echeances.length) {
   O.push('⏳ Dans les 90 jours : ' + sel.echeances.slice(0, 3).map((e) => dateLongue(e.date).replace(/ \d{4}$/, '') + ', ' + md(tronquer(e.titre, 70))).join(' ; '));

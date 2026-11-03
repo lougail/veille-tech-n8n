@@ -52,6 +52,9 @@ DISCORD_PARLIA_URL = (
 )
 DISCORD_STATUS_URL = "={{ $env.DISCORD_WEBHOOK_STATUS + '?wait=true' }}"
 
+# Les dossiers montés dans le conteneur (docker-compose.yml) : n8n 2.x n'écrit et ne lit que sous ~/.n8n-files.
+DOSSIER_NOTES = "/home/node/.n8n-files/parlia-notes"
+
 OUTILS = (SRC / "outils.js").read_text(encoding="utf-8")
 OUTILS_NOMS = (
     "PARLIA", "texteSimple", "tronquer", "hacher", "domaineDe", "cleAdresse", "cellule", "pourDiscord",
@@ -195,9 +198,42 @@ def build(mode: str):
         code_node("Journal officiel", "jorf-parlia.js", [1400, 320]),
         code_node("Alertes", "alertes-parlia.js", [1600, 320]),
         discord_node("Discord alertes", DISCORD_PARLIA_URL, [1800, 320], disabled=test_mode),
-        # Branche 2 : la préparation de la semaine. Le fichier d'abord (branche haute), puis Discord.
-        code_node("Sélection", "selection-parlia.js", [600, 560]),
-        code_node("Préparation", "preparation-parlia.js", [800, 560]),
+        # Branche 2 : les notes de séance, relues en lecture seule, avant la préparation et le rappel qui s'en
+        # servent. Dossier absent ou vide : une erreur tolérée, que le nœud Notes traduit (« notes non lues »).
+        code_node("Notes à lire ?", "notes-dues-parlia.js", [600, 440]),
+        {
+            "parameters": {
+                "operation": "read",
+                "fileSelector": DOSSIER_NOTES + "/*-seance-*.md",
+                "options": {},
+            },
+            "id": slug("Lire les notes"),
+            "name": "Lire les notes",
+            "type": "n8n-nodes-base.readWriteFile",
+            "typeVersion": 1.1,
+            "position": [800, 440],
+            "continueOnFail": True,
+            "alwaysOutputData": True,
+        },
+        {
+            "parameters": {
+                "operation": "text",
+                "binaryPropertyName": "data",
+                "destinationKey": "texte",
+                "options": {"keepSource": "json"},
+            },
+            "id": slug("Texte des notes"),
+            "name": "Texte des notes",
+            "type": "n8n-nodes-base.extractFromFile",
+            "typeVersion": 1.1,
+            "position": [1000, 440],
+            "continueOnFail": True,
+            "alwaysOutputData": True,
+        },
+        code_node("Notes", "notes-parlia.js", [1200, 440]),
+        # Branche 3 : la préparation de la semaine. Le fichier d'abord (branche haute), puis Discord.
+        code_node("Sélection", "selection-parlia.js", [600, 640]),
+        code_node("Préparation", "preparation-parlia.js", [800, 640]),
         {
             "parameters": {
                 "operation": "toText",
@@ -209,7 +245,7 @@ def build(mode: str):
             "name": "Convertir en fichier",
             "type": "n8n-nodes-base.convertToFile",
             "typeVersion": 1.1,
-            "position": [1000, 480],
+            "position": [1000, 560],
         },
         {
             # Écrit dans /home/node/.n8n-files/parlia, le seul dossier que n8n 2.x autorise par défaut
@@ -225,19 +261,19 @@ def build(mode: str):
             "name": "Écrire le fichier",
             "type": "n8n-nodes-base.readWriteFile",
             "typeVersion": 1.1,
-            "position": [1200, 480],
+            "position": [1200, 560],
             "continueOnFail": True,
         },
-        code_node("Ouverture", "ouverture-parlia.js", [1000, 640]),
-        discord_node("Discord ouverture", DISCORD_PARLIA_URL, [1200, 640], disabled=test_mode),
-        code_node("Fiches", "fiches-parlia.js", [1400, 640]),
-        discord_node("Discord fiches", DISCORD_PARLIA_URL, [1600, 640], disabled=test_mode),
-        # Branche 3 : le rappel du jeudi.
-        code_node("Rappel", "rappel-parlia.js", [600, 820]),
-        discord_node("Discord rappel", DISCORD_PARLIA_URL, [800, 820], disabled=test_mode),
-        # Branche 4 (la plus basse, donc la dernière) : le message de #status, qui lit tout le passage.
-        code_node("Statut", "statut-parlia.js", [600, 1000]),
-        discord_node("Discord statut", DISCORD_STATUS_URL, [800, 1000], disabled=test_mode),
+        code_node("Ouverture", "ouverture-parlia.js", [1000, 720]),
+        discord_node("Discord ouverture", DISCORD_PARLIA_URL, [1200, 720], disabled=test_mode),
+        code_node("Fiches", "fiches-parlia.js", [1400, 720]),
+        discord_node("Discord fiches", DISCORD_PARLIA_URL, [1600, 720], disabled=test_mode),
+        # Branche 4 : le rappel du jeudi, seulement si les notes ne montrent pas de séance cette semaine.
+        code_node("Rappel", "rappel-parlia.js", [600, 880]),
+        discord_node("Discord rappel", DISCORD_PARLIA_URL, [800, 880], disabled=test_mode),
+        # Branche 5 (la plus basse, donc la dernière) : le message de #status, qui lit tout le passage.
+        code_node("Statut", "statut-parlia.js", [600, 1040]),
+        discord_node("Discord statut", DISCORD_STATUS_URL, [800, 1040], disabled=test_mode),
     ]
     if test_mode:
         nodes.append({
@@ -255,7 +291,7 @@ def build(mode: str):
     connections = {
         "Toutes les 30 min": {"main": [main("Réglages")]},
         "Réglages": {"main": [main("Que faire ?")]},
-        "Que faire ?": {"main": [main("Sources ParlIA", "Sélection", "Rappel", "Statut")]},
+        "Que faire ?": {"main": [main("Sources ParlIA", "Notes à lire ?", "Sélection", "Rappel", "Statut")]},
         "Sources ParlIA": {"main": [main("Flux ParlIA")]},
         # SplitInBatches v3 : sortie 0 « done », sortie 1 « loop ».
         "Flux ParlIA": {"main": [main("Pages et API"), main("Lire le flux")]},
@@ -269,6 +305,9 @@ def build(mode: str):
         "Lire le tri": {"main": [main("Registre")]},
         "Journal officiel": {"main": [main("Alertes")]},
         "Alertes": {"main": [main("Discord alertes")]},
+        "Notes à lire ?": {"main": [main("Lire les notes")]},
+        "Lire les notes": {"main": [main("Texte des notes")]},
+        "Texte des notes": {"main": [main("Notes")]},
         "Sélection": {"main": [main("Préparation")]},
         "Préparation": {"main": [main("Convertir en fichier", "Ouverture")]},
         "Convertir en fichier": {"main": [main("Écrire le fichier")]},
@@ -311,10 +350,12 @@ def build(mode: str):
             for out in outs:
                 for c in out:
                     assert c["node"] in names, f"cible inconnue : {c['node']} (depuis {src_name})"
-    # L'ordre v1 exécute les branches de haut en bas : le statut doit rester la dernière, le fichier passer
-    # avant Discord, le tri avant le Journal officiel (les alertes du registre partent avec celles du JO).
+    # L'ordre v1 exécute les branches de haut en bas : le statut doit rester la dernière, les notes passer avant
+    # la préparation et le rappel, le fichier avant Discord, le tri avant le Journal officiel (les alertes du
+    # registre partent avec celles du JO).
     y = {n["name"]: n["position"][1] for n in nodes}
-    for avant, apres in (("Sources ParlIA", "Sélection"), ("Sélection", "Rappel"), ("Rappel", "Statut"),
+    for avant, apres in (("Sources ParlIA", "Notes à lire ?"), ("Notes à lire ?", "Sélection"),
+                         ("Sélection", "Rappel"), ("Rappel", "Statut"),
                          ("Consigne de tri", "Journal officiel"), ("Convertir en fichier", "Ouverture")):
         assert y[avant] < y[apres], f"ordre d'exécution : {avant} doit être au-dessus de {apres}"
     return workflow

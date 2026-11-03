@@ -84,6 +84,22 @@ test("le rappel sans post connu ouvre son propre post ; sans webhook, il est seu
   assert.equal(sd.prep.rappel, true);
 });
 
+const SEANCE_02 = { numero: '02', debut: '2026-11-04', fin: '2026-11-04', fichier: '2026-11-04-seance-02.md' };
+test('le rappel ne part pas quand les notes montrent la séance de la semaine', async () => {
+  const sd = { prep: prepFaite(), _passage: { notes: { lisibles: true, lues: 2, tenues: 2, seanceSemaine: SEANCE_02 } } };
+  assert.deepEqual(await rappel(sd), []);
+  assert.equal(sd.prep.rappel, true); // une seule fois : plus de rappel cette semaine
+  assert.equal(sd._passage.rappel, 'inutile');
+  assert.deepEqual(sd._passage.rappelSeance, SEANCE_02);
+});
+
+test("notes lues sans séance cette semaine : le rappel part, sans « si c'est fait »", async () => {
+  const sd = { prep: prepFaite(), _passage: { notes: { lisibles: true, lues: 1, tenues: 1, seanceSemaine: null } } };
+  const [r] = await rappel(sd);
+  assert.match(r.payload.content, /c'est déjà une séance courte\. Aucune note de séance cette semaine pour l'instant\.$/);
+  assert.equal(sd._passage.rappel, 'préparé');
+});
+
 const alerte = (type, extra = {}) => Object.assign({ type, id: type + '1', titre: 'Décret ' + type, url: 'https://www.legifrance.gouv.fr/jorf/id/' + type,
   date: '2026-11-02', origine: 'Journal officiel, archive JORF_20261102-002304.tar.gz', cle: 'c-' + type }, extra);
 async function alertes(sd, extra = {}) {
@@ -165,4 +181,15 @@ test('#status : rien ne part sans le webhook de #status ; le mode essai est sign
   assert.equal(sd._passage, undefined);
   const s = await statut({ rappel: 'préparé' }, { 'Discord rappel': [{ payload: {} }] }, { essai: true });
   assert.match(s.payload.content, /· ESSAI\n⏰ Rappel du jeudi : préparé \(essai\)/);
+});
+
+test('#status : les notes de séance lues ou non, et le rappel devenu inutile', async () => {
+  const notes = { lisibles: true, motif: '', lues: 2, tenues: 2, derniere: { numero: '02', debut: '2026-11-04', fin: '2026-11-04' } };
+  const inutile = await statut({ rappel: 'inutile', rappelSeance: SEANCE_02, notes });
+  assert.equal(inutile.payload.flags, 4096);
+  assert.match(inutile.payload.content, /📓 Notes de séance : 2 lue\(s\), 2 tenue\(s\) ; dernière : séance 02, 4 novembre 2026\n⏰ Rappel du jeudi : inutile, séance 02 tenue le 4 novembre 2026$/);
+  const illisibles = await statut({ preparation: { fichier: 'f.md', candidats: 3, reserve: 0 }, notes: { lisibles: false, motif: 'aucune note trouvée : dossier des notes non monté, ou vide' } },
+    { 'Écrire le fichier': [{ fileName: 'f.md' }] }, { reglages: { discord: false } });
+  assert.match(illisibles.payload.content, /📓 Notes de séance : non lues \(aucune note trouvée : dossier des notes non monté, ou vide\)/);
+  assert.equal(illisibles.payload.flags, 4096); // des notes illisibles ne sont pas une panne
 });

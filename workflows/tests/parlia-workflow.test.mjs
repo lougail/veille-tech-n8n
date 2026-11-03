@@ -48,12 +48,32 @@ test("les connexions, et l'ordre d'exécution v1 : de haut en bas, le statut en 
   const enfants = (nom) => wf.connections[nom].main[0].map((c) => c.node);
   const y = (nom) => parNom[nom].position[1];
   const ordonne = (liste) => liste.every((nom, i) => i === 0 || y(liste[i - 1]) < y(nom));
-  assert.deepEqual(enfants('Que faire ?'), ['Sources ParlIA', 'Sélection', 'Rappel', 'Statut']);
+  assert.deepEqual(enfants('Que faire ?'), ['Sources ParlIA', 'Notes à lire ?', 'Sélection', 'Rappel', 'Statut']);
   assert.ok(ordonne(enfants('Que faire ?')));
   assert.ok(ordonne(enfants('Normaliser')));
   assert.ok(ordonne(enfants('Préparation')));
   assert.deepEqual(wf.connections['Flux ParlIA'].main.map((s) => s[0].node), ['Pages et API', 'Lire le flux']);
   assert.equal(parNom['Toutes les 30 min'].parameters.rule.interval[0].expression, '0 15,45 7-22 * * *');
+});
+
+test('les notes de séance : lues dans le seul dossier monté, sans écriture, erreurs tolérées, nom du fichier gardé', () => {
+  const chaine = ['Notes à lire ?', 'Lire les notes', 'Texte des notes', 'Notes'];
+  chaine.slice(0, -1).forEach((nom, i) => assert.deepEqual(wf.connections[nom].main[0].map((c) => c.node), [chaine[i + 1]]));
+  const lire = parNom['Lire les notes'];
+  assert.equal(lire.type, 'n8n-nodes-base.readWriteFile');
+  assert.equal(lire.typeVersion, 1.1); // 1.1 : « aucun fichier » est une erreur, donc un élément, pas un silence
+  assert.equal(lire.parameters.operation, 'read');
+  assert.equal(lire.parameters.fileSelector, '/home/node/.n8n-files/parlia-notes/*-seance-*.md');
+  assert.equal(lire.continueOnFail, true);
+  const texte = parNom['Texte des notes'];
+  assert.equal(texte.type, 'n8n-nodes-base.extractFromFile');
+  assert.deepEqual([texte.parameters.operation, texte.parameters.binaryPropertyName, texte.parameters.destinationKey], ['text', 'data', 'texte']);
+  assert.equal(texte.parameters.options.keepSource, 'json');
+  assert.equal(texte.continueOnFail, true);
+  // Aucun nœud n'écrit ailleurs que dans le dossier des préparations.
+  const ecritures = wf.nodes.filter((n) => n.type === 'n8n-nodes-base.readWriteFile' && n.parameters.operation === 'write');
+  assert.deepEqual(ecritures.map((n) => n.name), ['Écrire le fichier']);
+  assert.match(parNom['Préparation'].parameters.jsCode, /chemin: '\/home\/node\/\.n8n-files\/parlia\/' \+ nom/);
 });
 
 test('Discord et OpenRouter : adresses lues dans les variables d\'environnement, erreurs tolérées, un seul identifiant', () => {
@@ -75,7 +95,7 @@ test('Discord et OpenRouter : adresses lues dans les variables d\'environnement,
 });
 
 test('aucun secret ni chemin personnel dans ce qui est versionné', () => {
-  const textes = [lire('workflows/veille-parlia.json'), lire('workflows/build_parlia.py'), lire('.env.example')]
+  const textes = [lire('workflows/veille-parlia.json'), lire('workflows/build_parlia.py'), lire('.env.example'), lire('docker-compose.yml')]
     .concat(fichiers.concat(['outils.js']).map(source));
   if (existsSync(new URL('docs/veille-parlia.md', racine))) textes.push(lire('docs/veille-parlia.md'));
   const interdits = [/discord(app)?\.com\/api\/webhooks\/\d/i, /sk-or-v1-[0-9a-f]{16,}/i, /\bsk-[A-Za-z0-9]{24,}/, /Bearer [A-Za-z0-9._-]{20,}/,

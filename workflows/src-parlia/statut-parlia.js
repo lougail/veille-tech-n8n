@@ -74,7 +74,16 @@ if (p.preparation) {
       + (ko ? ' · ❌ ' + envoi.err[0] : ''));
   }
 }
-if (p.rappel) {
+if (p.notes && (p.preparation || p.rappel)) {
+  const n = p.notes;
+  lignes.push('📓 Notes de séance : ' + (n.lisibles
+    ? n.lues + ' lue(s), ' + n.tenues + ' tenue(s)' + (n.derniere ? ' ; dernière : séance ' + n.derniere.numero + ', ' + dateLongue(n.derniere.fin) : '')
+    : 'non lues (' + n.motif + ')'));
+}
+if (p.rappel === 'inutile') {
+  const s = p.rappelSeance || {};
+  lignes.push('⏰ Rappel du jeudi : inutile, séance ' + (s.numero || '?') + ' tenue ' + (s.debut ? 'le ' + dateLongue(s.debut) : 'cette semaine'));
+} else if (p.rappel) {
   const envoi = sortieDe(() => $('Discord rappel'));
   const ko = envoi && envoi.err.length;
   if (ko) probleme = true;

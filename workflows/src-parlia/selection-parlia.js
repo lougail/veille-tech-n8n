@@ -10,8 +10,9 @@
 // 6. Un événement, une ligne : la source primaire en tête, « couvert aussi par » ensuite ; un article non primaire
 //    n'entre que si l'original manque, marqué « à recouper ».
 // 8. Hors thème : jamais.
-// Les règles 1 et 2 passent avant les plafonds, jamais avant le maximum. La règle 7 (le report des points
-// « à surveiller ») attend que le bot sache lire les réponses de Louis : voir docs/veille-parlia.md.
+// Les règles 1 et 2 passent avant les plafonds, jamais avant le maximum. La règle 7 (les points « à surveiller »
+// des séances précédentes, en tête et hors quota) ne passe pas par ici : la préparation les reprend des notes de
+// séance (nœud Notes), au-dessus des candidats.
 const sd = $getWorkflowStaticData('global');
 const plan = $('Que faire ?').first().json;
 if (!plan.preparation) return [];
