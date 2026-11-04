@@ -4,6 +4,7 @@
 // extraits (126 textes, 59 décrets), en 0,2 seconde pour 3,3 Mo. Lance avec : npm test
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import vm from 'node:vm';
 import zlib from 'node:zlib';
 import { executer, http } from './aide-parlia.mjs';
 
@@ -113,6 +114,28 @@ test('les formats : blocs stockés, compression forte, noms longs du tar, répon
       [LISTE + 'JORF_20261102-002304.tar.gz']: { statusCode: 200, body: JSON.parse(JSON.stringify(gz)) },
     });
     assert.deepEqual(sortie.jorf, { archives: 1, textes: 2, decrets: 2, alertes: 2, erreur: '' }, 'niveau ' + niveau);
+  }
+});
+
+test("les octets venus du bac à sable de n8n : une vue d'un autre contexte, son tampon, un objet à clés numériques", async () => {
+  // Le nœud Code de n8n 2.x s'exécute dans un autre contexte JavaScript que helpers.httpRequest : instanceof y échoue.
+  const r = '20261102-002304';
+  const compo = texte(r, 'DECRET', '2026-11-02', 'Décret du 1er novembre 2026 relatif à la composition du Gouvernement');
+  const gz = archive([compo]);
+  const ailleurs = vm.runInNewContext('(n) => new Uint8Array(n)')(gz.length);
+  ailleurs.set(gz);
+  assert.equal(ailleurs instanceof Uint8Array, false);
+  const formes = {
+    'vue d\'un autre contexte': ailleurs,
+    'tampon d\'un autre contexte': ailleurs.buffer,
+    'objet à clés numériques': JSON.parse(JSON.stringify(Uint8Array.from(gz))),
+  };
+  for (const [nom, corps] of Object.entries(formes)) {
+    const [sortie] = await passer({}, {
+      [LISTE]: { statusCode: 200, body: listeHtml(['JORF_20261102-002304.tar.gz']) },
+      [LISTE + 'JORF_20261102-002304.tar.gz']: { statusCode: 200, body: corps },
+    });
+    assert.deepEqual(sortie.jorf, { archives: 1, textes: 1, decrets: 1, alertes: 1, erreur: '' }, nom);
   }
 });
 

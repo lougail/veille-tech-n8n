@@ -46,6 +46,16 @@ test('une réponse valable, même entourée de texte ou de balises de code, est 
   assert.match(a.brut, /"pertinence":9/);
 });
 
+test("« null » écrit en toutes lettres donne un champ vide ; une nature « inconnu » reprend celle de la source", async () => {
+  const lot = { _articles: [art('a1')], _version: 'v' };
+  const texte = JSON.stringify({ articles: [avis('a1', { a_chercher: 'null', resume: 'None', nature: 'inconnu' })] });
+  const [a] = await lire([lot], [{ text: texte }]);
+  assert.equal(a.tri.a_chercher, '');
+  assert.equal(a.tri.resume, '');
+  assert.equal(a.tri.nature, 'editeur');
+  assert.equal(a.tri.secours, '');
+});
+
 test('les plafonds : source non primaire 6, prépublication 8, annonce hors domaine officiel 2', async () => {
   const lot = { _articles: [
     art('np', { source: Object.assign({}, art('x').source, { nature: 'praticien', primaire: false }) }),

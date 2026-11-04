@@ -7,7 +7,8 @@ chaque point (rien, à surveiller, décision à ouvrir) et écrit la note. Le co
 assemblé par `workflows/build_parlia.py`. Le workflow a sa propre mémoire : la veille personnelle (v2 en service,
 v3) ne change pas.
 
-**État** : prêt, vérifié par `npm test` ; pas encore importé dans n8n, ni essayé en vrai.
+**État** : essayé dans n8n en mode test le 4 novembre 2026, corrigé, vérifié par `npm test` (130 tests) ; la mise en
+service attend le webhook du salon (section « Installer »).
 
 Thème : « Étiqueter les questions écrites du Sénat avec un modèle de langage commercial : choisir, mesurer et pouvoir
 remplacer le fournisseur, dans le respect du RGPD et du règlement européen sur l'IA. » Quatre axes : fournisseurs et
@@ -280,18 +281,26 @@ officiel (de 0,1 à 6 Mo). Il peut être relancé autant de fois que nécessaire
 - Les fichiers déjà écrits restent dans le dossier des préparations.
 - En dernier recours, la sauvegarde de l'étape 4 remet la base telle qu'elle était.
 
-## Ce qui n'a pas pu être vérifié sans n8n
+## Le premier essai dans n8n, le 4 novembre 2026
 
-Les nœuds Code sont testés comme n8n les exécute (`npm test`), et les paramètres des autres nœuds ont été vérifiés
-dans le code de n8n 2.10.3 (lecture et écriture de fichiers, extraction du texte, conversion en fichier, chaîne LLM).
-Restent à voir au premier essai :
+Deux essais en mode test, sur n8n 2.10.3, avant les montages vers le coffre (le fichier est allé dans `exports/`) :
 
-- les lectures des pages, des API et des archives du Journal officiel par `helpers.httpRequest` depuis un nœud
-  Code : n8n 2.10.3 l'expose, mais une archive arrive en octets à travers le task runner ;
-- la décompression d'une vraie archive (jusqu'à 40 Mo une fois ouverte) : durée et mémoire ;
-- les droits d'écriture sur le dossier monté à travers OrbStack, et la lecture des notes en lecture seule ;
-- les messages Components V2 publiés par webhook dans un post de forum ;
-- la qualité du tri : le jeu de contrôle de l'étude n'a pas encore été rejoué.
+- **Ce qui a marché** : 34 sources lues, 2 882 éléments, 68 triés par Mistral Small 3.2, dont 16 hors thème, 10 fiches
+  et 10 en réserve ; le fichier écrit à travers OrbStack ; l'exécution en moins d'une minute.
+- **Les archives du Journal officiel** arrivaient illisibles : à travers le task runner, les octets sont une vue
+  d'un autre contexte JavaScript, que `instanceof` ne reconnaît pas. `enOctets` les reconnaît à leur forme, et son
+  message d'erreur dit désormais la forme reçue. Au second essai : « lu sans problème ».
+- **Les deux pages Gemini** revenaient vides : `ai.google.dev` renvoie vers `aistudio.google.com`, dont les pages se
+  construisent dans le navigateur. Le bot lit leur version Markdown (`changelog.md`, `deprecations.md`) ; le lien de
+  la fiche reste la page lisible.
+- **Le tri** écrivait parfois « null » en toutes lettres, ou une nature « inconnue » pour une source connue : le
+  premier devient un champ vide, la seconde reprend la nature de la source.
+- **La lecture des notes** a été vérifiée hors de n8n, sur les vraies notes des séances 01 et 02 : la séance de la
+  semaine est reconnue, et les points « à surveiller » reviennent avec leur titre.
+
+Restent à voir après la mise en service : la lecture des notes à travers le montage en lecture seule, les messages
+publiés dans un post de forum, et la qualité du tri, à rejouer sur le jeu de contrôle de l'étude. Au premier essai,
+les hypothèses du tri restaient souvent générales (« pourrait influencer la conformité RGPD »).
 
 ## Les décisions qui restent à Louis
 

@@ -256,9 +256,23 @@ function textesDeLArchive(tar) {
 function enOctets(x) {
   if (x instanceof Uint8Array) return x;
   if (x instanceof ArrayBuffer) return new Uint8Array(x);
+  // Vu le 4 novembre 2026 dans n8n 2.10.3 : à travers le task runner, les octets arrivent comme une vue
+  // d'un autre contexte (instanceof échoue) ou comme un objet { 0: 31, 1: 139, … }.
+  if (x && typeof x === 'object' && typeof x.byteLength === 'number' && x.buffer !== undefined) {
+    return new Uint8Array(x.buffer, x.byteOffset || 0, x.byteLength);
+  }
+  if (x && typeof x === 'object' && typeof x.byteLength === 'number') return new Uint8Array(x);
   if (x && x.type === 'Buffer' && Array.isArray(x.data)) return Uint8Array.from(x.data);
   if (x && x.body !== undefined) return enOctets(x.body);
-  throw new Error("réponse illisible pour l'archive");
+  if (x && typeof x === 'object' && typeof x[0] === 'number' && typeof x[1] === 'number') {
+    const n = Object.keys(x).length;
+    const octets = new Uint8Array(n);
+    for (let i = 0; i < n; i++) octets[i] = x[i];
+    return octets;
+  }
+  // Le message dit la forme reçue, pour corriger sans deviner si n8n change encore de format.
+  const forme = Object.prototype.toString.call(x) + (x && typeof x === 'object' ? ' {' + Object.keys(x).slice(0, 4).join(', ') + '}' : '');
+  throw new Error("réponse illisible pour l'archive : " + forme);
 }
 const dateDuNom = (nom) => nom.slice(5, 9) + '-' + nom.slice(9, 11) + '-' + nom.slice(11, 13);
 function typeAlerte(titre) {

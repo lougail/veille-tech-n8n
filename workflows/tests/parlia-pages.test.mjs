@@ -9,7 +9,7 @@ import { executer, http, plan } from './aide-parlia.mjs';
 const PAGES = [
   'https://developers.openai.com/api/docs/changelog', 'https://developers.openai.com/api/docs/deprecations',
   'https://platform.claude.com/docs/en/about-claude/model-deprecations', 'https://docs.mistral.ai/resources/changelogs',
-  'https://ai.google.dev/gemini-api/docs/changelog?hl=en', 'https://ai.google.dev/gemini-api/docs/deprecations?hl=en',
+  'https://aistudio.google.com/docs/changelog.md', 'https://aistudio.google.com/docs/deprecations.md',
   'https://typesafe.ai/blog', 'https://docs.typesafe.ai/models', 'https://www.liquid.ai/news/models',
   'https://ai-act-service-desk.ec.europa.eu/fr/resources', 'https://digital-strategy.ec.europa.eu/en/policies/ai-office',
   'https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N53140',
@@ -22,6 +22,10 @@ const entree = (date, texte) => '<h2>' + date + '</h2><p>' + texte + '</p><div>F
 const BASE = Array.from({ length: 12 }, (_, i) => entree('October ' + (25 - i), "Entrée numéro " + i + " du journal, avec assez de texte pour faire une vraie ligne de contenu."));
 const page = (entrees) => '<html><head><title>T</title><script>var x = 1;</script></head><body><nav>Menu Docs API</nav><main><h1>Changelog</h1>'
   + entrees.join('') + '</main><footer>© 2026</footer></body></html>';
+// Les pages Gemini, lues en Markdown : « ## date », puis l'entrée en liste.
+const pageMd = (entrees) => '> ## AI Agent Context\n> Get the complete documentation index.\n\n# Release notes\n\n'
+  + entrees.map(([d, t]) => '## ' + d + '\n\n- ' + t + '\n').join('\n');
+const BASE_MD = Array.from({ length: 12 }, (_, i) => ['October ' + (25 - i) + ', 2026', 'Entrée numéro ' + i + ' du journal, avec assez de texte pour faire une vraie ligne de contenu.']);
 const modele = (id, extra = {}) => Object.assign({ id, name: id, created: 1790000000, context_length: 128000,
   pricing: { prompt: '0.0000001', completion: '0.0000005' }, description: 'Un modèle.' }, extra);
 const BOURRE = Array.from({ length: 60 }, (_, i) => modele('autre/modele-' + i));
@@ -33,7 +37,7 @@ const RESSOURCES = [['r1', 'Questions écrites', 'csv'], ['r2', 'Réponses', 'cs
 
 function table(modifs = {}) {
   const t = {};
-  for (const u of PAGES) t[u] = { statusCode: 200, body: page(BASE) };
+  for (const u of PAGES) t[u] = { statusCode: 200, body: u.endsWith('.md') ? pageMd(BASE_MD) : page(BASE) };
   t[OPENROUTER] = { statusCode: 200, body: catalogue() };
   t[DATAGOUV] = { statusCode: 200, body: fiche(RESSOURCES) };
   t[hf('Cloudflare')] = { statusCode: 200, body: [{ id: 'Cloudflare/clef', createdAt: '2026-10-09T08:00:00.000Z', tags: [] }] };
@@ -73,6 +77,19 @@ test("une entrée ajoutée en tête d'un journal devient un article, titré par 
   assert.match(a._cle, /^page:F09:/);
   assert.equal(a._source.kind, 'page');
   assert.equal(a.link, 'https://docs.mistral.ai/resources/changelogs');
+});
+
+test("une page en Markdown (Gemini) : ses intertitres se lisent comme ceux d'une page HTML, et le lien mène à la page lisible", async () => {
+  const U = 'https://aistudio.google.com/docs/changelog.md';
+  const sd = {};
+  await passer(sd, table());
+  const nouvelle = ['October 30, 2026', 'The \x60gemini-2.5-pro\x60 model is **deprecated** and will be redirected to [gemini-3.8-flash](/models) on December 1, 2026.'];
+  const { articles } = await passer(sd, table({ [U]: { statusCode: 200, body: pageMd([nouvelle].concat(BASE_MD)) } }));
+  assert.equal(articles.length, 1);
+  const a = articles[0];
+  assert.equal(a.title, "Google, journal de l'API Gemini — The gemini-2.5-pro model is deprecated and will be redirected to gemini-3.8-flash on December 1, 2026.");
+  assert.equal(a.isoDate, '2026-10-30T12:00:00.000Z');
+  assert.equal(a.link, 'https://aistudio.google.com/docs/changelog?hl=en');
 });
 
 test('les garde-fous : un refus, une page vidée, une page refaite', async () => {

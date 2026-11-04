@@ -25,9 +25,11 @@ const PAGES = [
   { id: 'F02', s: 'OpenAI, retraits de modèles', u: 'https://developers.openai.com/api/docs/deprecations', axe: 'fournisseurs', nature: 'editeur' },
   { id: 'F06', s: 'Anthropic, retraits de modèles', u: 'https://platform.claude.com/docs/en/about-claude/model-deprecations', axe: 'fournisseurs', nature: 'editeur' },
   { id: 'F09', s: 'Mistral, journal des modifications', u: 'https://docs.mistral.ai/resources/changelogs', axe: 'fournisseurs', nature: 'editeur' },
-  // Google sert une traduction automatique à qui demande le français : on lit l'anglais.
-  { id: 'F12', s: "Google, journal de l'API Gemini", u: 'https://ai.google.dev/gemini-api/docs/changelog?hl=en', axe: 'fournisseurs', nature: 'editeur', anglais: true },
-  { id: 'F13', s: 'Google, retraits de modèles Gemini', u: 'https://ai.google.dev/gemini-api/docs/deprecations?hl=en', axe: 'fournisseurs', nature: 'editeur', anglais: true },
+  // Google a déplacé sa documentation sur aistudio.google.com, dont les pages se construisent dans le navigateur
+  // (vu le 4 novembre 2026 : aucun texte dans le HTML) ; la version Markdown de chaque page, elle, porte le texte.
+  // Le lien montré dans la préparation reste la page lisible.
+  { id: 'F12', s: "Google, journal de l'API Gemini", u: 'https://aistudio.google.com/docs/changelog.md', voir: 'https://aistudio.google.com/docs/changelog?hl=en', axe: 'fournisseurs', nature: 'editeur', anglais: true, markdown: true },
+  { id: 'F13', s: 'Google, retraits de modèles Gemini', u: 'https://aistudio.google.com/docs/deprecations.md', voir: 'https://aistudio.google.com/docs/deprecations?hl=en', axe: 'fournisseurs', nature: 'editeur', anglais: true, markdown: true },
   { id: 'D02', s: 'TypeSafe AI, blog', u: 'https://typesafe.ai/blog', axe: 'fournisseurs', nature: 'editeur', decision: true },
   { id: 'Y02', s: 'TypeSafe AI, page des modèles', u: 'https://docs.typesafe.ai/models', axe: 'fournisseurs', nature: 'editeur', decision: true },
   { id: 'D04', s: 'Liquid AI, actualités des modèles', u: 'https://www.liquid.ai/news/models', axe: 'fournisseurs', nature: 'editeur', decision: true },
@@ -74,6 +76,26 @@ const prixM = (v) => {
 const dollars = (n) => (n == null ? '?' : String(n).replace('.', ',') + ' $');
 
 // ---- Pages : le texte visible, en lignes ; « §T » marque un intertitre ----
+// Une page en Markdown : une ligne par ligne non vide ; « # Titre » devient un intertitre ; les liens gardent
+// leur texte, les marques de mise en forme et les blocs de code partent.
+function lignesDuMarkdown(texte) {
+  const lignes = [];
+  let dansCode = false;
+  for (const brute of String(texte).replace(/\r\n?/g, '\n').split('\n')) {
+    if (/^\s*(\x60\x60\x60|~~~)/.test(brute)) { dansCode = !dansCode; continue; }
+    if (dansCode || /^\s*>/.test(brute)) continue;
+    const titre = /^\s*#{1,6}\s+(.+)$/.exec(brute);
+    const sans = (titre ? titre[1] : brute)
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/[*\x60]+/g, '')
+      .replace(/^\s*([-+]|\d+\.)\s+/, '');
+    const l = texteSimple(sans);
+    if (l.length > 1) lignes.push(titre ? '§T ' + l : l);
+  }
+  return lignes;
+}
 function lignesDe(html) {
   let h = String(html);
   const m1 = h.search(/<main\b/i);
@@ -148,7 +170,8 @@ function comparer(lignes, etat) {
   return { nouveau, blocs: blocs.filter((b) => b.lignes.join(' ').length >= 60).slice(0, 5) };
 }
 async function page(p) {
-  const lignes = lignesDe(texteDe(await lire(p.u, p.anglais)));
+  const corps = texteDe(await lire(p.u, p.anglais));
+  const lignes = p.markdown ? lignesDuMarkdown(corps) : lignesDe(corps);
   if (!sd.pages) sd.pages = {};
   const r = comparer(lignes, sd.pages[p.id]);
   if (r.erreur) throw new Error(r.erreur);
@@ -159,7 +182,7 @@ async function page(p) {
     const date = dateDuBloc(texte, b.avant);
     return { json: {
       title: tronquer(p.s + ' — ' + tete, 200),
-      link: p.u,
+      link: p.voir || p.u,
       isoDate: date ? date + 'T12:00:00.000Z' : undefined,
       contentSnippet: tronquer((b.avant && !b.titre ? 'Sous « ' + b.avant + ' » : ' : '') + texte, 900),
       _cle: 'page:' + p.id + ':' + hacher(texte),

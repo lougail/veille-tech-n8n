@@ -27,7 +27,12 @@ function lireJson(texte) {
     return null;
   }
 }
-const texteCourt = (v, n) => tronquer(texteSimple(v == null ? '' : v), n);
+// « null », « none » ou « n/a » écrits en toutes lettres par le modèle (vu le 4 novembre 2026) : un champ vide.
+const VIDE = /^(null|none|n\/?a|undefined|aucun|aucune|néant)$/i;
+const texteCourt = (v, n) => {
+  const t = texteSimple(v == null ? '' : v);
+  return VIDE.test(t) ? '' : tronquer(t, n);
+};
 
 function secours(a, motif) {
   return {
@@ -55,7 +60,8 @@ function valider(a, p) {
     pertinence,
     hypothese: texteCourt(p.hypothese, 320),
     source_primaire: typeof p.source_primaire === 'boolean' ? p.source_primaire : !!a.source.primaire,
-    nature: PARLIA.NATURES.includes(p.nature) ? p.nature : 'inconnu',
+    // « inconnu », ou une nature hors de la liste : celle que la liste des sources donne pour cette source.
+    nature: PARLIA.NATURES.includes(p.nature) && p.nature !== 'inconnu' ? p.nature : (a.source.nature || 'inconnu'),
     resume: texteCourt(p.resume, 320),
     a_chercher: texteCourt(p.a_chercher, 320),
     drapeaux,
