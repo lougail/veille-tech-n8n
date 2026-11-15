@@ -28,8 +28,33 @@ test('la consigne : des lots de 12, la date du jour, la liste de suivi, les arti
   assert.match(p, /--- ARTICLE id=a0 ---/);
   assert.match(p, /Un extrait avec \$& et \{DATE\} dedans/);
   assert.doesNotMatch(p, /\{ARTICLES\}|\{LISTE_DE_SUIVI\}/);
-  assert.equal(lots[0]._version, 'sources.md 5.2 du 29 octobre 2026');
+  assert.doesNotMatch(p, /\{ETAT_DU_PROJET\}|\{DATE\}\./);
+  assert.equal(lots[0]._version, 'sources.md 5.2 du 15 novembre 2026');
   assert.deepEqual(await executer('consigne-tri-parlia.js', { input: [{ _rien: true }] }), []);
+});
+
+// Semaine 46 : la consigne du 29 octobre disait « Le 8 novembre 2026, Louis compare des services d'étiquetage. Le
+// comparatif inclut des modèles de décision : la Decisions API d'OpenAI (GPT-6 Luna), Jev de TypeSafe AI, Clef de
+// Cloudflare, d1 de Liquid AI. » Mistral Small en a tiré « le choix de ParlIA pour Jev », « les modèles de décision
+// utilisés par ParlIA ». Rien n'était choisi : l'application utilise le modèle entraîné par Louis.
+test("la consigne ne dit jamais qu'un modèle est utilisé par ParlIA : les modèles de décision sont des candidats à l'étude", async () => {
+  const [lot] = await executer('consigne-tri-parlia.js', { input: [art('a0')], maintenant: MAINTENANT });
+  const consigne = lot.prompt.slice(0, lot.prompt.indexOf('\nARTICLES\n'));
+  assert.doesNotMatch(consigne, /Louis compare|comparatif inclut/i);
+  assert.match(consigne, /l'application n'utilise aucun service d'IA du marché/);
+  // Chaque phrase où un service ou un modèle est utilisé est une négation (« utilisable », un adjectif, ne compte pas).
+  const phrases = consigne.split(/[.;]\s|\n/).filter((ph) => /utilis(?:e|é|ée|és|ées|ent|er|ons|ez)?(?![a-zà-ÿ])/i.test(ph));
+  assert.ok(phrases.length >= 3);
+  for (const ph of phrases) assert.match(ph, /\baucun\b|\bjamais\b|n'utilise/, ph);
+  // La Decisions API, Jev, Clef et d1 n'apparaissent dans l'état du projet que comme candidats à l'étude.
+  const etat = consigne.slice(consigne.indexOf("L'ÉTAT DU PROJET"), consigne.indexOf('LE THÈME'));
+  const candidats = etat.split('\n').filter((l) => /Decisions API|Jev|Clef|\bd1\b/.test(l) && !l.startsWith('Modèles suivis'));
+  assert.equal(candidats.length, 1);
+  assert.match(candidats[0], /^- Les candidats à l'étude pour ce comparatif, dont aucun n'est utilisé : /);
+  for (const nom of ["la Decisions API d'OpenAI", 'Jev de TypeSafe AI', 'Clef de Cloudflare', 'd1 de Liquid AI']) assert.ok(candidats[0].includes(nom), nom);
+  // L'état du projet ne porte aucune date au jour près : il ne peut pas vieillir comme celui du 29 octobre.
+  const sansAujourdhui = etat.replace(/Nous sommes le .*\./, '');
+  assert.doesNotMatch(sansAujourdhui, /\b\d{1,2}(er)? (janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre) 20\d{2}\b|\b20\d{2}-\d{2}-\d{2}\b/);
 });
 
 async function lire(lots, reponses) {

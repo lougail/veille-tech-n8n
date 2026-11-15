@@ -54,11 +54,18 @@ disparitions : ces drapeaux sont calculés par le programme, le tri ne peut pas 
 
 ### Le tri
 
-La consigne (`consigne-tri-parlia.js`) reprend mot pour mot celle de l'étude (§5.2) : le projet, le thème et ses
-axes, un barème de pertinence sur 10, des plafonds, trois exemples, la liste de suivi. Pour chaque article, Mistral
-Small 3.2 propose un axe, une note, une hypothèse au conditionnel (« ce que ça pourrait changer pour ParlIA »), la
-nature de la source, un résumé de deux lignes, ce qu'il faut chercher dans l'original, quatre drapeaux et une date
-d'effet.
+La consigne (`consigne-tri-parlia.js`) est celle de l'étude (§5.2), dans sa version du 15 novembre 2026
+(`VERSION` : « sources.md 5.2 du 15 novembre 2026 »). L'état du projet y forme un bloc à part, `ETAT_DU_PROJET`,
+écrit sans date : ParlIA n'utilise aucun service du marché, le comparatif n'a pas commencé, et la Decisions API, Jev,
+Clef et d1 sont des candidats à l'étude. C'est ce bloc qu'on met à jour quand le projet avance, en changeant
+`VERSION` en même temps. Suivent le thème et ses axes, le lien concret avec ParlIA (sans lien : l'axe « hors_theme »
+et l'hypothèse « rien »), un barème de pertinence sur 10, des plafonds, la lecture d'une ligne de tableau de retraits
+(le modèle arrêté, puis son remplaçant), cinq exemples, la liste de suivi. La version du 29 octobre disait que Louis
+comparait des services le 8 novembre : le tri en concluait que ParlIA les utilisait (préparation de la semaine 46).
+
+Pour chaque article, Mistral Small 3.2 propose un axe, une note, une hypothèse au conditionnel (« ce que ça pourrait
+changer pour ParlIA »), la nature de la source, un résumé de deux lignes, ce qu'il faut chercher dans l'original,
+quatre drapeaux et une date d'effet.
 
 Le programme vérifie ce qu'il vérifie mieux que le modèle (`lire-tri-parlia.js`, §5.3) :
 

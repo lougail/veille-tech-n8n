@@ -84,7 +84,7 @@ test('les fiches guidées : deux lignes, quoi chercher, les deux questions, l\'h
     assert.ok(fiche1.includes(l), l);
   }
   assert.match(md, /#### Fiche 2 · Fournisseurs et coûts · praticien, source non primaire, à recouper · note du tri : 6\/10/);
-  assert.match(md, /- L'hypothèse du tri : Pas d'hypothèse du tri : à formuler en séance\./);
+  assert.match(md, /- L'hypothèse du tri : Rien pour ParlIA, d'après le tri : à confirmer ou à contredire en séance\./);
   assert.match(md, /\*\*La CNIL et le CEPD cette semaine\*\* : « @everyone regardez » \(CNIL, actualités\), fiche 4/);
   assert.match(md, /- 30 novembre 2026 : Arrêt d'OpenAI Evals \(sources\.md, 6\.4\)/);
   assert.match(md, /- Attributions : « Décret relatif aux attributions du ministre du travail » \(30 octobre 2026/);

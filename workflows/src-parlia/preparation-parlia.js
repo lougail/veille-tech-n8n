@@ -42,7 +42,11 @@ const laSemaine = 'semaine ' + semaine.numero + ', ' + periode(semaine.lundi, se
 const nature = (c) => (PARLIA.NOM_NATURE[c.nature] || 'nature inconnue') + ', ' + (c.primaire ? 'source primaire' : 'source non primaire, à recouper');
 const listeNumeros = (ns) => (ns.length <= 1 ? 'la fiche ' + (ns[0] || '') : 'les fiches ' + ns.slice(0, -1).join(', ') + ' et ' + ns[ns.length - 1]);
 const plage = (ns) => (ns.length === 1 ? 'fiche ' + ns[0] : (ns[ns.length - 1] === ns[0] + 1 ? 'fiches ' + ns[0] + ' et ' + ns[1] : 'fiches ' + ns[0] + ' à ' + ns[ns.length - 1]));
-const hypothese = (c) => (c.hypothese && !/^rien\.?$/i.test(c.hypothese) ? c.hypothese : "Pas d'hypothèse du tri : à formuler en séance.");
+// « rien » : le tri ne voit pas de lien concret avec ParlIA. Un champ vide : il n'a pas proposé d'hypothèse.
+const hypothese = (c) => {
+  if (/^rien\.?$/i.test(String(c.hypothese || '').trim())) return "Rien pour ParlIA, d'après le tri : à confirmer ou à contredire en séance.";
+  return c.hypothese || "Pas d'hypothèse du tri : à formuler en séance.";
+};
 
 // ---- Sources interrogées ----
 const carnet = sd.semaine || { collectes: 0, parSource: {} };
