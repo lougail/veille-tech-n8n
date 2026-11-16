@@ -11,6 +11,8 @@
 //   de la semaine (thread_name) ; les messages suivants y vont (nœud Fiches).
 // La date de la préparation est posée ici ; si l'ouverture échoue dans Discord, le nœud Fiches la retire, et la
 // préparation repart au passage suivant (trois essais par semaine au plus).
+// La date d'un candidat : celle de sa publication, signalée quand elle précède la période lue ; sans date donnée
+// par la source, « date inconnue », avec le jour où le bot l'a vu (jamais ce jour à la place de la date).
 const sd = $getWorkflowStaticData('global');
 const plan = $('Que faire ?').first().json;
 const reglages = plan.reglages || {};
@@ -47,6 +49,8 @@ const hypothese = (c) => {
   if (/^rien\.?$/i.test(String(c.hypothese || '').trim())) return "Rien pour ParlIA, d'après le tri : à confirmer ou à contredire en séance.";
   return c.hypothese || "Pas d'hypothèse du tri : à formuler en séance.";
 };
+const quand = (c) => (c.date ? dateLongue(c.date) + (c.avantPeriode ? ', avant la période lue' : '')
+  : 'date inconnue' + (c.vu ? ' (vu le ' + dateLongue(c.vu) + ')' : ''));
 
 // ---- Sources interrogées ----
 const carnet = sd.semaine || { collectes: 0, parSource: {} };
@@ -134,7 +138,7 @@ for (const axe of PARLIA.AXES) {
   L.push('| N° | Élément et date | Source et nature | Lien | Ce que ça pourrait changer pour ParlIA (hypothèse) |');
   L.push('|---|---|---|---|---|');
   for (const c of liste) {
-    const element = '« ' + c.titre + ' »' + (c.resume ? ' : ' + c.resume.replace(/\.?$/, '.') : '.') + (c.date ? ' ' + dateLongue(c.date) : '');
+    const element = '« ' + c.titre + ' »' + (c.resume ? ' : ' + c.resume.replace(/\.?$/, '.') : '.') + ' ' + quand(c);
     let src = c.source + ' : ' + PARLIA.NOM_NATURE[c.nature] + ', ' + (c.primaire ? 'primaire' : 'non primaire, à recouper');
     if (c.aussi && c.aussi.length) src += '. Couvert aussi par : ' + c.aussi.map((a) => a.s).join(', ');
     L.push('| ' + [c.n, element, src, c.url, hypothese(c)].map(cellule).join(' | ') + ' |');
@@ -158,7 +162,12 @@ for (const id of Object.keys(sante)) {
 for (const c of candidats) {
   if (c.secours) nonVerifie.push('Fiche ' + c.n + " : le tri automatique n'a pas répondu (" + c.secours + ') ; note de secours, à lire en entier.');
   if (!c.primaire) nonVerifie.push('Fiche ' + c.n + " : source non primaire ; l'original reste à trouver.");
-  if (!c.date) nonVerifie.push('Fiche ' + c.n + ' : date de publication inconnue.');
+  if (!c.date) nonVerifie.push('Fiche ' + c.n + ' : date de publication inconnue' + (c.vu ? " ; le bot l'a vue le " + dateLongue(c.vu) : '') + '.');
+  if (c.avantPeriode) {
+    nonVerifie.push('Fiche ' + c.n + ' : publiée le ' + dateLongue(c.date) + ', avant la période lue (qui commence le '
+      + dateLongue(sel.jourDebut) + ") : un article ancien, ou la mise à jour d'un avis ancien.");
+  }
+  if (c.dateAvant && c.dateEffet) nonVerifie.push('Fiche ' + c.n + ' : la source a changé la date, du ' + dateLongue(c.dateAvant) + ' au ' + dateLongue(c.dateEffet) + '.');
   if (c.plafonds) nonVerifie.push('Fiche ' + c.n + ' : note plafonnée (' + c.plafonds + ').');
 }
 nonVerifie.forEach((l) => L.push('- ' + l));
@@ -171,7 +180,7 @@ if (total) {
     L.push('');
     L.push('#### Fiche ' + c.n + ' · ' + PARLIA.NOM_AXE[c.axe] + ' · ' + nature(c) + ' · note du tri : ' + c.p + '/10');
     L.push('');
-    L.push('**« ' + c.titre + ' »**' + (c.date ? ' — ' + dateLongue(c.date) : '') + ' — ' + c.source);
+    L.push('**« ' + c.titre + ' »** — ' + quand(c) + ' — ' + c.source);
     L.push('');
     L.push("- En deux lignes (résumé automatique, à vérifier dans l'original) : " + (c.resume || "pas de résumé : lire l'original."));
     L.push("- À chercher dans l'original : " + (c.aChercher || 'la date, les chiffres et ce qui change concrètement.'));
@@ -196,9 +205,15 @@ L.push('');
 L.push('### Échéances dans les 90 jours');
 L.push('');
 if (sel.echeances && sel.echeances.length) {
-  sel.echeances.forEach((e) => L.push('- ' + dateLongue(e.date) + ' : ' + e.titre + (e.source ? ' (' + e.source + ')' : '') + (e.url ? ' — ' + e.url : '')));
+  sel.echeances.forEach((e) => L.push('- ' + dateLongue(e.date) + ' : ' + e.titre + (e.avant ? " (date changée par la source : c'était le " + dateLongue(e.avant) + ')' : '')
+    + (e.source ? ' (' + e.source + ')' : '') + (e.url ? ' — ' + e.url : '')));
 } else {
   L.push('Aucune échéance connue.');
+}
+if (sel.echeancesChangees && sel.echeancesChangees.length) {
+  L.push('');
+  L.push('Changées ou retirées par la source depuis leur relevé, à vérifier dans l\'original :');
+  sel.echeancesChangees.forEach((e) => L.push('- ' + dateLongue(e.date) + ' : ' + e.titre + ' (texte changé le ' + dateLongue(e.changee) + ')' + (e.url ? ' — ' + e.url : '')));
 }
 L.push('');
 L.push('### Alertes depuis la dernière préparation');
@@ -257,7 +272,7 @@ if (reglages.forum) ouverture.payload.thread_name = ('Semaine ' + semaine.numero
 function carte(c) {
   const comps = [];
   comps.push({ type: 10, content: '### Fiche ' + c.n + '/' + total + ' · ' + PARLIA.NOM_AXE[c.axe] + '\n**' + md(tronquer(c.titre, 200)) + '**\n-# '
-    + [c.date ? dateLongue(c.date) : 'date inconnue', md(c.source), nature(c), 'note du tri ' + c.p + '/10'].join(' · ') });
+    + [quand(c), md(c.source), nature(c), 'note du tri ' + c.p + '/10'].join(' · ') });
   comps.push({ type: 10, content: '**En deux lignes** : ' + md(tronquer(c.resume || "pas de résumé : lire l'original.", 400))
     + "\n**À chercher dans l'original** : " + md(tronquer(c.aChercher || 'la date, les chiffres et ce qui change concrètement.', 400)) });
   comps.push({ type: 10, content: "**Deux questions** : qu'est-ce qui sort ? Est-ce que ça pourrait servir à ParlIA ?\n**L'hypothèse du tri** : "

@@ -16,7 +16,7 @@ const fichiers = readdirSync(new URL('workflows/src-parlia/', racine)).filter((f
 const codes = wf.nodes.filter((n) => n.type === 'n8n-nodes-base.code');
 const AsyncFunction = (async () => {}).constructor;
 const OUTILS_NOMS = ['PARLIA', 'texteSimple', 'tronquer', 'hacher', 'domaineDe', 'cleAdresse', 'cellule', 'pourDiscord', 'MOIS_FR',
-  'dateLongue', 'MOIS_EN', 'dateDansTexte', 'noterSante', 'pousserAlerte'];
+  'dateLongue', 'MOIS_EN', 'datesDansTexte', 'dateDansTexte', 'noterSante', 'pousserAlerte'];
 
 test('le JSON est à jour : chaque nœud Code reprend son fichier de src-parlia/, outils en tête quand il en a besoin', () => {
   const utilises = new Set();

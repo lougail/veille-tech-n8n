@@ -34,7 +34,7 @@ test("l'étiquetage : la fiche de la source, une erreur, un flux vide", async ()
   });
   assert.equal(sortie[0]._source.id, 'A08');
   assert.equal(sortie[0]._source.cnil, true);
-  assert.equal(sortie[0].content.length, 1500);
+  assert.equal(sortie[0].content.length, 2500);
   assert.match(sortie[1].erreur, /ENOTFOUND/);
   assert.equal(sortie[2]._vide, true);
 });
@@ -137,4 +137,49 @@ test('la santé des pages et des API vient de leurs éléments _sante ; le carne
   assert.deepEqual(sd.semaine.parSource.F01, { s: "OpenAI, journal de l'API", lus: 0, echecs: 1, k: 'autre' });
   assert.equal(sd.semaine.parSource.A05.k, 'flux');
   assert.equal(sd.lastCollectAt, ms(MAINTENANT));
+});
+
+// Fiche 1 de la semaine 46 : le billet de TypeSafe du 3 novembre 2026, vu le 5 sur la page du blog qui ne date
+// pas ses billets, portait le 5 et entrait dans une période qui commençait le 4.
+test("fiche 1 (semaine 46) : sans date de publication, « date inconnue », et le jour où le bot a vu l'article, à part", async () => {
+  const blog = src('D02', { s: 'TypeSafe AI, blog', kind: 'page', decision: true });
+  const [a] = await executer('normaliser-parlia.js', { sd: {}, maintenant: '2026-11-05T10:02', input: [{
+    title: 'TypeSafe AI, blog — Don’t Call It a Decision Model', link: 'https://typesafe.ai/blog', _cle: 'page:D02:abc',
+    contentSnippet: 'Thoughts · Don’t Call It a Decision Model · Jev makes judgments, code makes decisions.', _source: blog,
+  }] });
+  assert.equal(a.date, '');
+  assert.equal(a.vu.slice(0, 10), '2026-11-05');
+  const [lot] = await executer('consigne-tri-parlia.js', { input: [a], maintenant: '2026-11-05T10:02' });
+  assert.match(lot.prompt, /Publié le : date inconnue \(vu par le bot le 2026-11-05\)/);
+  // Datés par leur source, les articles gardent leur date.
+  const [b] = await normaliser([article('Un billet daté', 'https://typesafe.ai/blog/b', 2, src('A03'))], {});
+  assert.equal(b.date.slice(0, 10), '2026-10-31');
+});
+
+// Fiche 3 de la semaine 46 : Cloudflare a repoussé du 15 au 20 novembre 2026 l'arrêt annoncé dans son billet du
+// 5 novembre, sans changer sa date de publication ; la préparation gardait le 15.
+test("fiche 3 (semaine 46) : quand la source change le texte d'un article dont l'échéance est relevée, il est trié de nouveau", async () => {
+  const cf = src('X01', { s: 'Cloudflare, journal de Workers AI', decision: true });
+  const url = 'https://developers.cloudflare.com/changelog/post/2026-11-05-planned-model-deprecations/';
+  const billet = (texte, lien = url) => ({ title: 'Workers AI - Planned model deprecations on Workers AI', link: lien,
+    isoDate: '2026-11-05T00:00:00.000Z', contentSnippet: texte, _source: cf });
+  const avant = 'Update your apps to remove references to the models listed below before November 15, 2026.';
+  const apres = 'Update your apps to remove references to the models listed below before November 20, 2026. We originally stated these models would be deprecated on November 15, 2026, and have moved the deprecation date to November 20, 2026.';
+  const sd = {};
+  const [a] = await executer('normaliser-parlia.js', { input: [billet(avant)], sd, maintenant: '2026-11-06T08:59' });
+  sd.echeances = [{ date: '2026-11-15', titre: a.titre, url, s: cf.s, id: a.id, cle: a.cle, empreinte: a.empreinte }];
+  assert.deepEqual(await executer('normaliser-parlia.js', { input: [billet(avant)], sd, maintenant: '2026-11-10T09:45' }), [{ _rien: true }]);
+  const [b] = await executer('normaliser-parlia.js', { input: [billet(apres)], sd, maintenant: '2026-11-10T13:45' });
+  assert.equal(b.id, a.id);
+  assert.deepEqual(b.maj, { date: '2026-11-15' });
+  assert.equal(sd._passage.collecteStats.majEcheances, 1);
+  // Une échéance relevée avant cette version n'a ni identifiant ni empreinte : reconnue par l'adresse de son
+  // article, elle le fait trier une fois de plus, avec la nouvelle consigne.
+  const ancienne = { vus: { [a.cle]: ms('2026-11-06T08:59') }, echeances: [{ date: '2026-11-15', titre: a.titre, url, s: cf.s }] };
+  const [c] = await executer('normaliser-parlia.js', { input: [billet(apres)], sd: ancienne, maintenant: '2026-11-10T09:45' });
+  assert.deepEqual(c.maj, { date: '2026-11-15' });
+  // Sans échéance relevée, un article déjà vu reste écarté, même si son texte change.
+  const sans = {};
+  await executer('normaliser-parlia.js', { input: [billet(avant, url + 'autre')], sd: sans, maintenant: '2026-11-06T08:59' });
+  assert.deepEqual(await executer('normaliser-parlia.js', { input: [billet(apres, url + 'autre')], sd: sans, maintenant: '2026-11-06T13:15' }), [{ _rien: true }]);
 });

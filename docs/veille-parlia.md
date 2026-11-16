@@ -47,10 +47,32 @@ Les 32 sources « à retenir » de l'étude des sources du 29 octobre 2026 (§4.
 
 Une page sans flux est comparée à celle de la veille : les lignes nouvelles qui se suivent forment un article. Le
 premier passage apprend la page sans rien proposer ; une page qui perd plus de 70 % de ses lignes est une panne, une
-page dont plus de 40 % des lignes changent a été refaite et n'est pas proposée. Le catalogue d'OpenRouter donne les
+page dont plus de 40 % des lignes changent a été refaite et n'est pas proposée. Une ligne, c'est un paragraphe, un
+élément de liste, ou une rangée de tableau dont chaque cellule est précédée de l'en-tête de sa colonne :
+« Shutdown date : Dec 1, 2026 · Affected model : chatgpt-image-latest · Status : Deprecated · Recommended
+replacement : gpt-image-2.6-sunburst or gpt-image-2.6-flare · Notice date : Jun 2, 2026 ». Sans les en-têtes, le tri
+avait annoncé l'arrêt des remplaçants (fiche 4 de la semaine 46). Le même découpage lit les tableaux Markdown de
+Gemini et garde le nom des modèles d'Anthropic, écrit dans un bouton. Depuis ce changement (15 novembre 2026),
+chaque page est réapprise une fois, sans rien proposer. Le catalogue d'OpenRouter donne les
 nouveaux modèles des fournisseurs du thème et, pour la liste de suivi (GPT-6 Luna, Claude Haiku 5.5, Mistral
 Small 3.2, GPT-4o mini, GPT-6.1 Terra, Gemini 4 Argon), les changements de prix, les retraits annoncés et les
 disparitions : ces drapeaux sont calculés par le programme, le tri ne peut pas les oublier.
+
+Les dates :
+
+- la date d'un article est celle que donne sa source ; sans elle, l'article n'en reçoit pas (« date inconnue »), et
+  le jour où le bot l'a vu est gardé à part. Le billet de TypeSafe du 3 novembre 2026, vu le 5 sur la page du blog,
+  portait le 5 (fiche 1 de la semaine 46) ;
+- sur une page sans flux, la date d'un bloc est sa première date déjà passée, sinon celle de son intertitre : une
+  date à venir est une date d'effet (un arrêt annoncé), et une date collée à un nom de modèle
+  (« gpt-image-2-2026-04-21 ») n'est pas une date ;
+- un candidat publié avant le premier jour de la période lue est signalé : un article ancien, ou la mise à jour
+  d'un avis ancien ;
+- une échéance relevée garde la clé et l'empreinte du texte de son article. Si la source change ce texte, l'article
+  est trié de nouveau, même ancien : une autre date remplace l'ancienne, rappelée dans la préparation (« c'était le
+  15 novembre »), et l'article revient parmi les candidats. Cloudflare avait repoussé du 15 au 20 novembre l'arrêt
+  de la fiche 3 de la semaine 46 sans que la préparation le voie. Une échéance relevée sur une page sans flux dont
+  les lignes disparaissent est signalée comme changée ou retirée par la source, à vérifier.
 
 ### Le tri
 
@@ -77,6 +99,8 @@ Le programme vérifie ce qu'il vérifie mieux que le modèle (`lire-tri-parlia.j
 - la réponse brute et la version de la consigne sont gardées avec l'article, pour pouvoir rejouer le tri.
 
 Coût : environ 85 articles par semaine, une dizaine de demandes, moins de 5 centimes de dollar par mois.
+Chaque article arrive au tri avec un extrait de 1 200 caractères au plus (600 jusqu'au 15 novembre 2026 : les
+résumés d'arXiv étaient coupés au milieu, comme celui de la fiche 9 de la semaine 46).
 
 ### La sélection
 
@@ -95,7 +119,8 @@ Coût : environ 85 articles par semaine, une dizaine de demandes, moins de 5 cen
 8. hors thème : jamais.
 
 Le reste, noté 4 ou plus, va dans la réserve. Les échéances des 90 jours suivants (retraits de modèles, dates du
-règlement IA) sont rappelées en pied de préparation.
+règlement IA) sont rappelées en pied de préparation, avec l'ancienne date quand la source l'a changée ; celles que
+la source a changées ou retirées sans date lisible sont mises à part, à vérifier.
 
 ### Le fichier de préparation
 
@@ -176,7 +201,8 @@ dans le journal que reprend le fichier de la semaine.
   suivante repart de la dernière collecte réussie.
 
 La mémoire du workflow garde : la date de la dernière collecte, les adresses déjà vues (45 jours), la santé des
-sources, le registre des articles triés (400 au plus, 16 jours), les échéances, les empreintes des pages sans flux,
+sources, le registre des articles triés (400 au plus, 16 jours), les échéances (jusqu'à 14 jours après leur date,
+avec l'empreinte du texte de leur article), les empreintes des pages sans flux et leur format,
 l'état du catalogue d'OpenRouter, de data.gouv.fr et de Hugging Face, la dernière archive lue du Journal officiel,
 les alertes envoyées et la préparation de la semaine.
 

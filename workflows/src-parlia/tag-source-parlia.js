@@ -1,5 +1,7 @@
 // Attache la fiche de la source à chaque article lu par le nœud RSS, et allège l'article : seuls les champs
-// utiles sont gardés, tronqués. Une erreur de lecture devient un élément « erreur », compté par la santé des flux.
+// utiles sont gardés, tronqués (assez long pour l'extrait de 1 200 caractères que reçoit le tri : un résumé
+// d'arXiv en fait souvent 1 000 à 1 900). Une erreur de lecture devient un élément « erreur », compté par la santé
+// des flux.
 const flux = $('Flux ParlIA').first().json;
 const source = {
   id: flux.id, s: flux.s, u: flux.u, axe: flux.axe, nature: flux.nature, primaire: !!flux.primaire,
@@ -14,7 +16,7 @@ return $input.all().map((item) => {
   return { json: {
     title: court(j.title, 300), link: j.link || j.url || j.id, guid: j.guid,
     isoDate: j.isoDate, pubDate: j.pubDate, date: j.date, published: j.published, updated: j.updated,
-    contentSnippet: court(j.contentSnippet, 900), summary: court(j.summary, 900), content: court(j.content, 1500),
+    contentSnippet: court(j.contentSnippet, 1500), summary: court(j.summary, 1500), content: court(j.content, 2500),
     _source: source,
   } };
 });

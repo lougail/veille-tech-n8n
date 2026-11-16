@@ -4,6 +4,16 @@
 //   fois. staticData n'est enregistré qu'après une exécution réussie : si l'exécution échoue, la suivante repart
 //   de l'ancienne date et ne perd rien. Les pages sans flux et les API ne signalent que du neuf : pas de fenêtre.
 // - Un article déjà vu (même adresse, ou même bloc de page) est écarté pendant 45 jours.
+//   Sauf un article dont l'échéance est relevée (sd.echeances) quand sa source en change le texte : il est trié de
+//   nouveau, même ancien, pour reprendre sa date. Cloudflare a repoussé du 15 au 20 novembre 2026, dans le même
+//   billet, l'arrêt de la fiche 3 de la semaine 46 ; la préparation gardait le 15. La clé et l'empreinte du texte
+//   sont gardées avec l'échéance (registre-parlia.js). Une échéance relevée avant le 15 novembre 2026 n'en a pas :
+//   reconnue par l'adresse de son article, elle le fait trier une fois de plus, avec la consigne du 15 novembre.
+// - Sans date de publication, l'article n'en reçoit pas : « date inconnue ». Le jour où le bot l'a vu est gardé à
+//   part (vu). Le 9 novembre 2026, le billet de TypeSafe du 3 novembre portait le 5, jour de la collecte, et entrait
+//   dans une période qui commençait le 4.
+// - L'extrait : 1 200 caractères au plus (600 jusqu'au 15 novembre 2026, ce qui coupait les résumés d'arXiv au
+//   milieu : fiche 9 de la semaine 46).
 // - Un domaine officiel est celui d'un éditeur ou d'une institution suivis (sources.md, 5.3) : le tri le reçoit,
 //   pour plafonner une « annonce » publiée ailleurs.
 // - Les communiqués de l'Élysée ne sont jamais triés : un titre sur la nomination ou la composition du
@@ -18,6 +28,8 @@ const fenetre = derniere ? Math.min(14 * J, Math.max(2 * J, maintenant - dernier
 const depuis = maintenant - fenetre;
 if (!sd.vus) sd.vus = {};
 for (const [cle, t] of Object.entries(sd.vus)) if (maintenant - t > 45 * J) delete sd.vus[cle];
+const echeances = sd.echeances || [];
+const echeanceDe = (cle) => echeances.find((e) => (e.id ? e.cle === cle && !!e.empreinte : cleAdresse(e.url) === cle));
 
 const OFFICIELS = [
   'openai.com', 'anthropic.com', 'claude.com', 'mistral.ai', 'ai.google.dev', 'blog.google', 'googleblog.com',
@@ -41,7 +53,7 @@ const dateDe = (j) => {
 const MOIS = /\b(january|february|march|april|may|june|july|august|september|october|november|december|janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\b/gi;
 const titreUtile = (t) => /[a-zà-ÿ]{4}/i.test(t.replace(MOIS, ''));
 
-const stats = { lus: 0, nouveaux: 0, horsFenetre: 0, dejaVus: 0, ecartes: 0, parSource: {} };
+const stats = { lus: 0, nouveaux: 0, horsFenetre: 0, dejaVus: 0, ecartes: 0, majEcheances: 0, parSource: {} };
 const sante = {};
 const articles = [];
 for (const item of $input.all()) {
@@ -66,10 +78,14 @@ for (const item of $input.all()) {
   stats.lus++;
   stats.parSource[src.id] = (stats.parSource[src.id] || 0) + 1;
   if (!titreUtile(titre)) titre = src.s + ' — ' + titre;
-  const extrait = tronquer(texteSimple(j.contentSnippet || j.summary || j.content || j.description || ''), 600);
+  const extrait = tronquer(texteSimple(j.contentSnippet || j.summary || j.content || j.description || ''), 1200);
   const pub = dateDe(j);
   const parFlux = src.kind !== 'page' && src.kind !== 'api';
-  if (parFlux && pub && pub < depuis) { stats.horsFenetre++; continue; }
+  const cle = j._cle || cleAdresse(url) || hacher(titre);
+  const empreinte = hacher(extrait);
+  const echeance = sd.vus[cle] ? echeanceDe(cle) : null;
+  const maj = !!echeance && echeance.empreinte !== empreinte;
+  if (parFlux && pub && pub < depuis && !maj) { stats.horsFenetre++; continue; }
 
   if (src.role === 'detecteur') {
     if (/nomination du gouvernement|composition du gouvernement|nomination du premier ministre/i.test(titre)) {
@@ -81,15 +97,18 @@ for (const item of $input.all()) {
     continue;
   }
   if (src.filtre && !new RegExp(src.filtre, 'i').test(titre + ' ' + extrait)) { stats.ecartes++; continue; }
-  const cle = j._cle || cleAdresse(url) || hacher(titre);
-  if (sd.vus[cle]) { stats.dejaVus++; continue; }
+  if (sd.vus[cle] && !maj) { stats.dejaVus++; continue; }
   sd.vus[cle] = maintenant;
   stats.nouveaux++;
+  if (maj) stats.majEcheances++;
   articles.push({
     id: hacher(cle),
+    cle,
+    empreinte,
     titre: tronquer(titre, 220),
     url,
-    date: pub ? new Date(pub).toISOString() : $now.toUTC().toISO(),
+    date: pub ? new Date(pub).toISOString() : '',
+    vu: $now.toUTC().toISO(),
     extrait,
     officiel: officiel(url),
     source: {
@@ -97,6 +116,8 @@ for (const item of $input.all()) {
       cnil: !!src.cnil, decision: !!src.decision, arxiv: !!src.arxiv, kind: src.kind || 'flux',
     },
     verifie: j._verifie || null,
+    lignes: Array.isArray(j._lignes) ? j._lignes : [],
+    maj: maj ? { date: echeance.date } : null,
   });
 }
 

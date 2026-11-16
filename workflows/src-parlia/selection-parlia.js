@@ -13,6 +13,9 @@
 // Les règles 1 et 2 passent avant les plafonds, jamais avant le maximum. La règle 7 (les points « à surveiller »
 // des séances précédentes, en tête et hors quota) ne passe pas par ici : la préparation les reprend des notes de
 // séance (nœud Notes), au-dessus des candidats.
+// Chaque candidat porte sa date de publication (vide si la source n'en donne pas), le jour où le bot l'a vu, et
+// s'il a été publié avant le premier jour de la période lue (avantPeriode) : un article ancien, ou la mise à jour
+// d'un avis ancien, à signaler (le billet de TypeSafe du 3 novembre 2026, dans la période du 4 au 9 novembre).
 const sd = $getWorkflowStaticData('global');
 const plan = $('Que faire ?').first().json;
 if (!plan.preparation) return [];
@@ -36,6 +39,9 @@ const ECHEANCES_CONNUES = [
 
 const prep = sd.prep || {};
 const depuis = plan.essai || !prep.at ? maintenant - 7 * J : Math.max(Number(prep.at), maintenant - 14 * J);
+// Le jour (heure de Paris) d'un instant passé, en millisecondes.
+const jourDe = (t) => (t ? $now.minus({ milliseconds: Math.max(0, maintenant - Number(t)) }).toISODate() : '');
+const jourDebut = jourDe(depuis);
 const fenetre = (sd.registre || []).filter((a) => (a.vu || 0) > depuis);
 const stats = { lus: fenetre.length, horsTheme: 0, secours: 0, parAxe: {}, notes6: 0 };
 for (const a of fenetre) {
@@ -80,6 +86,7 @@ const candidats = evenements.map((e) => {
     id: tete.id, titre: tete.t, url: tete.u, source: tete.s, sid: tete.sid, axe: tete.axe, p,
     primaire: !!tete.pr, nature: tete.na || 'inconnu', resume: tete.r || '', aChercher: tete.c || '', hypothese: tete.h || '',
     drapeaux: f, dateEffet: e.membres.map((m) => m.de).find(Boolean) || null, date: tete.d || '',
+    vu: jourDe(tete.vu), avantPeriode: !!tete.d && tete.d < jourDebut, dateAvant: tete.da || '',
     arxiv: !!tete.ax, cnil: e.membres.some((m) => m.cn), decision: !!tete.dc, secours: tete.sec || '', verifie: e.membres.some((m) => m.v),
     plafonds: tete.pl || '', aRecouper: !tete.pr,
     aussi: e.membres.slice(1).map((m) => ({ s: m.s, u: m.u })).slice(0, 3),
@@ -141,13 +148,19 @@ const reserve = dansLeTheme.filter((c) => !choisis.includes(c) && c.p >= 4).slic
   .map((c) => ({ titre: c.titre, url: c.url, source: c.source, axe: c.axe, p: c.p, primaire: c.primaire }));
 
 // ---- Les échéances des 90 jours : les dates connues, celles des articles, celles du catalogue d'OpenRouter ----
+// Une échéance dont la source a changé la date garde l'ancienne (avant) ; celle dont la source a changé ou retiré
+// le texte sans date lisible est mise à part, à vérifier.
 const echeances = [];
+const changees = [];
 const ajouterEcheance = (e) => {
   if (!e.date || e.date < aujourdhui || e.date > dans90) return;
   if (!echeances.some((x) => x.date === e.date && x.titre === e.titre)) echeances.push(e);
 };
 ECHEANCES_CONNUES.forEach((e) => ajouterEcheance(Object.assign({ source: 'sources.md, 6.4' }, e)));
-(sd.echeances || []).forEach((e) => ajouterEcheance({ date: e.date, titre: e.titre, url: e.url, source: e.s }));
+(sd.echeances || []).forEach((e) => {
+  if (!e.changee) ajouterEcheance({ date: e.date, titre: e.titre, url: e.url, source: e.s, avant: e.avant || '' });
+  else if (e.date >= aujourdhui) changees.push({ date: e.date, titre: e.titre, url: e.url, source: e.s, changee: e.changee });
+});
 const suivis = (sd.openrouter && sd.openrouter.suivi) || {};
 for (const [id, m] of Object.entries(suivis)) {
   if (m && m.e) ajouterEcheance({ date: m.e, titre: 'Arrêt annoncé de ' + id + " chez OpenRouter", url: 'https://openrouter.ai/' + id, source: "OpenRouter, catalogue des modèles" });
@@ -159,10 +172,12 @@ return [{ json: {
   semaine: plan.semaine,
   essai: !!plan.essai,
   depuis,
+  jourDebut,
   candidats: choisis.map((c) => Object.assign({}, c, { horsTheme: undefined })),
   aLaUne: aLaUne.map((c) => c.n).sort((x, y) => x - y),
   reserve,
   cnil: cnil ? { n: choisis.includes(cnil) ? cnil.n : null, titre: cnil.titre, url: cnil.url, source: cnil.source, p: cnil.p, horsTheme: cnil.horsTheme } : null,
   echeances: echeances.slice(0, 10),
+  echeancesChangees: changees.slice(0, 5),
   stats,
 } }];

@@ -142,3 +142,27 @@ test('les échéances des 90 jours : les dates connues, celles des articles, cel
   assert.ok(s.echeances.some((e) => /gpt-4o-mini chez OpenRouter/.test(e.titre)));
   assert.ok(s.echeances.length <= 10);
 });
+
+test("les dates : publié avant la période lue, signalé ; sans date, le jour où le bot l'a vu ; les échéances changées par la source", async () => {
+  const vu = ms('2026-11-05T10:02');
+  const reg = [
+    r('fournisseurs', 7, { d: '2026-11-03', vu }), r('qualite', 7, { d: '', vu }), r('conformite', 7, { d: '2026-11-04', vu }),
+  ];
+  const sd = {
+    registre: reg, prep: { semaine: '2026-S45', at: ms('2026-11-04T16:38') },
+    echeances: [
+      { date: '2026-11-20', avant: '2026-11-15', titre: 'Workers AI - Planned model deprecations', url: 'https://exemple.org/cf', s: 'Cloudflare' },
+      { date: '2026-12-01', changee: '2026-11-08', titre: 'Une ligne changée sur la page des retraits', url: 'https://exemple.org/oa', s: 'OpenAI' },
+    ],
+  };
+  const [s] = await executer('selection-parlia.js', { sd, maintenant: '2026-11-09T07:15', sorties: { 'Que faire ?': [plan({ semaine: { cle: '2026-S46', numero: 46, lundi: '2026-11-09', dimanche: '2026-11-15' } })] } });
+  assert.equal(s.jourDebut, '2026-11-04');
+  const parAxe = Object.fromEntries(s.candidats.map((c) => [c.axe, c]));
+  assert.deepEqual([parAxe.fournisseurs.date, parAxe.fournisseurs.avantPeriode], ['2026-11-03', true]);
+  assert.deepEqual([parAxe.qualite.date, parAxe.qualite.vu, parAxe.qualite.avantPeriode], ['', '2026-11-05', false]);
+  assert.equal(parAxe.conformite.avantPeriode, false); // le jour même où commence la période
+  const cf = s.echeances.find((e) => /Workers AI/.test(e.titre));
+  assert.equal(cf.avant, '2026-11-15');
+  assert.ok(!s.echeances.some((e) => /ligne changée/.test(e.titre)));
+  assert.deepEqual(s.echeancesChangees.map((e) => [e.date, e.changee]), [['2026-12-01', '2026-11-08']]);
+});

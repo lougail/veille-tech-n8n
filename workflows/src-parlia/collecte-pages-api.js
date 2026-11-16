@@ -6,6 +6,10 @@
 //   devient un article. Garde-fous : un code autre que 200, ou une page qui perd plus de 70 % de ses lignes, est
 //   une panne, pas une nouveauté ; une page dont plus de 40 % des lignes sont nouvelles a été refaite : elle est
 //   relue comme au premier jour, sans rien proposer. Le premier passage ne propose rien : il apprend la page.
+//   Une rangée de tableau forme une seule ligne, chaque cellule précédée de son en-tête : « Shutdown date : Dec 1,
+//   2026 · Affected model : chatgpt-image-latest · Recommended replacement : gpt-image-2.6-sunburst ». Sans les
+//   en-têtes, le tri avait pris le 6 novembre 2026 les remplaçants pour les modèles arrêtés (fiche 4, semaine 46).
+//   La date de publication d'un bloc est sa première date déjà passée : une date à venir est une date d'effet.
 // - Le catalogue d'OpenRouter (A02) : les nouveaux modèles des fournisseurs suivis ; pour la liste de suivi
 //   (sources.md, 4.4), un changement de prix, une date de retrait annoncée, une disparition. Ces deux drapeaux
 //   sont calculés par le programme (_verifie) : le tri ne peut pas les oublier.
@@ -75,25 +79,131 @@ const prixM = (v) => {
 };
 const dollars = (n) => (n == null ? '?' : String(n).replace('.', ',') + ' $');
 
-// ---- Pages : le texte visible, en lignes ; « §T » marque un intertitre ----
-// Une page en Markdown : une ligne par ligne non vide ; « # Titre » devient un intertitre ; les liens gardent
-// leur texte, les marques de mise en forme et les blocs de code partent.
+// ---- Pages : le texte visible, en lignes ; « §T » marque un intertitre, « §L » une rangée de tableau ----
+// Le format des lignes : quand il change, chaque page est réapprise une fois, sans rien proposer (comparer).
+// 2 (15 novembre 2026) : une rangée de tableau en une seule ligne, avec les en-têtes des colonnes.
+const FORMAT_PAGES = 2;
+// Une rangée de tableau : chaque cellule précédée de l'en-tête de sa colonne ; une cellule vide est omise.
+function rangee(entetes, valeurs) {
+  const morceaux = valeurs.map((v, i) => (v && entetes[i] && entetes[i] !== v ? entetes[i] + ' : ' + v : v)).filter(Boolean);
+  return morceaux.length ? '§L ' + morceaux.join(' · ') : '';
+}
+// Des rangées (listes de cellules) en lignes ; avecEntetes : la première rangée donne les en-têtes.
+function rangeesEnLignes(rangees, avecEntetes) {
+  const pleines = rangees.filter((r) => r.some(Boolean));
+  if (!pleines.length) return [];
+  const entetes = avecEntetes ? pleines[0] : [];
+  return (avecEntetes ? pleines.slice(1) : pleines).map((r) => rangee(entetes, r)).filter(Boolean);
+}
+// Un tableau HTML : une cellule fusionnée (rowspan, colspan) est recopiée partout où elle s'étend. Le texte d'un
+// bouton est gardé : chez Anthropic, le nom du modèle est un bouton qui le copie.
+function tableauHtml(t) {
+  const texteCellule = (c) => texteSimple(String(c).replace(/<(svg|script|style)\b[\s\S]*?<\/\1>/gi, ' '));
+  const finEntete = t.search(/<\/thead>/i);
+  const rangees = [];
+  const report = [];
+  let entetes = null;
+  for (const tr of t.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)) {
+    const cellules = Array.from(tr[1].matchAll(/<(td|th)\b([^>]*)>([\s\S]*?)<\/\1>/gi), (c) => ({
+      th: c[1].toLowerCase() === 'th',
+      texte: texteCellule(c[3]),
+      hauteur: Math.min(50, Number((/rowspan\s*=\s*["']?(\d+)/i.exec(c[2]) || [])[1]) || 1),
+      largeur: Math.min(20, Number((/colspan\s*=\s*["']?(\d+)/i.exec(c[2]) || [])[1]) || 1),
+    }));
+    const valeurs = [];
+    let k = 0;
+    let col = 0;
+    while (col < 60 && (k < cellules.length || report.some((r, i) => i >= col && r && r.reste > 0))) {
+      if (report[col] && report[col].reste > 0) {
+        valeurs.push(report[col].texte);
+        report[col].reste--;
+        col++;
+      } else if (k < cellules.length) {
+        const c = cellules[k++];
+        for (let s = 0; s < c.largeur; s++, col++) {
+          valeurs.push(c.texte);
+          report[col] = c.hauteur > 1 ? { texte: c.texte, reste: c.hauteur - 1 } : null;
+        }
+      } else {
+        valeurs.push('');
+        col++;
+      }
+    }
+    const dansEntete = finEntete > 0 && tr.index < finEntete;
+    if (!entetes && !rangees.length && cellules.length && (dansEntete || cellules.every((c) => c.th))) entetes = valeurs;
+    else rangees.push(valeurs);
+  }
+  return rangeesEnLignes(entetes ? [entetes].concat(rangees) : rangees, !!entetes);
+}
+// Une page en Markdown : une ligne par paragraphe ou par élément de liste, même coupé à 80 colonnes dans le
+// fichier ; « # Titre » devient un intertitre ; les liens gardent leur texte, les marques de mise en forme, les
+// balises Markdoc (« {% id=… %} ») et les blocs de code partent.
+// Les tableaux, à barres verticales ou Markdoc (« {% table %} », une cellule par « * », des « --- » entre les
+// rangées, comme sur la page des retraits de Gemini), donnent une ligne par rangée, avec les en-têtes.
 function lignesDuMarkdown(texte) {
   const lignes = [];
   let dansCode = false;
+  let markdoc = null;
+  let barres = [];
+  let paragraphe = '';
+  const nettoyer = (s) => texteSimple(String(s)
+    .replace(/\{%[^%]*%\}/g, ' ')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/[*\x60]+/g, ''));
+  const finirParagraphe = () => {
+    const l = nettoyer(paragraphe);
+    if (l.length > 1) lignes.push(l);
+    paragraphe = '';
+  };
+  const separateur = (l) => /^\s*\|?[\s:|-]+\|?\s*$/.test(l) && l.includes('-');
+  const finirBarres = () => {
+    if (!barres.length) return;
+    const rangees = barres.filter((l) => !separateur(l))
+      .map((l) => l.trim().replace(/^\|/, '').replace(/\|$/, '').split(/(?<!\\)\|/).map(nettoyer));
+    lignes.push(...rangeesEnLignes(rangees, barres.length > 1 && separateur(barres[1])));
+    barres = [];
+  };
   for (const brute of String(texte).replace(/\r\n?/g, '\n').split('\n')) {
-    if (/^\s*(\x60\x60\x60|~~~)/.test(brute)) { dansCode = !dansCode; continue; }
+    if (/^\s*(\x60\x60\x60|~~~)/.test(brute)) { finirBarres(); finirParagraphe(); dansCode = !dansCode; continue; }
     if (dansCode || /^\s*>/.test(brute)) continue;
+    if (markdoc) {
+      if (/^\s*\{%\s*\/table\s*%\}/.test(brute)) {
+        lignes.push(...rangeesEnLignes(markdoc.rangees.concat([markdoc.courante]), true));
+        markdoc = null;
+      } else if (/^\s*-{3,}\s*$/.test(brute)) {
+        markdoc.rangees.push(markdoc.courante);
+        markdoc.courante = [];
+      } else {
+        const cellule = /^\s*[*+-]\s?(.*)$/.exec(brute);
+        if (cellule) markdoc.courante.push(nettoyer(cellule[1]));
+        else if (brute.trim() && markdoc.courante.length) markdoc.courante[markdoc.courante.length - 1] += ' ' + nettoyer(brute);
+      }
+      continue;
+    }
+    if (/^\s*\{%\s*table\b[^%]*%\}/.test(brute)) { finirBarres(); finirParagraphe(); markdoc = { rangees: [], courante: [] }; continue; }
+    if (/^\s*\|/.test(brute)) { finirParagraphe(); barres.push(brute); continue; }
+    finirBarres();
+    if (!brute.trim() || /^\s*\{%[^%]*%\}\s*$/.test(brute) || /^\s*([-*_])(\s*\1){2,}\s*$/.test(brute)) { finirParagraphe(); continue; }
     const titre = /^\s*#{1,6}\s+(.+)$/.exec(brute);
-    const sans = (titre ? titre[1] : brute)
-      .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
-      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/[*\x60]+/g, '')
-      .replace(/^\s*([-+]|\d+\.)\s+/, '');
-    const l = texteSimple(sans);
-    if (l.length > 1) lignes.push(titre ? '§T ' + l : l);
+    if (titre) {
+      finirParagraphe();
+      const l = nettoyer(titre[1]);
+      if (l.length > 1) lignes.push('§T ' + l);
+      continue;
+    }
+    const element = /^\s*([*+-]|\d+\.)\s+(.*)$/.exec(brute);
+    if (element) {
+      finirParagraphe();
+      paragraphe = element[2];
+    } else {
+      paragraphe += (paragraphe ? ' ' : '') + brute.trim();
+    }
   }
+  finirParagraphe();
+  finirBarres();
+  if (markdoc) lignes.push(...rangeesEnLignes(markdoc.rangees.concat([markdoc.courante]), true));
   return lignes;
 }
 function lignesDe(html) {
@@ -105,8 +215,12 @@ function lignesDe(html) {
     const b = h.search(/<body\b/i);
     if (b >= 0) h = h.slice(b);
   }
-  h = h.replace(/<!--[\s\S]*?-->/g, ' ')
-    .replace(/<(script|style|noscript|svg|template|iframe|head|button|form|select)\b[\s\S]*?<\/\1>/gi, ' ')
+  // Un retour à la ligne du code HTML n'en est pas un à l'écran : les lignes ne naissent que des balises de bloc.
+  // Sinon, une balise écrite sur plusieurs lignes laissait des morceaux (« href=… », « class=… ») devenus des lignes
+  // de texte (page du Bureau de l'IA, 6 novembre 2026). Les tableaux passent avant que les boutons partent.
+  h = h.replace(/<!--[\s\S]*?-->/g, ' ').replace(/\s+/g, ' ');
+  h = h.replace(/<table\b[\s\S]*?<\/table>/gi, (t) => '\n' + tableauHtml(t).join('\n') + '\n');
+  h = h.replace(/<(script|style|noscript|svg|template|iframe|head|button|form|select)\b[\s\S]*?<\/\1>/gi, ' ')
     .replace(/<(nav|footer|aside)\b[\s\S]*?<\/\1>/gi, ' ');
   h = h.replace(/<(h[1-6])\b[^>]*>/gi, '\n§T ').replace(/<\/(h[1-6])>/gi, '\n')
     .replace(/<(br|hr)\b[^>]*>/gi, '\n')
@@ -115,27 +229,37 @@ function lignesDe(html) {
     .map((l) => texteSimple(l))
     .filter((l) => l.length > 1 && l !== '§T');
 }
-// Une date sans année (« Oct 30 », journal d'OpenAI) : l'année en cours, ou la précédente si la date est à venir.
 const MOIS_JOUR = /\b(jan|feb|mar|apr|may|jun|jul|aug|sept?|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})\b/i;
 // Un intertitre qui n'est qu'une date (« October 30 », « 27 octobre 2026 ») ne fait pas un bon titre.
 const estUneDate = (t) => t.length < 32 && (!!dateDansTexte(t) || MOIS_JOUR.test(t));
+// La date de publication d'un bloc : sa première date déjà passée, sinon celle de son intertitre ; sinon aucune
+// (« date inconnue »). Une date à venir est une date d'effet (« Shutdown date : Dec 1, 2026 ») : le 6 novembre
+// 2026, elle était devenue la date de publication de la fiche 4. Une date sans année (« Oct 30 », journal
+// d'OpenAI) prend l'année en cours, ou la précédente si elle tombait plus tard dans l'année.
 function dateDuBloc(texte, avant) {
-  const d = dateDansTexte(texte) || dateDansTexte(avant);
-  if (d) return d;
-  const m = MOIS_JOUR.exec(texte) || MOIS_JOUR.exec(avant || '');
-  if (!m) return '';
-  let annee = $now.year;
-  const iso = (a) => a + '-' + String(MOIS_EN[m[1].toLowerCase()]).padStart(2, '0') + '-' + String(m[2]).padStart(2, '0');
-  if (iso(annee) > aujourdhui) annee--;
-  return iso(annee);
+  for (const t of [texte, avant || '']) {
+    const avecAnnee = datesDansTexte(t);
+    if (avecAnnee.length) {
+      const passee = avecAnnee.find((d) => d <= aujourdhui);
+      if (passee) return passee;
+      continue;
+    }
+    const m = MOIS_JOUR.exec(t);
+    if (!m) continue;
+    let annee = $now.year;
+    const iso = (a) => a + '-' + String(MOIS_EN[m[1].toLowerCase()]).padStart(2, '0') + '-' + String(m[2]).padStart(2, '0');
+    if (iso(annee) > aujourdhui) annee--;
+    return iso(annee);
+  }
+  return '';
 }
-// Compare la page à la veille. etat : { h : empreintes des 400 premières lignes, n : nombre de lignes }.
+// Compare la page à la veille. etat : { h : empreintes des 400 premières lignes, n : nombre de lignes, v : format }.
 function comparer(lignes, etat) {
   const tete = lignes.slice(0, 400);
   const empreintes = tete.map((l) => hacher(l));
-  const nouveau = { h: empreintes.join(','), n: lignes.length };
+  const nouveau = { h: empreintes.join(','), n: lignes.length, v: FORMAT_PAGES };
   if (lignes.length < 5) return { erreur: 'page presque vide (' + lignes.length + ' lignes)' };
-  if (!etat || !etat.h) return { nouveau, blocs: [], premier: true };
+  if (!etat || !etat.h || etat.v !== FORMAT_PAGES) return { nouveau, blocs: [], premier: true };
   if (lignes.length < 0.3 * (etat.n || 0)) return { erreur: 'page réduite à ' + lignes.length + ' lignes, contre ' + etat.n };
   const connues = new Set(String(etat.h).split(','));
   const neuves = empreintes.map((h) => !connues.has(h));
@@ -151,10 +275,11 @@ function comparer(lignes, etat) {
     const titre = l.startsWith('§T ') ? l.slice(3) : '';
     const texte = titre || l;
     if (neuves[i]) {
-      if (!courant) courant = { lignes: [], titre: '', avant: dernierTitre };
+      if (!courant) courant = { lignes: [], empreintes: [], titre: '', avant: dernierTitre };
       else courant.lignes.push(...attente);
       attente = [];
       courant.lignes.push(texte);
+      courant.empreintes.push(empreintes[i]);
       if (titre && !courant.titre) courant.titre = titre;
     } else if (courant) {
       if (attente.length < 2 && texte.length < 40) attente.push(texte);
@@ -167,7 +292,13 @@ function comparer(lignes, etat) {
     if (titre) dernierTitre = titre;
   });
   if (courant) blocs.push(courant);
-  return { nouveau, blocs: blocs.filter((b) => b.lignes.join(' ').length >= 60).slice(0, 5) };
+  return { nouveau, blocs: blocs.filter((b) => texteDuBloc(b.lignes).length >= 60).slice(0, 5) };
+}
+// Le texte d'un bloc : ses lignes séparées par « · », ses rangées de tableau par « ; ».
+const estRangee = (l) => l.startsWith('§L ');
+const sansMarque = (l) => (estRangee(l) ? l.slice(3) : l);
+function texteDuBloc(lignes) {
+  return lignes.reduce((t, l, i) => t + (i ? (estRangee(l) || estRangee(lignes[i - 1]) ? ' ; ' : ' · ') : '') + sansMarque(l), '');
 }
 async function page(p) {
   const corps = texteDe(await lire(p.u, p.anglais));
@@ -176,16 +307,25 @@ async function page(p) {
   const r = comparer(lignes, sd.pages[p.id]);
   if (r.erreur) throw new Error(r.erreur);
   sd.pages[p.id] = r.nouveau;
+  // Les échéances relevées sur cette page : si plus aucune de leurs lignes n'y figure, la source les a changées ou
+  // retirées. Une page réapprise ou refaite ne compte pas : ses lignes ne sont plus comparables.
+  if (!r.premier && !r.refaite) {
+    const presentes = new Set(lignes.map((l) => hacher(l)));
+    for (const e of sd.echeances || []) {
+      if (e.page === p.id && Array.isArray(e.lignes) && e.lignes.length && !e.changee && !e.lignes.some((h) => presentes.has(h))) e.changee = aujourdhui;
+    }
+  }
   const items = r.blocs.map((b) => {
-    const texte = b.lignes.join(' · ');
-    const tete = (b.titre && !estUneDate(b.titre) ? b.titre : '') || b.lignes.find((l) => l.length >= 25) || b.lignes[0];
+    const texte = texteDuBloc(b.lignes);
+    const tete = sansMarque((b.titre && !estUneDate(b.titre) ? b.titre : '') || b.lignes.find((l) => sansMarque(l).length >= 25) || b.lignes[0]);
     const date = dateDuBloc(texte, b.avant);
     return { json: {
       title: tronquer(p.s + ' — ' + tete, 200),
       link: p.voir || p.u,
       isoDate: date ? date + 'T12:00:00.000Z' : undefined,
-      contentSnippet: tronquer((b.avant && !b.titre ? 'Sous « ' + b.avant + ' » : ' : '') + texte, 900),
+      contentSnippet: tronquer((b.avant && !b.titre ? 'Sous « ' + b.avant + ' » : ' : '') + texte, 1200),
       _cle: 'page:' + p.id + ':' + hacher(texte),
+      _lignes: b.empreintes,
       _source: source(p, 'page'),
     } };
   });

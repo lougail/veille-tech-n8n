@@ -182,3 +182,96 @@ test("pas dû aujourd'hui : les articles des flux passent, sans aucune lecture",
   const vide = await executer('collecte-pages-api.js', { input: [], sd, helpers: h, sorties: { 'Que faire ?': [plan({ pages: false })] } });
   assert.deepEqual(vide, [{ _rien: true }]);
 });
+
+// La page des retraits d'OpenAI, telle qu'elle est construite (relevé du 15 novembre 2026) : un tableau à en-têtes.
+const rangeeRetrait = (arret, modele, remplacant, avis) => '<tr><td><strong>' + arret + '</strong></td><td><span><code>' + modele
+  + '</code></span></td><td><span>Deprecated</span></td><td>' + remplacant + '</td><td>' + avis + '</td></tr>';
+const pageRetraits = (remplacant) => page([
+  '<p>Une phrase d\'introduction sur les retraits de modèles, assez longue pour faire une vraie ligne de la page.</p>',
+  '<h2>Upcoming deprecations</h2><div><table><thead><tr><th>Shutdown date</th><th>Affected model</th><th>Status</th>'
+    + '<th>Recommended replacement</th><th>Notice date</th></tr></thead><tbody>',
+  rangeeRetrait('Dec 1, 2026', 'gpt-image-1-mini', remplacant, 'Jun 2, 2026'),
+  rangeeRetrait('Dec 1, 2026', 'gpt-image-1.5', remplacant, 'Jun 2, 2026'),
+  rangeeRetrait('Dec 1, 2026', 'chatgpt-image-latest', remplacant, 'Jun 2, 2026'),
+  rangeeRetrait('Jan 14, 2027', 'gpt-4o-mini', '<code>gpt-6-luna</code>', 'Oct 14, 2026'),
+  '</tbody></table></div>',
+].concat(BASE));
+const SUNBURST = '<code>gpt-image-2.6-sunburst</code> or <code>gpt-image-2.6-flare</code>';
+
+// Fiche 4 de la semaine 46 : le 4 novembre 2026, OpenAI a remplacé dans ce tableau le remplaçant conseillé. Lues sans
+// leurs en-têtes, les cellules nouvelles avaient fait annoncer l'arrêt des remplaçants, daté du jour de l'arrêt.
+test("fiche 4 (semaine 46) : une rangée de tableau garde ses en-têtes ; sa date est celle de l'avis, pas celle de l'arrêt", async () => {
+  const sd = {};
+  await passer(sd, table({ [PAGES[1]]: { statusCode: 200, body: pageRetraits('<code>gpt-image-2</code>') } }));
+  const { articles } = await passer(sd, table({ [PAGES[1]]: { statusCode: 200, body: pageRetraits(SUNBURST) } }));
+  assert.equal(articles.length, 1);
+  const a = articles[0];
+  assert.ok(a.title.startsWith('OpenAI, retraits de modèles — Shutdown date : Dec 1, 2026 · Affected model : gpt-image-1-mini · Status : Deprecated'), a.title);
+  assert.ok(a.contentSnippet.startsWith('Sous « Upcoming deprecations » : '));
+  assert.ok(a.contentSnippet.includes('Affected model : chatgpt-image-latest · Status : Deprecated · Recommended replacement : gpt-image-2.6-sunburst or gpt-image-2.6-flare · Notice date : Jun 2, 2026'));
+  // Chaque remplaçant est annoncé comme tel ; les rangées sont séparées par « ; ».
+  const sunburst = a.contentSnippet.split('gpt-image-2.6-sunburst').length - 1;
+  assert.equal(sunburst, 3);
+  assert.equal(a.contentSnippet.split('Recommended replacement : gpt-image-2.6-sunburst').length - 1, sunburst);
+  assert.equal(a.contentSnippet.split(' ; ').length, 3);
+  assert.equal(a.isoDate, '2026-06-02T12:00:00.000Z');
+});
+
+test("Anthropic : le nom du modèle, écrit dans un bouton, est gardé ; une rangée sans date passée n'est pas datée", async () => {
+  const rangee = (nom, retrait) => '<tr><td><button>' + nom + '</button></td><td>Active</td><td>N/A</td><td>Not sooner than ' + retrait + '</td></tr>';
+  const pageModeles = (rangees) => page(['<h2>Model status</h2><div><table><thead><tr><th scope="col">API model name</th><th scope="col">Current state</th>'
+    + '<th scope="col">Deprecated</th><th scope="col">Tentative retirement date</th></tr></thead><tbody>' + rangees.join('') + '</tbody></table></div>'].concat(BASE));
+  const sd = {};
+  await passer(sd, table({ [PAGES[2]]: { statusCode: 200, body: pageModeles([rangee('claude-fable-5-1', 'September 1, 2027')]) } }));
+  const { articles } = await passer(sd, table({ [PAGES[2]]: { statusCode: 200, body: pageModeles([rangee('claude-fable-5-2', 'November 9, 2027'), rangee('claude-fable-5-1', 'September 1, 2027')]) } }));
+  assert.deepEqual(articles.map((a) => a.title), ['Anthropic, retraits de modèles — API model name : claude-fable-5-2 · Current state : Active · Deprecated : N/A · Tentative retirement date : Not sooner than November 9, 2027']);
+  assert.equal(articles[0].isoDate, undefined);
+});
+
+test("Gemini : un tableau Markdoc donne une ligne par rangée, avec ses en-têtes ; les balises « {% … %} » partent", async () => {
+  const U = 'https://aistudio.google.com/docs/deprecations.md';
+  const tableau = (rangees) => '# Gemini deprecations\n\nIntroduction de la page, assez longue pour faire une vraie ligne de texte.\n\n'
+    + '## Gemini 4 models  {% id="gemini-4-models" %}\n\n{% table %}\n  * Model\n  * Release date\n  * Shutdown date\n  * Recommended replacement\n'
+    + rangees.map(([m, d]) => '\n  ---\n\n  * \x60' + m + '\x60\n  * ' + d + '\n  * No shutdown date announced\n  * \n').join('') + '{% /table %}\n\n'
+    + BASE_MD.map(([d, t]) => '## ' + d + '\n\n- ' + t + '\n').join('\n');
+  const sd = {};
+  await passer(sd, table({ [U]: { statusCode: 200, body: tableau([['gemini-4-argon', 'October 13, 2026']]) } }));
+  const { articles } = await passer(sd, table({ [U]: { statusCode: 200, body: tableau([['gemini-4-carbon', 'October 30, 2026'], ['gemini-4-argon', 'October 13, 2026']]) } }));
+  assert.equal(articles.length, 1);
+  assert.equal(articles[0].title, 'Google, retraits de modèles Gemini — Model : gemini-4-carbon · Release date : October 30, 2026 · Shutdown date : No shutdown date announced');
+  assert.equal(articles[0].contentSnippet, 'Sous « Gemini 4 models » : Model : gemini-4-carbon · Release date : October 30, 2026 · Shutdown date : No shutdown date announced');
+  assert.equal(articles[0].isoDate, '2026-10-30T12:00:00.000Z');
+});
+
+test("une balise écrite sur plusieurs lignes ne laisse pas de morceaux dans le texte (page du Bureau de l'IA)", async () => {
+  const sd = {};
+  await passer(sd, table());
+  const nouvelle = '<h2>Latest News</h2><p><a\n  href="/en/news/commission-launches-ai-skills"\n  rel="bookmark"\n>Commission launches an AI skills package for public administrations</a></p>';
+  const { articles } = await passer(sd, table({ [PAGES[10]]: { statusCode: 200, body: page([nouvelle].concat(BASE)) } }));
+  assert.equal(articles.length, 1);
+  assert.equal(articles[0].contentSnippet, 'Latest News · Commission launches an AI skills package for public administrations');
+});
+
+test("le format des lignes change : chaque page est réapprise une fois, sans rien proposer, puis comparée comme avant", async () => {
+  const sd = {};
+  await passer(sd, table());
+  for (const etat of Object.values(sd.pages)) delete etat.v; // une page apprise avant le 15 novembre 2026
+  const mistral = (texte) => table({ 'https://docs.mistral.ai/resources/changelogs': { statusCode: 200, body: page([entree('Oct 30', texte)].concat(BASE)) } });
+  const reapprise = await passer(sd, mistral('Mistral Small 4 is now available, with calibrated scores for classification tasks.'));
+  assert.equal(reapprise.articles.length, 0);
+  assert.equal(sd._passage.pages.premiers, 12);
+  assert.ok(Object.values(sd.pages).every((e) => e.v === 2));
+  const ensuite = await passer(sd, mistral('Mistral Medium 4 is now available, with a longer context window for long documents.'));
+  assert.equal(ensuite.articles.length, 1);
+});
+
+test("une échéance relevée sur une page : quand ses lignes disparaissent de la page, elle est marquée changée", async () => {
+  const sd = {};
+  await passer(sd, table({ [PAGES[1]]: { statusCode: 200, body: pageRetraits('<code>gpt-image-2</code>') } }));
+  const { articles } = await passer(sd, table({ [PAGES[1]]: { statusCode: 200, body: pageRetraits(SUNBURST) } }));
+  sd.echeances = [{ date: '2026-12-01', titre: articles[0].title, url: PAGES[1], s: 'OpenAI', page: 'F02', lignes: articles[0]._lignes }];
+  await passer(sd, table({ [PAGES[1]]: { statusCode: 200, body: pageRetraits(SUNBURST) } }));
+  assert.equal(sd.echeances[0].changee, undefined); // les lignes sont toujours là
+  await passer(sd, table({ [PAGES[1]]: { statusCode: 200, body: pageRetraits('<code>gpt-image-3</code>') } }));
+  assert.equal(sd.echeances[0].changee, '2026-11-02');
+});

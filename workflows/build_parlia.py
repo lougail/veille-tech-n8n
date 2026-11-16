@@ -58,7 +58,7 @@ DOSSIER_NOTES = "/home/node/.n8n-files/parlia-notes"
 OUTILS = (SRC / "outils.js").read_text(encoding="utf-8")
 OUTILS_NOMS = (
     "PARLIA", "texteSimple", "tronquer", "hacher", "domaineDe", "cleAdresse", "cellule", "pourDiscord",
-    "MOIS_FR", "dateLongue", "MOIS_EN", "dateDansTexte", "noterSante", "pousserAlerte",
+    "MOIS_FR", "dateLongue", "MOIS_EN", "datesDansTexte", "dateDansTexte", "noterSante", "pousserAlerte",
 )
 
 

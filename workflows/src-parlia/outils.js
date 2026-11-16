@@ -77,27 +77,34 @@ function dateLongue(iso) {
   if (!m) return '';
   return Number(m[3]) + (m[3] === '01' ? 'er' : '') + ' ' + MOIS_FR[Number(m[2]) - 1] + ' ' + m[1];
 }
-// La première date écrite dans un texte (pages sans flux) : 2026-10-14, October 14, 2026, 14 octobre 2026,
-// ou 10.22.2026 (mois.jour.année, chez Liquid AI). Renvoie AAAA-MM-JJ, ou une chaîne vide.
+// Les dates écrites dans un texte (pages sans flux), dans l'ordre : 2026-10-14, October 14, 2026, 14 octobre 2026,
+// ou 10.22.2026 (mois.jour.année, chez Liquid AI). Renvoie une liste de AAAA-MM-JJ.
+// Une date collée à un nom (« gpt-image-2-2026-04-21 », une version datée) n'est pas une date.
 const MOIS_EN = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12 };
-function dateDansTexte(texte) {
+function datesDansTexte(texte) {
   const t = String(texte || '');
   const deux = (n) => String(n).padStart(2, '0');
   const candidats = [];
-  let m = /\b(20\d{2})-(\d{2})-(\d{2})\b/.exec(t);
-  if (m && Number(m[2]) <= 12 && Number(m[3]) <= 31) candidats.push({ i: m.index, d: m[1] + '-' + m[2] + '-' + m[3] });
-  m = /\b(jan|feb|mar|apr|may|jun|jul|aug|sept?|oct|nov|dec)[a-z]*\.?\s+(\d{1,2}),?\s+(20\d{2})\b/i.exec(t);
-  if (m) candidats.push({ i: m.index, d: m[3] + '-' + deux(MOIS_EN[m[1].toLowerCase()]) + '-' + deux(m[2]) });
-  m = /\b(\d{1,2})(?:er)?\s+(janvier|février|fevrier|mars|avril|mai|juin|juillet|août|aout|septembre|octobre|novembre|décembre|decembre)\s+(20\d{2})\b/i.exec(t);
-  if (m) {
+  for (const m of t.matchAll(/(?<![\w-])(20\d{2})-(\d{2})-(\d{2})(?=T\d|[^\w-]|$)/g)) {
+    if (Number(m[2]) <= 12 && Number(m[3]) <= 31) candidats.push({ i: m.index, d: m[1] + '-' + m[2] + '-' + m[3] });
+  }
+  for (const m of t.matchAll(/\b(jan|feb|mar|apr|may|jun|jul|aug|sept?|oct|nov|dec)[a-z]*\.?\s+(\d{1,2}),?\s+(20\d{2})\b/gi)) {
+    candidats.push({ i: m.index, d: m[3] + '-' + deux(MOIS_EN[m[1].toLowerCase()]) + '-' + deux(m[2]) });
+  }
+  for (const m of t.matchAll(/\b(\d{1,2})(?:er)?\s+(janvier|février|fevrier|mars|avril|mai|juin|juillet|août|aout|septembre|octobre|novembre|décembre|decembre)\s+(20\d{2})\b/gi)) {
     const mois = m[2].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const n = ['janvier', 'fevrier', 'mars', 'avril', 'mai', 'juin', 'juillet', 'aout', 'septembre', 'octobre', 'novembre', 'decembre'].indexOf(mois) + 1;
     if (n) candidats.push({ i: m.index, d: m[3] + '-' + deux(n) + '-' + deux(m[1]) });
   }
-  m = /\b(\d{1,2})\.(\d{1,2})\.(20\d{2})\b/.exec(t);
-  if (m && Number(m[1]) <= 12 && Number(m[2]) <= 31) candidats.push({ i: m.index, d: m[3] + '-' + deux(m[1]) + '-' + deux(m[2]) });
+  for (const m of t.matchAll(/\b(\d{1,2})\.(\d{1,2})\.(20\d{2})\b/g)) {
+    if (Number(m[1]) <= 12 && Number(m[2]) <= 31) candidats.push({ i: m.index, d: m[3] + '-' + deux(m[1]) + '-' + deux(m[2]) });
+  }
   candidats.sort((a, b) => a.i - b.i);
-  return candidats.length ? candidats[0].d : '';
+  return candidats.map((c) => c.d);
+}
+// La première date écrite dans un texte, ou une chaîne vide.
+function dateDansTexte(texte) {
+  return datesDansTexte(texte)[0] || '';
 }
 // La santé d'une source : un échec de plus, ou un retour. Au troisième échec de suite, une seule alerte
 // (sd._passage.flux, lue par le message de #status) ; au retour, un message de retour.

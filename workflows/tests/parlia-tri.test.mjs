@@ -129,7 +129,13 @@ const trie = (id, tri, extra = {}) => Object.assign(art(id, extra), { tri: Objec
 }, tri) });
 
 test('le registre garde 16 jours, compte les hors thème, et sonne pour un retrait de modèle suivi à moins de 90 jours', async () => {
-  const sd = { registre: [{ id: 'vieux', vu: ms(MAINTENANT) - 17 * JOUR }, { id: 'recent', vu: ms(MAINTENANT) - 2 * JOUR }] };
+  // Une échéance relevée par l'ancien tri (sans identifiant) est oubliée ; une échéance passée depuis plus de
+  // 14 jours aussi ; une échéance passée depuis moins de 14 jours reste, pour qu'un report de dernière minute se voie.
+  const sd = { registre: [{ id: 'vieux', vu: ms(MAINTENANT) - 17 * JOUR }, { id: 'recent', vu: ms(MAINTENANT) - 2 * JOUR }], echeances: [
+    { date: '2026-12-01', titre: 'OpenAI, retraits de modèles — gpt-image-2.6-sunburst or gpt-image-2.6-flare', url: 'u', s: 's' },
+    { date: '2026-10-10', titre: 'Passée depuis longtemps', url: 'u', s: 's', id: 'p1' },
+    { date: '2026-10-25', titre: 'Passée depuis peu', url: 'u', s: 's', id: 'p2' },
+  ] };
   const retrait = { retrait_modele: true, changement_prix: false, nouveau_modele_decision: false, echeance_reglementaire: false };
   await executer('registre-parlia.js', { sd, maintenant: MAINTENANT, input: [
     trie('suivi', { drapeaux: retrait, date_effet: '2027-01-14' }, { titre: 'Retiring gpt-4o-mini' }),
@@ -139,12 +145,41 @@ test('le registre garde 16 jours, compte les hors thème, et sonne pour un retra
   ] });
   assert.deepEqual(sd.registre.map((a) => a.id), ['recent', 'suivi', 'loin', 'autre', 'ht']);
   assert.deepEqual(sd._alertes.map((a) => [a.type, a.id, a.date]), [['retrait', 'suivi', '2027-01-14']]);
-  assert.deepEqual(sd._passage.tri, { nouveaux: 4, secours: 0, horsTheme: 1, parAxe: { fournisseurs: 3, hors_theme: 1 } });
+  assert.deepEqual(sd._passage.tri, { nouveaux: 4, secours: 0, horsTheme: 1, parAxe: { fournisseurs: 3, hors_theme: 1 }, majEcheances: 0 });
   // Les échéances sont gardées à part, jusqu'à leur date.
-  assert.deepEqual(sd.echeances.map((e) => e.date), ['2026-12-01', '2027-01-14', '2027-06-01']);
+  assert.deepEqual(sd.echeances.map((e) => e.date), ['2026-10-25', '2026-12-01', '2027-01-14', '2027-06-01']);
+  assert.ok(!sd.echeances.some((e) => /sunburst/.test(e.titre)));
+  assert.deepEqual(sd.echeances.find((e) => e.date === '2027-01-14').id, 'suivi');
   const entree = sd.registre.find((a) => a.id === 'suivi');
   assert.equal(entree.de, '2027-01-14');
   assert.equal(entree.f.retrait_modele, true);
   assert.equal(entree.h, 'h');
   assert.deepEqual([sd.registre.at(-1).r, sd.registre.at(-1).h], ['', '']); // hors thème : pas de textes longs
+});
+
+test("une échéance changée par la source : la nouvelle date remplace l'ancienne, gardée, et l'article revient ; la même date ne change rien", async () => {
+  const retrait = { retrait_modele: true, changement_prix: false, nouveau_modele_decision: false, echeance_reglementaire: false };
+  const echeance = () => ({ date: '2026-11-15', titre: 'Workers AI - Planned model deprecations on Workers AI', url: 'https://developers.cloudflare.com/x', s: 'Cloudflare', id: 'cf', cle: 'k', empreinte: 'ancienne' });
+  const avant = ms(MAINTENANT) - 4 * JOUR;
+  const sd = { registre: [{ id: 'cf', t: 'Workers AI', vu: avant }], echeances: [echeance()] };
+  const relu = (dateEffet, axe = 'fournisseurs') => trie('cf', { axe, drapeaux: retrait, date_effet: dateEffet },
+    { url: 'https://developers.cloudflare.com/x', cle: 'k', empreinte: 'nouvelle', maj: { date: '2026-11-15' } });
+  await executer('registre-parlia.js', { sd, maintenant: MAINTENANT, input: [relu('2026-11-20')] });
+  assert.deepEqual([sd.echeances[0].date, sd.echeances[0].avant, sd.echeances[0].empreinte], ['2026-11-20', '2026-11-15', 'nouvelle']);
+  assert.equal(sd.echeances.length, 1);
+  assert.deepEqual(sd.registre.map((a) => [a.id, a.vu, a.da]), [['cf', ms(MAINTENANT), '2026-11-15']]);
+  // La même date : seule l'empreinte change ; l'article ne revient pas dans la préparation.
+  const meme = { registre: [{ id: 'cf', t: 'Workers AI', vu: avant }], echeances: [echeance()] };
+  await executer('registre-parlia.js', { sd: meme, maintenant: MAINTENANT, input: [relu('2026-11-15')] });
+  assert.deepEqual([meme.echeances[0].date, meme.echeances[0].empreinte, meme.echeances[0].avant], ['2026-11-15', 'nouvelle', undefined]);
+  assert.deepEqual(meme.registre.map((a) => [a.id, a.vu]), [['cf', avant]]);
+  assert.deepEqual([meme._passage.tri.nouveaux, meme._passage.tri.majEcheances], [0, 1]);
+  // Plus de date lisible : l'échéance est à vérifier.
+  const perdue = { registre: [], echeances: [echeance()] };
+  await executer('registre-parlia.js', { sd: perdue, maintenant: MAINTENANT, input: [relu(null)] });
+  assert.equal(perdue.echeances[0].changee, '2026-11-02');
+  // Une échéance de l'ancien tri, sans identifiant, prend celui de l'article trié de nouveau, et sa nouvelle date.
+  const ancienne = { registre: [], echeances: [{ date: '2026-11-15', titre: 'Workers AI', url: 'https://developers.cloudflare.com/x', s: 'Cloudflare' }] };
+  await executer('registre-parlia.js', { sd: ancienne, maintenant: MAINTENANT, input: [relu('2026-11-20')] });
+  assert.deepEqual(ancienne.echeances.map((e) => [e.date, e.avant, e.id, e.cle]), [['2026-11-20', '2026-11-15', 'cf', 'k']]);
 });
