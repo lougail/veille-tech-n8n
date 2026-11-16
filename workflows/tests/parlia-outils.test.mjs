@@ -195,6 +195,9 @@ test("le contrôle des hypothèses : décimales, négations, conditions, relativ
     'Claude Haiku 5.5 utilisé par ParlIA pourrait coûter plus cher.',
     'Louis a choisi GPT-6.1 Terra pour le comparatif.',
     'La Decisions API que ParlIA utilise pourrait changer de prix.',
+    // Essai du 16 novembre 2026 : « données », plus haut dans la phrase, ne la rendait pas vraie.
+    'Les recommandations du CEPD sur les BCR-ST pourraient influencer les pratiques de conservation des données par les fournisseurs de modèles utilisés par ParlIA.',
+    "Les recommandations sur les règles d'entreprise contraignantes pour les sous-traitants pourraient influencer la conformité des services d'IA utilisés par ParlIA.",
   ]) assert.match(o.hypotheseFautive(h, 'un article'), /^elle dit « /, h);
   assert.equal(o.hypotheseFautive('Le retrait de GPT\u20116 Luna obligerait à changer de service.', 'OpenAI retire gpt-4.1-mini'),
     "elle prête un retrait à GPT-6 Luna, que l'article ne nomme pas");

@@ -213,11 +213,15 @@ function hypotheseFautive(hypothese, texte) {
   const FIN = /[;:!?,]|\.(?=\s|$)/;
   const avant = (i) => bas.slice(Math.max(0, i - 80), i).split(FIN).pop();
   const apres = (i) => bas.slice(i, i + 60).split(FIN)[0].trim().split(/\s+/).slice(0, 5).join(' ');
-  // « les services d'OpenAI utilisés par ParlIA ».
+  // « les services d'OpenAI utilisés par ParlIA » : le groupe qualifié, juste avant (quatre mots), est un service du
+  // marché ; « les données du Sénat utilisées par ParlIA » reste, même après « la conservation des données par les
+  // fournisseurs de modèles », qui, lui, est écarté (essai du 16 novembre 2026).
   for (const m of bas.matchAll(/(?<!\p{L})(?:utilisé|choisi|retenu|comparé|testé|employé|adopté)(?:e|s|es)?\s+par\s+(?:parlia|louis)(?!\p{L})/gu)) {
     const sujet = avant(m.index);
-    if (SERVICE_DU_MARCHE.test(sujet) && !DONNEES_PUBLIQUES.test(sujet) && !CONDITION.test(sujet)
-      && !sujet.trim().split(/\s+/).slice(-3).some((w) => SUPPOSITION_OU_NEGATION.test(w))) {
+    const mots = sujet.trim().split(/\s+/);
+    const groupe = mots.slice(-4).join(' ');
+    if (SERVICE_DU_MARCHE.test(groupe) && !DONNEES_PUBLIQUES.test(groupe) && !CONDITION.test(sujet)
+      && !mots.slice(-3).some((w) => SUPPOSITION_OU_NEGATION.test(w))) {
       return usage(m.index, m.index + m[0].length);
     }
   }
