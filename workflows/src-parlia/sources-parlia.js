@@ -35,7 +35,9 @@ const FLUX = [
     filtre: '(eval\\w*|annotat\\w*|label\\w*|classif\\w*|calibrat\\w*|judge|benchmark|decision|argilla|setfit|zero-shot)' },
   // ---- Conformité ----
   { id: 'A08', s: 'CNIL, actualités', u: 'https://www.cnil.fr/fr/rss.xml', axe: 'conformite', nature: 'institution', primaire: true, cnil: true },
-  { id: 'A09', s: 'CEPD, actualités', u: 'https://www.edpb.europa.eu/feed/news_en', axe: 'conformite', nature: 'institution', primaire: true, cnil: true },
+  // Le flux anglais du CEPD (feed/news_en) répond « Sorry » (erreur 503) depuis la mise en service du bot ; le flux
+  // français donne les mêmes actualités, aux titres en français ou en anglais (vérifié le 16 novembre 2026).
+  { id: 'A09', s: 'CEPD, actualités', u: 'https://www.edpb.europa.eu/feed/news_fr', axe: 'conformite', nature: 'institution', primaire: true, cnil: true },
   { id: 'A10', s: 'Commission européenne, numérique', u: 'https://digital-strategy.ec.europa.eu/en/rss.xml', axe: 'conformite', nature: 'institution', primaire: true, filtre: IA_UE },
   { id: 'Z01', s: 'Sénat, dossier de la loi DDADUE', u: 'https://www.senat.fr/dossier-legislatif/rss/doslegpjl25-118.xml', axe: 'conformite', nature: 'institution', primaire: true },
   // ---- Exploitation ----

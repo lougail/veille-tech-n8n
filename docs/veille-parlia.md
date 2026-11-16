@@ -49,7 +49,7 @@ Les 32 sources « à retenir » de l'étude des sources du 29 octobre 2026 (§4.
 
 | Fichier | Ce qu'il lit |
 |---|---|
-| `sources-parlia.js` | 18 flux : journal d'OpenRouter ; OpenAI (filtré sur l'API) ; notes de version d'Anthropic ; Mistral ; Google « Developer tools » ; Simon Willison (filtré) ; journal de Workers AI (Cloudflare) ; trois requêtes arXiv ciblées (étiquetage par modèle de langage, modèles de décision et calibration, textes parlementaires ou administratifs) ; Hamel Husain ; Hugging Face (filtré) ; CNIL ; CEPD ; Commission européenne (filtrée sur l'IA) ; dossier de la loi DDADUE au Sénat ; data.senat.fr. Les communiqués de l'Élysée ne sont jamais triés : ils servent de détecteur de remaniement de secours |
+| `sources-parlia.js` | 18 flux : journal d'OpenRouter ; OpenAI (filtré sur l'API) ; notes de version d'Anthropic ; Mistral ; Google « Developer tools » ; Simon Willison (filtré) ; journal de Workers AI (Cloudflare) ; trois requêtes arXiv ciblées (étiquetage par modèle de langage, modèles de décision et calibration, textes parlementaires ou administratifs) ; Hamel Husain ; Hugging Face (filtré) ; CNIL ; CEPD (son flux en français : l'anglais répond « Sorry » depuis la mise en service) ; Commission européenne (filtrée sur l'IA) ; dossier de la loi DDADUE au Sénat ; data.senat.fr. Les communiqués de l'Élysée ne sont jamais triés : ils servent de détecteur de remaniement de secours |
 | `collecte-pages-api.js` | Une fois par jour : 12 pages sans flux (journaux et pages de retraits d'OpenAI, d'Anthropic, de Mistral et de Google ; blog et page des modèles de TypeSafe ; Liquid AI ; service d'assistance et Bureau de l'IA de la Commission ; dossier DDADUE à l'Assemblée), le catalogue d'OpenRouter, la fiche data.gouv.fr des questions du Sénat, les comptes Hugging Face de Cloudflare et de Perplexity |
 | `jorf-parlia.js` | Les archives quotidiennes du Journal officiel, deux par jour |
 | `lecture-pages.js` | Le découpage d'une page en lignes (paragraphes, éléments de liste, rangées de tableau avec leurs en-têtes), en HTML ou en Markdown ; commun aux nœuds qui lisent des pages, ajouté en tête de leur code par le builder |
@@ -445,9 +445,6 @@ proposer (nouveau format des lignes).
 7. **Le modèle qui résume les originaux** (`MODEL_RESUMES` dans `build_parlia.py`). Au plus 8 demandes par
    semaine : le coût reste de l'ordre du centime, et le choix porte sur la justesse des résumés. Mistral Small 3.2
    par défaut ; Louis le garde (16 novembre 2026) et en jugera sur la préparation du 23 novembre.
-8. **Le CEPD (A09)** n'a jamais répondu au bot depuis sa mise en service (46 échecs au 16 novembre 2026, erreur
-   503) : son site bloque les programmes. La CNIL relaie ses actualités (« Actualité du CEPD »). Avis : le retirer,
-   et compter sur le relais de la CNIL.
 
 ## Ce qui reste à faire
 
