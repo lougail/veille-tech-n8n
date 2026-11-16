@@ -102,7 +102,27 @@ test("les retraits d'OpenAI et de Cloudflare : une ligne qui ne nomme que des mo
   assert.equal(o.deRetraitsTexte('F02', '', 'OpenAI, retraits de modèles'), true);
   assert.equal(o.deRetraitsTexte('X01', 'Workers AI - Planned model deprecations on Workers AI', ''), true);
   assert.equal(o.deRetraitsTexte('X01', 'Workers AI - EmbeddingGemma 2 now available on Workers AI', 'Cloudflare, journal de Workers AI'), false);
-  assert.equal(o.deRetraitsTexte('F13', '', 'Google, retraits de modèles Gemini'), false);
+  // La page des retraits de Gemini, depuis le 16 novembre 2026.
+  assert.equal(o.deRetraitsTexte('F13', '', 'Google, retraits de modèles Gemini'), true);
+  assert.equal(o.deRetraitsTexte('F12', '', "Google, journal de l'API Gemini"), false);
+});
+
+// Des lignes réelles de la page des retraits de Gemini, relue le 16 novembre 2026 : 54 lignes écartées sur 133.
+test("les retraits de Gemini : images (Nano Banana), musique (Lyria), voix (Live), robotique dehors ; texte et décision dedans", () => {
+  for (const l of [
+    '§L Model : gemini-3.1-flash-image · Release date : May 28, 2026 · Shutdown date : No shutdown date announced · Recommended replacement : gemini-nano-banana-2.1',
+    '§L Model : imagen-4.0-generate-001 · Release date : June 24, 2025 · Shutdown date : August 17, 2026 · Recommended replacement : gemini-nano-banana-2.1',
+    '§L Model : lyria-3.5 · Release date : September 3, 2026 · Shutdown date : No shutdown date announced',
+    '§L Model : gemini-2.5-flash-native-audio-preview-12-2025 · Release date : December 12, 2025 · Shutdown date : March 31, 2027 · Recommended replacement : gemini-3.8-live',
+    '§L Model : gemini-robotics-er-2-preview · Release date : July 30, 2026 · Shutdown date : No shutdown date announced',
+    '§T Nano Banana models',
+  ]) assert.equal(o.ligneHorsTexte(l), true, l);
+  for (const l of [
+    '§L Model : gemini-decision-1 · Release date : November 11, 2026 · Shutdown date : No shutdown date announced',
+    '§L Model : gemini-2.5-flash · Release date : June 17, 2025 · Shutdown date : December 1, 2026 · Recommended replacement : gemini-3.5-flash-lite',
+    // « live » ne compte pas au milieu d'un mot.
+    'Requests are delivered to a newer model.',
+  ]) assert.equal(o.ligneHorsTexte(l), false, l);
 });
 
 // La relecture du 16 novembre 2026 : une ligne sur un modèle suivi, écrit seul, était écartée pour un mot de son

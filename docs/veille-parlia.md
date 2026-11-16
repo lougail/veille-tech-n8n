@@ -63,9 +63,10 @@ replacement : gpt-image-2.6-sunburst or gpt-image-2.6-flare · Notice date : Jun
 avait annoncé l'arrêt des remplaçants (fiche 4 de la semaine 46). Le même découpage lit les tableaux Markdown de
 Gemini et garde le nom des modèles d'Anthropic, écrit dans un bouton. Depuis ce changement (15 novembre 2026),
 chaque page est réapprise une fois, sans rien proposer. Sur la page des retraits d'OpenAI et dans les billets de
-retraits du journal de Workers AI (Cloudflare), le bot ne garde que les lignes des modèles de texte : une ligne qui
-ne nomme que des modèles d'image, de son, de vidéo, de plongements ou de modération n'entre dans aucun article ni
-dans aucun original lu, ni la section entière d'un intertitre qui ne nomme qu'eux ; une ligne qui nomme un modèle
+retraits du journal de Workers AI (Cloudflare), et depuis le 16 novembre 2026 sur la page des retraits de Gemini, le
+bot ne garde que les lignes des modèles de texte : une ligne qui ne nomme que des modèles d'image, de son, de vidéo,
+de musique, de plongements, de modération ou de robotique n'entre dans aucun article ni dans aucun original lu, ni
+la section entière d'un intertitre qui ne nomme qu'eux (54 lignes sur 133 chez Gemini) ; une ligne qui nomme un modèle
 suivi est toujours gardée (`PARLIA.RETRAITS_TEXTE`, `ligneHorsTexte` et `lignesHorsTexte`, dans `outils.js`, depuis le
 16 novembre 2026). Un billet de retraits de Cloudflare dont le titre ne nomme que ces modèles-là n'est pas trié.
 La documentation de TypeSafe répond en Markdown aux programmes : sa page des modèles est lue dans sa version
@@ -441,14 +442,12 @@ proposer (nouveau format des lignes).
    un nouvel essai.
 7. **Le modèle qui résume les originaux** (`MODEL_RESUMES` dans `build_parlia.py`). Au plus 8 demandes par
    semaine : le coût reste de l'ordre du centime, et le choix porte sur la justesse des résumés. Mistral Small 3.2
-   par défaut.
+   par défaut ; Louis le garde (16 novembre 2026) et en jugera sur la préparation du 23 novembre.
 8. **Le CEPD (A09)** n'a jamais répondu au bot depuis sa mise en service (46 échecs au 16 novembre 2026, erreur
    503) : son site bloque les programmes. La CNIL relaie ses actualités (« Actualité du CEPD »). Avis : le retirer,
    et compter sur le relais de la CNIL.
-9. **Les retraits de Gemini (F13)** mêlent aussi des modèles d'image et de son (20 lignes sur 93). Avis : les ajouter
-   à `PARLIA.RETRAITS_TEXTE`, comme ceux d'OpenAI et de Cloudflare.
-10. **Le plafond de 3 prépublications arXiv** a fait passer Zuse, gardé en séance, dans la réserve (rejeu de la
-    semaine 46). Avis : en exempter un article qui nomme un modèle suivi, plutôt que relever le plafond.
+9. **Le plafond de 3 prépublications arXiv** a fait passer Zuse, gardé en séance, dans la réserve (rejeu de la
+   semaine 46). Avis : en exempter un article qui nomme un modèle suivi, plutôt que relever le plafond.
 
 ## Ce qui reste à faire
 

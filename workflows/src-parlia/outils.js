@@ -30,11 +30,12 @@ const PARLIA = {
 - Le protocole prévu pour le comparatif : mesurer d'abord l'accord du service avec 3 267 questions dont le ministère est connu ; consigner la version du modèle et la date de chaque appel ; garder la réponse brute ; ne jamais mettre une étiquette du service dans le jeu de test ; garder l'étiquetage assisté seulement s'il améliore le macro-F1.
 - L'épreuve E5 porte sur un remaniement du Gouvernement qui change la liste des ministères. La soutenance a lieu en janvier 2027.`,
   UA: 'veille-parlia/1.0 (veille de certification de Louis; +https://github.com/lougail)',
-  // Les retraits d'OpenAI (sa page des retraits, F02) et de Cloudflare (les billets de retraits du journal de Workers
-  // AI, X01) : le bot n'en garde que les lignes des modèles de texte (ligneHorsTexte). Le 5 novembre 2026, Cloudflare
-  // arrêtait seize modèles de texte et huit autres (son, image, vision, plongements) ; la page d'OpenAI mêle aux
-  // modèles de texte ceux d'image, de son, de vidéo, de plongements et de modération.
-  RETRAITS_TEXTE: ['F02', 'X01'],
+  // Les retraits d'OpenAI (sa page des retraits, F02), de Cloudflare (les billets de retraits du journal de Workers
+  // AI, X01) et de Google (la page des retraits de Gemini, F13, depuis le 16 novembre 2026) : le bot n'en garde que
+  // les lignes des modèles de texte (ligneHorsTexte). Le 5 novembre 2026, Cloudflare arrêtait seize modèles de texte
+  // et huit autres (son, image, vision, plongements) ; les pages d'OpenAI et de Google mêlent aux modèles de texte
+  // ceux d'image, de son, de vidéo, de musique, de plongements, de modération ou de robotique.
+  RETRAITS_TEXTE: ['F02', 'X01', 'F13'],
 };
 
 // Texte lisible : sans balises ni entités, espaces réduits.
@@ -125,9 +126,10 @@ function dateDansTexte(texte) {
 // Un modèle d'image, de son, de vidéo, de plongements (embeddings) ou de modération se reconnaît à son nom : chez
 // OpenAI gpt-image-1-mini, chatgpt-image-latest, dall-e-3, tts-1, whisper-1, gpt-realtime, gpt-4o-mini-transcribe,
 // sora-2, text-embedding-3-small, omni-moderation ; chez Cloudflare melotts, stable-diffusion, dreamshaper, flux,
-// llava, embeddinggemma, deepgram/aura, deepgram/nova.
+// llava, embeddinggemma, deepgram/aura, deepgram/nova ; chez Google gemini-3-pro-image, imagen, nano-banana (images),
+// veo (vidéo), lyria (musique), gemini-3.8-live (voix), gemini-robotics.
 // « tts » et « voice » ne comptent pas au milieu d'un mot : ni mattshumer, ni invoice.
-const MODELES_HORS_TEXTE = /image|dall-?e|flux|stable-diffusion|sdxl|dreamshaper|inpaint|(?<![a-z])tts|tts(?![a-z])|whisper|transcri|audio|realtime|speech|(?<![a-z])voice|sora|video|embedding|similarity|search-(ada|babbage|curie|davinci)|rerank|moderation|llama-guard|llava|resnet|detr|uform|deepgram\/|^aura\b|^nova-\d/i;
+const MODELES_HORS_TEXTE = /image|dall-?e|flux|stable-diffusion|sdxl|dreamshaper|inpaint|banana|(?<![a-z])veo-\d|lyria|robotics|(?<![a-z])live(?![a-z])|(?<![a-z])tts|tts(?![a-z])|whisper|transcri|audio|realtime|speech|(?<![a-z])voice|sora|video|embedding|similarity|search-(ada|babbage|curie|davinci)|rerank|moderation|llama-guard|llava|resnet|detr|uform|deepgram\/|^aura\b|^nova-\d/i;
 // Un modèle de texte se reconnaît à sa famille : gpt-6-luna, o3, claude-haiku-5.5, llama-3.2-1b-instruct, qwq-32b…
 const MODELES_TEXTE = /^(gpt-|o\d|chatgpt-|codex|babbage-002|davinci-002|claude|llama|meta-llama|mistral|mixtral|ministral|magistral|codestral|devstral|qwen|qwq|gemma|gemini|deepseek|phi-\d|hermes|openhermes|falcon|tinyllama|openchat|zephyr|starling|sqlcoder|discolm|granite|kimi|glm|nemotron|jev|kev|clef|zuse|decider)/i;
 // Les modèles suivis qu'un texte nomme (PARLIA.NOMS_SUIVIS) : une table clé → graphie du texte. La clé est commune aux
