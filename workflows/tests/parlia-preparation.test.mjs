@@ -168,6 +168,32 @@ test('une semaine sans candidat : le fichier et le message le disent', async () 
   assert.equal(s.discord.fiches.length, 0);
 });
 
+test('les sources sur quatre semaines : une ligne par source du bot, articles proposés et gardés en séance, sans le Journal officiel', async () => {
+  const sd = SD();
+  sd._passage = { notes: { lisibles: true, lues: 3, tenues: 3, derniere: null, seancePrecedente: null, sources: {
+    depuis: '2026-10-26', seances: [{ numero: '03', preparation: '2026-11-09-preparation.md' }],
+    nonComptees: [{ numero: '01', motif: 'préparée à la main' }, { numero: '02', motif: 'préparée à la main' }],
+    parSource: { 'arXiv : modèles de décision et calibration': { proposes: 2, gardes: 2 }, 'CNIL, actualités': { proposes: 2, gardes: 0 }, 'TypeSafe AI, blog': { proposes: 1, gardes: 0 } },
+  } } };
+  const { s } = await preparer(SEL, sd);
+  const md = s.markdown;
+  const partie = md.slice(md.indexOf('### Les sources sur quatre semaines'), md.indexOf('### Classer en séance'));
+  assert.match(partie, /Depuis le lundi 26 octobre 2026\. Séances comptées, tenues sur une préparation du bot : séance 03 \(préparation du 9 novembre 2026\)\. Pas comptées : séance 01, préparée à la main ; séance 02, préparée à la main\./);
+  assert.match(partie, /Le bot ne retire aucune source/);
+  const rangees = partie.split('\n').filter((l) => l.startsWith('| ') && !l.startsWith('| Source |'));
+  assert.deepEqual(rangees, [
+    '| arXiv : modèles de décision et calibration | 2 | 2 |',
+    '| CNIL, actualités | 2 | 0 |',
+    '| TypeSafe AI, blog | 1 | 0 |',
+    "| OpenAI, journal de l'API | 0 | 0 |",
+    '| Source 1 | 0 | 0 |',
+  ]);
+  assert.doesNotMatch(partie, /Journal officiel \(DILA\) \|/);
+  // Sans notes lisibles, pas de bilan.
+  const sansNotes = (await preparer()).s.markdown;
+  assert.match(sansNotes, /### Les sources sur quatre semaines\n\nLes notes de séance n'ont pas pu être lues : pas de bilan des sources cette semaine\.\n/);
+});
+
 // Ce que le nœud Notes a lu dans les notes de séance (sd._passage.notes).
 const NOTES = {
   lisibles: true, motif: '', lues: 2, tenues: 1, seanceSemaine: null,

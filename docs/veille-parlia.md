@@ -1,6 +1,6 @@
 # Veille ParlIA — la séance de la semaine, préparée par le bot
 
-Mise à jour du 15 novembre 2026. Le workflow « Veille ParlIA » (`VeilleParlIAprod`, 37 nœuds) prépare chaque
+Mise à jour du 16 novembre 2026. Le workflow « Veille ParlIA » (`VeilleParlIAprod`, 39 nœuds) prépare chaque
 semaine la séance de veille du projet ParlIA : Louis la tient pour l'épreuve E2 de sa certification (une heure de
 veille par semaine, une note datée par séance). Le bot collecte, trie, lit l'original des fiches retenues et
 prépare ; Louis lit les originaux, classe chaque point (rien, à surveiller, décision à ouvrir) et écrit la note.
@@ -30,7 +30,7 @@ Toutes les 30 min, de 7 h 15 à 22 h 45, quand le Mac est allumé
       │    → Tri par Mistral Small 3.2, par lots de 12 → Lire le tri : contrôles, plafonds, tri de secours
       │    → Registre (16 jours)
       │    → Journal officiel (archives de la DILA) → Alertes immédiates → Discord
-      ├─ Notes de séance : relues sans écriture, seulement avant la préparation ou le rappel
+      ├─ Notes de séance et préparations déjà écrites : relues sans écriture, avant la préparation ou le rappel
       ├─ Préparation : au premier passage à partir du lundi 6 h, 8 fiches au plus, sans minimum
       │    → Originaux : l'original de chaque fiche, lu, puis résumé par le modèle choisi, une demande par fiche
       │    → fichier AAAA-MM-JJ-preparation.md → Discord : ouverture, fiches guidées, réserve
@@ -177,6 +177,9 @@ la reprendre telle quelle :
   qu'il faut chercher dans l'original ; ce que l'original contredit dans le tri ; deux questions (« Qu'est-ce qui
   sort ? », « Est-ce que ça pourrait servir à ParlIA ? ») ; l'hypothèse ; le lien ;
 - la réserve, les échéances des 90 jours, les alertes depuis la dernière préparation.
+- avant « Classer en séance », les sources sur quatre semaines : une ligne par source du bot, avec les articles
+  proposés aux séances tenues sur ses préparations et ceux qu'un point retenu cite (voir « Les notes de séance »).
+  Le bot ne retire aucune source : Louis décide.
 
 Le fichier est signé et daté : c'est le travail du bot, pas une lecture. Le bot ne commite jamais : aucun dossier
 `.git` n'est monté dans le conteneur. Le fichier entre dans Git avec la note de séance, par le commit de Louis.
@@ -201,7 +204,7 @@ Tout passe par un webhook, `DISCORD_WEBHOOK_PARLIA`. Sans lui, rien n'est publi�
 ### Les notes de séance
 
 Le dossier des notes est monté en lecture seule. `notes-parlia.js` lit les fichiers `AAAA-MM-JJ-seance-NN.md`
-et n'en tire que trois choses.
+et n'en tire que quatre choses.
 
 - **Les séances tenues.** Une séance compte comme tenue quand la ligne « Date » du tableau « Séance » porte une date
   AAAA-MM-JJ déjà passée, sans repère « [À REMPLIR …] », « [À COMPLÉTER …] » ni « [EN COURS …] » : une note
@@ -211,6 +214,14 @@ et n'en tire que trois choses.
   classement commence par « à surveiller », avec le titre du point retenu. Pour garder un point au-delà, la séance
   suivante le reclasse « à surveiller » dans sa propre note.
 - **La « Prochaine piste »** de cette séance.
+- **Les sources sur quatre semaines** (§6.2, règle 10). Pour chaque séance tenue depuis quatre semaines sur une
+  préparation du bot : les fiches de cette préparation, avec leur source, et celles que citent ses points retenus
+  (« (fiche 7) », « (candidat 2) », dans la première parenthèse du point). La préparation est celle dont la note
+  donne le lien (`preparations/2026-11-09-preparation.md`), relue dans le dossier où le bot l'a écrite (nœuds « Lire
+  les préparations » et « Texte des préparations », une branche au-dessus de celle des notes) ; sans lien, la
+  dernière préparation du bot des sept jours d'avant. Une séance préparée à la main n'est pas comptée : ses
+  candidats ne viennent pas des sources du bot (séances 01 et 02). Le Journal officiel et l'Élysée, qui ne donnent
+  que des alertes, restent hors du tableau.
 
 Le rappel du jeudi ne part pas si une séance de la semaine est notée. Sans notes lisibles (dossier non monté ou
 vide), il part quand même, avec « si c'est fait, ignore ce message », et le fichier demande de reprendre les points
@@ -397,9 +408,10 @@ les hypothèses du tri restaient souvent générales (« pourrait influencer la 
 
 ## Ce qui reste à faire
 
-- Réimporter le workflow avec les corrections du 15 novembre 2026, après un essai en mode test.
+- Réimporter le workflow avec les corrections du 15 et du 16 novembre 2026, après un essai en mode test.
 - Rejouer le jeu de contrôle du tri (étude, §5.5) à chaque changement de la consigne ou du modèle.
-- La revue mensuelle des sources (règle 10) : étendre `outils/rendement-sources.py` à ParlIA.
+- La revue des sources (règle 10) : la préparation en donne le bilan sur quatre semaines ; à Louis de décider, en
+  séance, des sources à espacer ou à retirer.
 - La matière de la synthèse mensuelle.
 - Lire les réponses et les réactions dans Discord : il faudrait un bot Discord et son jeton, un webhook ne lit rien.
 - Les sources à l'essai de l'étude (§4.2), hors Élysée.

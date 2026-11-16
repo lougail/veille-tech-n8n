@@ -4,6 +4,9 @@
 //   les échéances des 90 jours et les alertes. Avant elle, « Depuis la dernière séance » : les points « à
 //   surveiller » et la piste de la dernière séance tenue, lus dans les notes (nœud Notes ; sources.md, 6.2,
 //   règle 7). Il est signé et daté : c'est le travail du bot, pas une lecture.
+//   Avant « Classer en séance », les sources sur quatre semaines (sources.md, 6.2, règle 10) : une ligne par source
+//   du bot, les articles proposés aux séances tenues et ceux qu'un point retenu cite (nœud Notes). Le bot ne retire
+//   aucune source : Louis décide.
 //   Nom : AAAA-MM-JJ-preparation.md, à la date où il est écrit ; « essai- » devant en mode test. Dossier :
 //   /home/node/.n8n-files/parlia dans le conteneur, monté depuis PARLIA_EXPORT_DIR (docs/veille-parlia.md).
 // - Discord : un message d'ouverture qui notifie (la semaine, par où commencer, comment répondre), puis une fiche
@@ -117,6 +120,31 @@ if (!notes || !notes.lisibles) {
     D.push('');
     D.push('La piste notée pour la suite : « ' + derniere.piste + ' »');
   }
+}
+
+// ---- Les sources sur quatre semaines (nœud Notes) ----
+// Le Journal officiel et les communiqués de l'Élysée ne donnent que des alertes : ils ne sont pas dans le tableau.
+const ALERTES_SEULEMENT = ['A12', 'X11'];
+const B = [];
+const bilanSources = notes && notes.lisibles ? notes.sources : null;
+if (!bilanSources) {
+  B.push("Les notes de séance n'ont pas pu être lues : pas de bilan des sources cette semaine.");
+} else {
+  const parNom = {};
+  for (const [id, e] of Object.entries(sante).concat(Object.entries(carnet.parSource || {}))) {
+    if (e && e.s && !ALERTES_SEULEMENT.includes(id)) parNom[e.s] = { proposes: 0, gardes: 0 };
+  }
+  for (const [nom, e] of Object.entries(bilanSources.parSource || {})) parNom[nom] = { proposes: e.proposes, gardes: e.gardes };
+  const rangees = Object.entries(parNom).sort(([na, a], [nb, b]) => (b.gardes - a.gardes) || (b.proposes - a.proposes) || na.localeCompare(nb, 'fr'));
+  const comptees = (bilanSources.seances || []).map((s) => 'séance ' + s.numero + ' (préparation du ' + dateLongue(s.preparation) + ')');
+  const exclues = (bilanSources.nonComptees || []).map((s) => 'séance ' + s.numero + ', ' + s.motif);
+  B.push('Depuis le lundi ' + dateLongue(bilanSources.depuis) + '. Séances comptées, tenues sur une préparation du bot : '
+    + (comptees.length ? comptees.join(', ') : 'aucune pour l\'instant') + '.' + (exclues.length ? ' Pas comptées : ' + exclues.join(' ; ') + '.' : '')
+    + " « Gardés » : les articles qu'un point retenu de la séance cite. Le Journal officiel et les communiqués de l'Élysée, qui ne donnent que des alertes, ne sont pas dans le tableau. Le bot ne retire aucune source : à Louis de garder, d'espacer ou d'enlever celles qui n'apportent rien.");
+  B.push('');
+  B.push('| Source | Articles proposés | Gardés en séance |');
+  B.push('|---|---|---|');
+  rangees.forEach(([nom, e]) => B.push('| ' + [nom, e.proposes, e.gardes].map(cellule).join(' | ') + ' |'));
 }
 
 // ---- Le fichier ----
@@ -261,6 +289,10 @@ const alertes = (sd.alertesJournal || []).filter((a) => (a.at || 0) > precedente
 const NOM_ALERTE = { remaniement: 'Remaniement', attributions: 'Attributions', retrait: "Retrait d'un modèle suivi" };
 if (alertes.length) alertes.forEach((a) => L.push('- ' + (NOM_ALERTE[a.type] || a.type) + ' : « ' + a.titre + ' » (' + (dateLongue(a.date) || a.date) + ', ' + a.origine + ') — ' + a.url));
 else L.push('Aucune.');
+L.push('');
+L.push('### Les sources sur quatre semaines');
+L.push('');
+B.forEach((l) => L.push(l));
 L.push('');
 L.push('### Classer en séance');
 L.push('');

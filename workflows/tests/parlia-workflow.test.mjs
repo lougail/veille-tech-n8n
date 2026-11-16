@@ -57,8 +57,9 @@ test("les connexions, et l'ordre d'exécution v1 : de haut en bas, le statut en 
 });
 
 test('les notes de séance : lues dans le seul dossier monté, sans écriture, erreurs tolérées, nom du fichier gardé', () => {
-  const chaine = ['Notes à lire ?', 'Lire les notes', 'Texte des notes', 'Notes'];
+  const chaine = ['Lire les notes', 'Texte des notes', 'Notes'];
   chaine.slice(0, -1).forEach((nom, i) => assert.deepEqual(wf.connections[nom].main[0].map((c) => c.node), [chaine[i + 1]]));
+  assert.deepEqual(wf.connections['Notes à lire ?'].main[0].map((c) => c.node).sort(), ['Lire les notes', 'Lire les préparations']);
   const lire = parNom['Lire les notes'];
   assert.equal(lire.type, 'n8n-nodes-base.readWriteFile');
   assert.equal(lire.typeVersion, 1.1); // 1.1 : « aucun fichier » est une erreur, donc un élément, pas un silence
@@ -70,6 +71,17 @@ test('les notes de séance : lues dans le seul dossier monté, sans écriture, e
   assert.deepEqual([texte.parameters.operation, texte.parameters.binaryPropertyName, texte.parameters.destinationKey], ['text', 'data', 'texte']);
   assert.equal(texte.parameters.options.keepSource, 'json');
   assert.equal(texte.continueOnFail, true);
+  // Les préparations du bot, relues pour le bilan des sources : une branche à part, au-dessus de celle des notes (elle
+  // s'exécute avant elle), dans le dossier où le bot les écrit, sans les essais.
+  const preps = parNom['Lire les préparations'];
+  assert.deepEqual([preps.type, preps.typeVersion, preps.parameters.operation], ['n8n-nodes-base.readWriteFile', 1.1, 'read']);
+  assert.equal(preps.parameters.fileSelector, '/home/node/.n8n-files/parlia/[0-9]*-preparation.md');
+  assert.deepEqual([preps.continueOnFail, preps.alwaysOutputData], [true, true]);
+  assert.ok(preps.position[1] < lire.position[1]);
+  assert.deepEqual(wf.connections['Lire les préparations'].main[0].map((c) => c.node), ['Texte des préparations']);
+  const textePreps = parNom['Texte des préparations'];
+  assert.deepEqual([textePreps.parameters.operation, textePreps.parameters.destinationKey, textePreps.parameters.options.keepSource], ['text', 'texte', 'json']);
+  assert.equal(wf.connections['Texte des préparations'], undefined); // le nœud Notes le lit par $(), sans connexion
   // Aucun nœud n'écrit ailleurs que dans le dossier des préparations.
   const ecritures = wf.nodes.filter((n) => n.type === 'n8n-nodes-base.readWriteFile' && n.parameters.operation === 'write');
   assert.deepEqual(ecritures.map((n) => n.name), ['Écrire le fichier']);

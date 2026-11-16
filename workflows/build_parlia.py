@@ -58,6 +58,7 @@ DISCORD_STATUS_URL = "={{ $env.DISCORD_WEBHOOK_STATUS + '?wait=true' }}"
 
 # Les dossiers montés dans le conteneur (docker-compose.yml) : n8n 2.x n'écrit et ne lit que sous ~/.n8n-files.
 DOSSIER_NOTES = "/home/node/.n8n-files/parlia-notes"
+DOSSIER_PREPARATIONS = "/home/node/.n8n-files/parlia"
 
 OUTILS = (SRC / "outils.js").read_text(encoding="utf-8")
 OUTILS_NOMS = (
@@ -224,6 +225,38 @@ def build(mode: str):
         # Branche 2 : les notes de séance, relues en lecture seule, avant la préparation et le rappel qui s'en
         # servent. Dossier absent ou vide : une erreur tolérée, que le nœud Notes traduit (« notes non lues »).
         code_node("Notes à lire ?", "notes-dues-parlia.js", [600, 440]),
+        # Les préparations déjà écrites par le bot, relues pour le bilan des sources sur quatre semaines (nœud Notes ;
+        # sources.md, 6.2, règle 10) : les seuls fichiers datés, pas les essais. Cette branche est au-dessus de celle
+        # des notes : elle s'exécute avant elle, et une panne (dossier vide) ne touche pas la lecture des notes.
+        {
+            "parameters": {
+                "operation": "read",
+                "fileSelector": DOSSIER_PREPARATIONS + "/[0-9]*-preparation.md",
+                "options": {},
+            },
+            "id": slug("Lire les préparations"),
+            "name": "Lire les préparations",
+            "type": "n8n-nodes-base.readWriteFile",
+            "typeVersion": 1.1,
+            "position": [800, 360],
+            "continueOnFail": True,
+            "alwaysOutputData": True,
+        },
+        {
+            "parameters": {
+                "operation": "text",
+                "binaryPropertyName": "data",
+                "destinationKey": "texte",
+                "options": {"keepSource": "json"},
+            },
+            "id": slug("Texte des préparations"),
+            "name": "Texte des préparations",
+            "type": "n8n-nodes-base.extractFromFile",
+            "typeVersion": 1.1,
+            "position": [1000, 360],
+            "continueOnFail": True,
+            "alwaysOutputData": True,
+        },
         {
             "parameters": {
                 "operation": "read",
@@ -335,7 +368,8 @@ def build(mode: str):
         "Lire le tri": {"main": [main("Registre")]},
         "Journal officiel": {"main": [main("Alertes")]},
         "Alertes": {"main": [main("Discord alertes")]},
-        "Notes à lire ?": {"main": [main("Lire les notes")]},
+        "Notes à lire ?": {"main": [main("Lire les préparations", "Lire les notes")]},
+        "Lire les préparations": {"main": [main("Texte des préparations")]},
         "Lire les notes": {"main": [main("Texte des notes")]},
         "Texte des notes": {"main": [main("Notes")]},
         "Sélection": {"main": [main("Originaux")]},
@@ -387,11 +421,12 @@ def build(mode: str):
                 for c in out:
                     assert c["node"] in names, f"cible inconnue : {c['node']} (depuis {src_name})"
     # L'ordre v1 exécute les branches de haut en bas : le statut doit rester la dernière, les notes passer avant
-    # la préparation et le rappel, le fichier avant Discord, le tri avant le Journal officiel (les alertes du
-    # registre partent avec celles du JO).
+    # la préparation et le rappel, les préparations déjà écrites avant les notes, le fichier avant Discord, le tri
+    # avant le Journal officiel (les alertes du registre partent avec celles du JO).
     y = {n["name"]: n["position"][1] for n in nodes}
     for avant, apres in (("Sources ParlIA", "Notes à lire ?"), ("Notes à lire ?", "Sélection"),
                          ("Sélection", "Rappel"), ("Rappel", "Statut"),
+                         ("Lire les préparations", "Lire les notes"),
                          ("Consigne de tri", "Journal officiel"), ("Convertir en fichier", "Ouverture")):
         assert y[avant] < y[apres], f"ordre d'exécution : {avant} doit être au-dessus de {apres}"
     return workflow
