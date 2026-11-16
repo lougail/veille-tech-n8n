@@ -140,9 +140,10 @@ résumés d'arXiv étaient coupés au milieu, comme celui de la fiche 9 de la se
 3. les notes de 6 ou plus, par ordre décroissant, 8 fiches au plus et sans minimum : une semaine calme en donne
    moins ;
 4. au plus 5 fiches par axe, sans minimum par axe ;
-5. au plus 3 prépublications arXiv et 2 articles d'une même source ; une prépublication dont le titre nomme un
-   modèle suivi présente ce modèle lui-même (« Zuse: A Decision Model for European Languages ») et ne compte dans
-   aucun de ces deux plafonds (16 novembre 2026 : au rejeu de la semaine 46, ils laissaient Zuse en réserve) ;
+5. au plus 3 prépublications arXiv et 2 articles d'une même source ; une prépublication dont le titre commence par le
+   nom d'un modèle suivi, suivi d'un deux-points, présente ce modèle lui-même (« Zuse: A Decision Model for European
+   Languages ») et ne compte dans aucun de ces deux plafonds (16 novembre 2026 : au rejeu de la semaine 46, ils
+   laissaient Zuse en réserve). Une étude sur un modèle suivi (« Is Jev a Good Multilingual Judge? ») y compte ;
 6. un événement, une ligne : la source primaire en tête, « couvert aussi par » ensuite ;
 7. les points « à surveiller » de la dernière séance reviennent en tête, hors quota (lus dans les notes, voir plus
    bas) ;

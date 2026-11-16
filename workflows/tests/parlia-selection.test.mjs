@@ -104,6 +104,31 @@ test("une étude dont le titre nomme un modèle suivi (Zuse) ne compte dans aucu
   assert.deepEqual(s.reserve.map((x) => x.titre), ['Measuring Definition Sensitivity in LLM Annotation of Social Science Concepts']);
 });
 
+// L'essai du 16 novembre 2026 : deux études qui ne font que parler de Jev passaient hors plafond, et la préparation
+// comptait 5 études arXiv sur 8 fiches.
+test("une étude sur un modèle suivi, sans le présenter, compte dans les plafonds arXiv", async () => {
+  const etude = (p, t) => r('qualite', p, { ax: true, na: 'auteurs', sid: 'R2', s: 'arXiv R2', t });
+  const s = await choisir([
+    etude(8, 'UltraBERT-JEV: Encoder models for System One Applications'),
+    etude(8, 'Can the Confidence and Decisions of System 1 Models Be Trusted? An Explainability and Perturbation Audit of Jev-Style Decision Models'),
+    etude(8, 'Small Heads, Strong Decisions: A Controlled Study of Typed-Decision Models'),
+    etude(7, 'Is Jev a Good Multilingual Judge?'),
+    etude(7, 'Jev 1.15: Technical Report'),
+  ]);
+  assert.deepEqual(s.candidats.map((c) => c.titre).sort(), ['Jev 1.15: Technical Report', 'UltraBERT-JEV: Encoder models for System One Applications',
+    'Can the Confidence and Decisions of System 1 Models Be Trusted? An Explainability and Perturbation Audit of Jev-Style Decision Models'].sort());
+});
+
+test("un prix n'est celui d'un modèle suivi que si le titre le nomme ; un retrait, aussi par son résumé", async () => {
+  const s = await choisir([
+    r('fournisseurs', 9, { f: { changement_prix: true }, t: 'Introducing Our Smallest, Most Efficient Model: Muse Ember',
+      r: "Meta AI lance Muse Ember. Son prix est aligné sur GPT-6 Luna et Claude Haiku 5.5 pour les prompts courts." }),
+    r('fournisseurs', 3, { f: { retrait_modele: true }, de: '2027-01-14', t: 'Planned model deprecations qxdeprecz',
+      r: "gpt-4o-mini s'arrêtera le 14 janvier 2027 ; l'éditeur conseille gpt-6-luna à sa place." }),
+  ]);
+  assert.deepEqual(s.candidats.map((c) => [c.titre.split(' ')[0], c.raison]), [['Introducing', 'note de 6 ou plus'], ['Planned', "retrait d'un modèle suivi"]]);
+});
+
 test('la CNIL ou le CEPD : toujours sur sa ligne à part ; une fiche seulement à partir de 6 ; hors thème, jamais', async () => {
   const texteCnil = (p) => r('conformite', p, { cn: true, sid: 'A08', s: 'CNIL, actualités', t: 'La CNIL publie ses recommandations' });
   const bas = await choisir([r('fournisseurs', 9), texteCnil(4)]);

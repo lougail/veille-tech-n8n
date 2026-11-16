@@ -10,9 +10,10 @@
 // 3. Seuil : les articles notés 6 ou plus, par note décroissante, jusqu'au maximum.
 // 4. Au plus 5 fiches par axe, sans minimum par axe.
 // 5. Plafonds : au plus 3 prépublications arXiv, au plus 2 articles d'une même source. Une prépublication dont le titre
-//    nomme un modèle suivi présente ce modèle lui-même (« Zuse: A Decision Model for European Languages ») : elle ne
-//    compte dans aucun de ces deux plafonds (16 novembre 2026 ; au rejeu de la semaine 46, ils laissaient Zuse en
-//    réserve, que Louis avait gardé en séance).
+//    commence par le nom d'un modèle suivi, suivi d'un deux-points, présente ce modèle lui-même (« Zuse: A Decision
+//    Model for European Languages ») : elle ne compte dans aucun de ces deux plafonds (16 novembre 2026 ; au rejeu de
+//    la semaine 46, ils laissaient Zuse en réserve, que Louis avait gardé en séance). Une étude sur un modèle suivi
+//    (« Is Jev a Good Multilingual Judge? », « UltraBERT-JEV: … ») y compte, comme les autres.
 // 6. Un événement, une ligne : la source primaire en tête, « couvert aussi par » ensuite ; un article non primaire
 //    n'entre que si l'original manque, marqué « à recouper ».
 // 8. Hors thème : jamais.
@@ -77,6 +78,13 @@ const proches = (a, b) => {
 };
 const ordre = (x, y) => (y.p - x.p) || ((y.pr ? 1 : 0) - (x.pr ? 1 : 0)) || ((y.v ? 1 : 0) - (x.v ? 1 : 0))
   || String(y.d || '').localeCompare(String(x.d || ''));
+// Une prépublication qui présente un modèle suivi : « Zuse: … », « Jev 1.15: … ».
+const PRESENTE_UN_SUIVI = new RegExp('^\\W*' + PARLIA.NOMS_SUIVIS.source + '(?:[\\s-]*v?\\d[\\w.]*)?\\s*:', 'i');
+// Un modèle suivi, pour la règle 2 : vérifié par le programme (catalogue d'OpenRouter), nommé dans le titre, ou, pour
+// un retrait, dans le résumé (« Planned model deprecations on Workers AI » ne dit pas lesquels). Un résumé qui cite
+// GPT-6 Luna pour comparer un prix ne fait pas d'un nouveau modèle un modèle suivi (Muse Ember, essai du 16 novembre
+// 2026).
+const nommeUnSuivi = (m) => !!m.v || nomsSuivisDans(m.t).size > 0 || (!!(m.f && m.f.retrait_modele) && nomsSuivisDans(m.r).size > 0);
 const evenements = [];
 for (const a of fenetre.slice().sort((x, y) => ((y.pr ? 1 : 0) - (x.pr ? 1 : 0)) || ordre(x, y))) {
   const ev = evenements.find((e) => e.membres.some((m) => proches(m, a)));
@@ -88,7 +96,7 @@ const candidats = evenements.map((e) => {
   const p = Math.max(...e.membres.map((m) => (m.axe === 'hors_theme' ? 0 : m.p)));
   const f = {};
   for (const m of e.membres) for (const [k, v] of Object.entries(m.f || {})) if (v) f[k] = true;
-  const suivi = e.membres.some((m) => m.v || nomsSuivisDans(m.t + ' ' + (m.r || '')).size > 0);
+  const suivi = e.membres.some(nommeUnSuivi);
   return {
     id: tete.id, titre: tete.t, url: tete.u, source: tete.s, sid: tete.sid, kind: tete.k || '', axe: tete.axe, p,
     primaire: !!tete.pr, nature: tete.na || 'inconnu', resume: tete.r || '', aChercher: tete.c || '', hypothese: tete.h || '',
@@ -96,7 +104,7 @@ const candidats = evenements.map((e) => {
     drapeaux: f, dateEffet: e.membres.map((m) => m.de).find(Boolean) || null, date: tete.d || '',
     vu: jourDe(tete.vu), avantPeriode: !!tete.d && tete.d < jourDebut, dateAvant: tete.da || '',
     arxiv: !!tete.ax, cnil: e.membres.some((m) => m.cn), decision: !!tete.dc, secours: tete.sec || '', verifie: e.membres.some((m) => m.v),
-    modeleSuiviArxiv: !!tete.ax && nomsSuivisDans(tete.t).size > 0,
+    modeleSuiviArxiv: !!tete.ax && PRESENTE_UN_SUIVI.test(String(tete.t || '').replace(/[\u2010-\u2015]/g, '-')),
     plafonds: tete.pl || '', aRecouper: !tete.pr,
     aussi: e.membres.slice(1).map((m) => ({ s: m.s, u: m.u })).slice(0, 3),
     horsTheme: tete.axe === 'hors_theme', suivi,
