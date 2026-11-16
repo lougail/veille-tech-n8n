@@ -140,7 +140,9 @@ résumés d'arXiv étaient coupés au milieu, comme celui de la fiche 9 de la se
 3. les notes de 6 ou plus, par ordre décroissant, 8 fiches au plus et sans minimum : une semaine calme en donne
    moins ;
 4. au plus 5 fiches par axe, sans minimum par axe ;
-5. au plus 3 prépublications arXiv et 2 articles d'une même source ;
+5. au plus 3 prépublications arXiv et 2 articles d'une même source ; une prépublication dont le titre nomme un
+   modèle suivi présente ce modèle lui-même (« Zuse: A Decision Model for European Languages ») et ne compte dans
+   aucun de ces deux plafonds (16 novembre 2026 : au rejeu de la semaine 46, ils laissaient Zuse en réserve) ;
 6. un événement, une ligne : la source primaire en tête, « couvert aussi par » ensuite ;
 7. les points « à surveiller » de la dernière séance reviennent en tête, hors quota (lus dans les notes, voir plus
    bas) ;
@@ -446,8 +448,6 @@ proposer (nouveau format des lignes).
 8. **Le CEPD (A09)** n'a jamais répondu au bot depuis sa mise en service (46 échecs au 16 novembre 2026, erreur
    503) : son site bloque les programmes. La CNIL relaie ses actualités (« Actualité du CEPD »). Avis : le retirer,
    et compter sur le relais de la CNIL.
-9. **Le plafond de 3 prépublications arXiv** a fait passer Zuse, gardé en séance, dans la réserve (rejeu de la
-   semaine 46). Avis : en exempter un article qui nomme un modèle suivi, plutôt que relever le plafond.
 
 ## Ce qui reste à faire
 

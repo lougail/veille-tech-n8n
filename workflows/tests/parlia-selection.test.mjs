@@ -86,6 +86,24 @@ test('les plafonds : 3 prépublications arXiv et 2 articles par source', async (
   assert.equal(s.candidats.filter((c) => c.sid === 'A03').length, 2);
 });
 
+// Le rejeu de la semaine 46 : Drex et l'étude sur la présentation (arXiv, modèles de décision) et celle sur les questions
+// parlementaires remplissaient les deux plafonds ; Zuse, que Louis a gardé en séance, finissait en réserve.
+test("une étude dont le titre nomme un modèle suivi (Zuse) ne compte dans aucun plafond ; les autres études, si", async () => {
+  const etude = (axe, p, sid, t) => r(axe, p, { ax: true, na: 'auteurs', sid, s: 'arXiv ' + sid, t });
+  const s = await choisir([
+    etude('fournisseurs', 8, 'R2', 'Towards Foundation Decision Models: Drex'),
+    etude('qualite', 8, 'R2', 'Can the Confidence and Decisions of System 1 Models Be Trusted?'),
+    etude('qualite', 8, 'R3', 'Beyond accuracy: what AI assurance needs to establish in public services'),
+    etude('fournisseurs', 7, 'R2', 'Zuse: A Decision Model for European Languages'),
+    etude('qualite', 7, 'R1', 'Measuring Definition Sensitivity in LLM Annotation of Social Science Concepts'),
+  ]);
+  const zuse = s.candidats.find((c) => c.titre.startsWith('Zuse'));
+  assert.ok(zuse, 'Zuse a sa fiche');
+  assert.match(zuse.raison, /présente un modèle suivi, hors des plafonds arXiv et par source/);
+  assert.equal(s.candidats.length, 4);
+  assert.deepEqual(s.reserve.map((x) => x.titre), ['Measuring Definition Sensitivity in LLM Annotation of Social Science Concepts']);
+});
+
 test('la CNIL ou le CEPD : toujours sur sa ligne à part ; une fiche seulement à partir de 6 ; hors thème, jamais', async () => {
   const texteCnil = (p) => r('conformite', p, { cn: true, sid: 'A08', s: 'CNIL, actualités', t: 'La CNIL publie ses recommandations' });
   const bas = await choisir([r('fournisseurs', 9), texteCnil(4)]);

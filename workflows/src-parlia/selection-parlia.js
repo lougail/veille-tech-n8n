@@ -9,7 +9,10 @@
 //    annoncé par une source primaire ; échéance réglementaire avant la fin de janvier 2027 (la soutenance).
 // 3. Seuil : les articles notés 6 ou plus, par note décroissante, jusqu'au maximum.
 // 4. Au plus 5 fiches par axe, sans minimum par axe.
-// 5. Plafonds : au plus 3 prépublications arXiv, au plus 2 articles d'une même source.
+// 5. Plafonds : au plus 3 prépublications arXiv, au plus 2 articles d'une même source. Une prépublication dont le titre
+//    nomme un modèle suivi présente ce modèle lui-même (« Zuse: A Decision Model for European Languages ») : elle ne
+//    compte dans aucun de ces deux plafonds (16 novembre 2026 ; au rejeu de la semaine 46, ils laissaient Zuse en
+//    réserve, que Louis avait gardé en séance).
 // 6. Un événement, une ligne : la source primaire en tête, « couvert aussi par » ensuite ; un article non primaire
 //    n'entre que si l'original manque, marqué « à recouper ».
 // 8. Hors thème : jamais.
@@ -93,6 +96,7 @@ const candidats = evenements.map((e) => {
     drapeaux: f, dateEffet: e.membres.map((m) => m.de).find(Boolean) || null, date: tete.d || '',
     vu: jourDe(tete.vu), avantPeriode: !!tete.d && tete.d < jourDebut, dateAvant: tete.da || '',
     arxiv: !!tete.ax, cnil: e.membres.some((m) => m.cn), decision: !!tete.dc, secours: tete.sec || '', verifie: e.membres.some((m) => m.v),
+    modeleSuiviArxiv: !!tete.ax && nomsSuivisDans(tete.t).size > 0,
     plafonds: tete.pl || '', aRecouper: !tete.pr,
     aussi: e.membres.slice(1).map((m) => ({ s: m.s, u: m.u })).slice(0, 3),
     horsTheme: tete.axe === 'hors_theme', suivi,
@@ -109,12 +113,15 @@ const parSource = {};
 let arxiv = 0;
 function ajouter(c, raison, force) {
   if (choisis.includes(c) || choisis.length >= MAX) return false;
-  if (!force && ((parAxe[c.axe] || 0) >= 5 || (parSource[c.sid] || 0) >= 2 || (c.arxiv && arxiv >= 3))) return false;
+  if (!force && (parAxe[c.axe] || 0) >= 5) return false;
+  if (!force && !c.modeleSuiviArxiv && ((parSource[c.sid] || 0) >= 2 || (c.arxiv && arxiv >= 3))) return false;
   c.raison = raison;
   choisis.push(c);
   parAxe[c.axe] = (parAxe[c.axe] || 0) + 1;
-  parSource[c.sid] = (parSource[c.sid] || 0) + 1;
-  if (c.arxiv) arxiv++;
+  if (!c.modeleSuiviArxiv) {
+    parSource[c.sid] = (parSource[c.sid] || 0) + 1;
+    if (c.arxiv) arxiv++;
+  }
   return true;
 }
 // Règle 1 : une fiche à partir de 6 ; plus bas, seulement la ligne à part (cnil, en sortie).
@@ -128,7 +135,9 @@ for (const c of dansLeTheme) {
   else if (f.echeance_reglementaire && c.dateEffet && c.dateEffet >= aujourdhui && c.dateEffet <= FIN_FORMATION) ajouter(c, 'échéance réglementaire', true);
 }
 // Règles 3 et 4 : les plafonds par axe, par source et pour arXiv sont vérifiés par ajouter().
-for (const c of dansLeTheme.filter((x) => x.p >= 6)) ajouter(c, 'note de 6 ou plus', false);
+for (const c of dansLeTheme.filter((x) => x.p >= 6)) {
+  ajouter(c, c.modeleSuiviArxiv ? 'note de 6 ou plus ; une étude qui présente un modèle suivi, hors des plafonds arXiv et par source' : 'note de 6 ou plus', false);
+}
 
 const rang = (axe) => PARLIA.AXES.indexOf(axe);
 choisis.sort((x, y) => (rang(x.axe) - rang(y.axe)) || parScore(x, y));
