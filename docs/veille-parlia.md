@@ -121,8 +121,8 @@ Le programme vérifie ce qu'il vérifie mieux que le modèle (`lire-tri-parlia.j
 - l'hypothèse : celle qui dit ParlIA équipé d'un service du marché (« les services d'OpenAI utilisés par ParlIA »),
   ou qui prête un retrait à un modèle suivi que le titre et l'extrait ne nomment pas, est écartée, et la fiche dit
   pourquoi (`hypotheseFautive`, dans `outils.js`). Une supposition (« s'il entrait au comparatif », « si ParlIA
-  utilisait ») reste, comme un modèle cité en exemple. Sur les 182 hypothèses du rejeu de la semaine 46 et de l'essai
-  du 16 novembre 2026, le contrôle en écarte 5, toutes à raison ;
+  utilisait ») reste, comme un modèle cité en exemple. Sur 291 hypothèses réelles (essais du 16 novembre 2026,
+  mémoire du bot), le contrôle en écarte 11, toutes à raison ;
 - la réponse brute et la version de la consigne sont gardées avec l'article, pour pouvoir rejouer le tri.
 
 Coût : environ 85 articles par semaine, une dizaine de demandes, moins de 5 centimes de dollar par mois.
@@ -426,6 +426,10 @@ rien écrire dans le coffre ni publier dans Discord :
   8 fiches, 5 originaux lus sur 8, les notes et le bilan des sources lus (la séance 03 y compte). Trois défauts,
   corrigés depuis : les dépôts Hugging Face de Perplexity sans texte lisible (le bot lit leur fiche), la page des
   modèles de TypeSafe réduite à une ligne (lue en Markdown), data.gouv.fr au-delà de 20 secondes (45 désormais).
+- **Les essais de la version finale**, l'après-midi, mémoire vierge : 53 articles triés sur 7 jours, les 16 pages et
+  API et les 18 flux lus sans échec, dont le CEPD (son flux en français), tous les originaux lus et résumés. Ils ont
+  encore fait resserrer deux règles de la sélection (l'exemption arXiv, le prix d'un modèle suivi) et le contrôle des
+  hypothèses (« les fournisseurs de modèles utilisés par ParlIA »).
 
 La version est publiée le 16 novembre 2026, avec la mémoire de la précédente : la préparation de la semaine 47, faite
 le matin, n'est pas refaite. À la première lecture des pages sans flux, chaque page est réapprise une fois, sans rien
