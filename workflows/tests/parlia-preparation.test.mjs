@@ -91,6 +91,16 @@ test('les fiches guidées : deux lignes, quoi chercher, les deux questions, l\'h
   assert.match(md, /- « Réserve 1 » — Source R \(Qualité de l'étiquetage, note 5\/10\) — https:\/\/exemple\.org\/r1/);
 });
 
+test('la CNIL ou le CEPD noté moins de 6 : signalé sur sa ligne, sans fiche', async () => {
+  const sel = Object.assign({}, SEL, {
+    candidats: SEL.candidats.slice(0, 3), aLaUne: [1, 3],
+    cnil: { n: null, titre: 'La CNIL publie son rapport annuel', url: 'https://www.cnil.fr/fr/rapport', source: 'CNIL, actualités', p: 4, horsTheme: false },
+  });
+  const { s } = await preparer(sel);
+  assert.match(s.markdown, /\*\*La CNIL et le CEPD cette semaine\*\* : « La CNIL publie son rapport annuel » \(CNIL, actualités\), noté 4\/10 par le tri : signalé ici, sans fiche \(une fiche demande une note de 6 ou plus\) — https:\/\/www\.cnil\.fr\/fr\/rapport/);
+  assert.match(s.discord.ouverture.payload.content, /La CNIL et le CEPD cette semaine : « La CNIL publie son rapport annuel »/);
+});
+
 test('le nom du fichier : la date du jour ; « essai- » devant en mode test', async () => {
   const { s } = await preparer();
   assert.equal(s.nom, '2026-11-02-preparation.md');
@@ -152,9 +162,9 @@ test('une semaine sans candidat : le fichier et le message le disent', async () 
   const vide = Object.assign({}, SEL, { candidats: [], aLaUne: [], reserve: [], cnil: null });
   const { s } = await preparer(vide);
   assert.equal(s.markdown.split('Aucun candidat cette semaine.').length - 1, 4);
-  assert.match(s.markdown, /Aucun candidat cette semaine : aucune source n'a publié d'article noté 5 ou plus dans le thème\./);
+  assert.match(s.markdown, /Aucun candidat cette semaine : aucune source n'a publié d'article noté 6 ou plus dans le thème\./);
   assert.match(s.markdown, /\*\*La CNIL et le CEPD cette semaine\*\* : aucun texte lu depuis la dernière préparation\./);
-  assert.match(s.discord.ouverture.payload.content, /Rien de neuf noté 5 ou plus dans le thème cette semaine\./);
+  assert.match(s.discord.ouverture.payload.content, /Rien de neuf noté 6 ou plus dans le thème cette semaine\./);
   assert.equal(s.discord.fiches.length, 0);
 });
 

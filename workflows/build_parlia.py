@@ -25,7 +25,7 @@ WORKFLOW_ID_TEST = "VeilleParlIAtest"
 CREDENTIALS = {"openRouterApi": {"id": "w6TWAQpgn7TIxlYq", "name": "OpenRouter account"}}
 ERROR_WORKFLOW = "yrUX1IcjTyIwpWqG"
 MODEL_TRI = "mistralai/mistral-small-3.2-24b-instruct"
-# Le modèle qui résume les originaux des candidats retenus (une dizaine de demandes par semaine) : le choix de Louis.
+# Le modèle qui résume les originaux des candidats retenus (8 demandes par semaine au plus) : le choix de Louis.
 # Un autre que celui du tri reçoit Mistral Small 3.2 en secours (refus ou « too many requests » d'OpenRouter).
 MODEL_RESUMES = MODEL_TRI
 
@@ -40,8 +40,7 @@ REGLAGES = [
     ("rappelJour", "={{ $env.PARLIA_RAPPEL_JOUR || '4' }}"),
     ("rappelHeure", "={{ $env.PARLIA_RAPPEL_HEURE || '16:30' }}"),
     ("collecteHeures", "={{ $env.PARLIA_COLLECTE_HEURES || '4' }}"),
-    ("candidatsMin", "={{ $env.PARLIA_CANDIDATS_MIN || '10' }}"),
-    ("candidatsMax", "={{ $env.PARLIA_CANDIDATS_MAX || '15' }}"),
+    ("candidatsMax", "={{ $env.PARLIA_CANDIDATS_MAX || '8' }}"),
     ("forum", "={{ $env.DISCORD_PARLIA_FORUM || '0' }}"),
     ("discord", "={{ $env.DISCORD_WEBHOOK_PARLIA ? '1' : '0' }}"),
     ("statut", "={{ $env.DISCORD_WEBHOOK_STATUS ? '1' : '0' }}"),

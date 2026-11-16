@@ -51,7 +51,7 @@ export function plan(extra = {}) {
     semaine: { cle: '2026-S45', numero: 45, lundi: '2026-11-02', dimanche: '2026-11-08' },
     reglages: {
       prepJour: 1, prepHeure: { h: 6, mn: 0 }, rappelJour: 4, rappelHeure: { h: 16, mn: 30 }, collecteHeures: 4,
-      candidatsMin: 10, candidatsMax: 15, forum: false, discord: true, statut: true, mention: '', essai: false,
+      candidatsMax: 8, forum: false, discord: true, statut: true, mention: '', essai: false,
     },
   }, extra, extra.reglages ? { reglages: Object.assign({}, plan().reglages, extra.reglages) } : {});
 }

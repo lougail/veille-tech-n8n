@@ -5,7 +5,7 @@ import test from 'node:test';
 import { executer, ms } from './aide-parlia.mjs';
 
 const REGLAGES = { prepJour: '1', prepHeure: '06:00', rappelJour: '4', rappelHeure: '16:30', collecteHeures: '4',
-  candidatsMin: '10', candidatsMax: '15', forum: '0', discord: '1', statut: '1', mention: '', essai: '0' };
+  candidatsMax: '8', forum: '0', discord: '1', statut: '1', mention: '', essai: '0' };
 async function passage(maintenant, sd, reglages = {}) {
   const sortie = await executer('planifier-parlia.js', { input: [Object.assign({}, REGLAGES, reglages)], sd, maintenant });
   return sortie[0] || null;
@@ -84,11 +84,11 @@ test('les réglages : préparation le mercredi à 20 h, rappel le samedi à 10 h
 });
 
 test('des réglages invalides reprennent les valeurs par défaut', async () => {
-  const p = await passage('2026-11-02T09:15', {}, { prepJour: '9', prepHeure: 'midi', candidatsMin: '40', candidatsMax: 'x', mention: 'louis' });
+  const p = await passage('2026-11-02T09:15', {}, { prepJour: '9', prepHeure: 'midi', candidatsMax: 'x', mention: 'louis' });
   assert.equal(p.reglages.prepJour, 1);
   assert.deepEqual(p.reglages.prepHeure, { h: 6, mn: 0 });
-  assert.equal(p.reglages.candidatsMax, 15);
-  assert.equal(p.reglages.candidatsMin, 10);
+  assert.equal(p.reglages.candidatsMax, 8);
+  assert.equal('candidatsMin' in p.reglages, false);
   assert.equal(p.reglages.mention, '');
   assert.equal(p.reglages.discord, true);
   assert.equal(p.reglages.forum, false);

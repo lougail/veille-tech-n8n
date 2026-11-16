@@ -1,4 +1,4 @@
-// La sélection de la semaine (selection-parlia.js) : de 10 à 15 candidats d'après les règles de sources.md, 6.2.
+// La sélection de la semaine (selection-parlia.js) : au plus 8 fiches, sans minimum, d'après les règles de sources.md, 6.2.
 // Lance avec : npm test
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -27,38 +27,42 @@ test("pas de préparation due : pas de sélection", async () => {
   assert.equal(await choisir([r('fournisseurs', 9)], {}, { preparation: false }), undefined);
 });
 
-test('jamais plus de 15, au plus 5 par axe, et jamais hors thème', async () => {
+test('au plus 8 fiches, les mieux notées, au plus 5 par axe, et jamais hors thème', async () => {
   const reg = [];
   for (const axe of ['fournisseurs', 'qualite', 'conformite', 'exploitation']) for (let i = 0; i < 7; i++) reg.push(r(axe, 6 + (i % 4)));
   for (let i = 0; i < 5; i++) reg.push(r('hors_theme', 10));
   const s = await choisir(reg);
-  assert.equal(s.candidats.length, 15);
-  assert.ok(Object.values(parAxe(s)).every((k) => k <= 5));
+  assert.equal(s.candidats.length, 8);
+  assert.ok(s.candidats.every((c) => c.p >= 8));
   assert.ok(s.candidats.every((c) => c.axe !== 'hors_theme'));
-  assert.deepEqual(s.candidats.map((c) => c.n), Array.from({ length: 15 }, (_, i) => i + 1));
+  assert.deepEqual(s.candidats.map((c) => c.n), Array.from({ length: 8 }, (_, i) => i + 1));
   assert.equal(s.stats.horsTheme, 5);
+  // Un axe très fourni ne prend pas plus de 5 fiches.
+  const fourni = [];
+  for (let i = 0; i < 9; i++) fourni.push(r('fournisseurs', 9));
+  fourni.push(r('qualite', 6), r('qualite', 6), r('conformite', 6));
+  assert.deepEqual(parAxe(await choisir(fourni)), { fournisseurs: 5, qualite: 2, conformite: 1 });
 });
 
-test('les notes de 6 ou plus par ordre décroissant ; moins de 10 : on complète avec les meilleurs 5', async () => {
+test('seulement les notes de 6 ou plus, sans minimum : les notes de 5 vont en réserve', async () => {
   const reg = [r('fournisseurs', 8), r('fournisseurs', 6), r('qualite', 7), r('conformite', 9), r('exploitation', 6)];
   for (let i = 0; i < 8; i++) reg.push(r(i % 2 ? 'qualite' : 'conformite', 5));
   reg.push(r('fournisseurs', 4));
   const s = await choisir(reg);
-  assert.equal(s.candidats.length, 10);
-  assert.equal(s.candidats.filter((c) => c.p === 5).length, 5);
-  assert.ok(!s.candidats.some((c) => c.p === 4));
-  assert.deepEqual(s.reserve.map((x) => x.p), [5, 5, 5, 4]);
+  assert.equal(s.candidats.length, 5);
+  assert.ok(s.candidats.every((c) => c.p >= 6 && c.raison === 'note de 6 ou plus'));
+  assert.deepEqual(s.reserve.map((x) => x.p), [5, 5, 5, 5, 5, 5, 5, 5, 4]);
   // Rangés par axe, puis par note.
-  assert.deepEqual(s.candidats.map((c) => c.axe + ' ' + c.p).slice(0, 3), ['fournisseurs 8', 'fournisseurs 6', 'qualite 7']);
+  assert.deepEqual(s.candidats.map((c) => c.axe + ' ' + c.p), ['fournisseurs 8', 'fournisseurs 6', 'qualite 7', 'conformite 9', 'exploitation 6']);
 });
 
-test("l'équilibre : au moins 2 par axe quand l'axe a des notes de 5 ou plus", async () => {
+test("sans équilibre forcé : un axe sans note de 6 n'a pas de fiche", async () => {
   const reg = [];
-  for (let i = 0; i < 12; i++) reg.push(r('fournisseurs', 9));
-  reg.push(r('qualite', 5), r('qualite', 5), r('qualite', 4), r('exploitation', 5));
+  for (let i = 0; i < 4; i++) reg.push(r('fournisseurs', 9));
+  reg.push(r('qualite', 5), r('qualite', 5), r('exploitation', 5));
   const s = await choisir(reg);
-  assert.deepEqual(parAxe(s), { fournisseurs: 5, qualite: 2, exploitation: 1 });
-  assert.ok(s.candidats.filter((c) => c.axe === 'qualite').every((c) => c.raison === 'équilibre des axes'));
+  assert.deepEqual(parAxe(s), { fournisseurs: 4 });
+  assert.equal(s.reserve.filter((x) => x.p === 5).length, 3);
 });
 
 test('les plafonds : 3 prépublications arXiv et 2 articles par source', async () => {
@@ -70,12 +74,15 @@ test('les plafonds : 3 prépublications arXiv et 2 articles par source', async (
   assert.equal(s.candidats.filter((c) => c.sid === 'A03').length, 2);
 });
 
-test('toujours un texte de la CNIL ou du CEPD, même noté bas ; hors thème, seulement sur sa ligne à part', async () => {
-  const reg = [r('fournisseurs', 9), r('conformite', 2, { cn: true, sid: 'A08', s: 'CNIL, actualités', t: 'La CNIL publie ses recommandations' })];
-  const s = await choisir(reg);
-  const cnil = s.candidats.find((c) => c.cnil);
-  assert.equal(cnil.raison, 'la CNIL et le CEPD cette semaine');
-  assert.equal(s.cnil.n, cnil.n);
+test('la CNIL ou le CEPD : toujours sur sa ligne à part ; une fiche seulement à partir de 6 ; hors thème, jamais', async () => {
+  const texteCnil = (p) => r('conformite', p, { cn: true, sid: 'A08', s: 'CNIL, actualités', t: 'La CNIL publie ses recommandations' });
+  const bas = await choisir([r('fournisseurs', 9), texteCnil(4)]);
+  assert.ok(!bas.candidats.some((c) => c.cnil));
+  assert.deepEqual([bas.cnil.n, bas.cnil.p, bas.cnil.horsTheme], [null, 4, false]);
+  const haut = await choisir([r('fournisseurs', 9), texteCnil(6)]);
+  const fiche = haut.candidats.find((c) => c.cnil);
+  assert.equal(fiche.raison, 'la CNIL et le CEPD cette semaine');
+  assert.equal(haut.cnil.n, fiche.n);
   const ht = await choisir([r('fournisseurs', 9), r('hors_theme', 1, { cn: true, sid: 'A09', s: 'CEPD, actualités' })]);
   assert.ok(!ht.candidats.some((c) => c.cnil));
   assert.equal(ht.cnil.horsTheme, true);
@@ -96,7 +103,7 @@ test('toujours les drapeaux vérifiés : modèle suivi, modèle de décision pri
   assert.ok(raisons.includes('nouveau modèle de décision'));
   assert.ok(raisons.includes('échéance réglementaire'));
   assert.ok(!s.candidats.some((c) => /Rumeur|lointaine/.test(c.titre)));
-  assert.equal(s.candidats.length, 15);
+  assert.equal(s.candidats.length, 8);
 });
 
 test("un événement, une ligne : la source primaire en tête, « couvert aussi par » ensuite ; seul, un article non primaire est à recouper", async () => {

@@ -1,4 +1,4 @@
-// La lecture des originaux (15 novembre 2026) : pour chaque candidat retenu par la sélection, une dizaine par
+// La lecture des originaux (15 novembre 2026) : pour chaque candidat retenu par la sélection, 8 au plus par
 // semaine, le bot lit l'original avant d'écrire le résumé de la fiche. Jusque-là, le résumé et l'hypothèse venaient
 // du tri, qui ne voit que le titre et un extrait ; la lecture des originaux, le 13 novembre 2026, a corrigé huit des
 // dix fiches de la semaine 46.

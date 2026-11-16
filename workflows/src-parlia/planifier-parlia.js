@@ -28,8 +28,8 @@ const reglages = {
   rappelJour: entier(r.rappelJour, 4, 1, 7),
   rappelHeure: heureMinute(r.rappelHeure, { h: 16, mn: 30 }),
   collecteHeures: entier(r.collecteHeures, 4, 1, 24),
-  candidatsMin: entier(r.candidatsMin, 10, 1, 30),
-  candidatsMax: entier(r.candidatsMax, 15, 1, 30),
+  // Le nombre maximal de fiches ; aucun minimum (sources.md, 6.2, règle 3).
+  candidatsMax: entier(r.candidatsMax, 8, 1, 30),
   forum: String(r.forum) === '1',
   discord: String(r.discord) === '1',
   statut: String(r.statut) === '1',
@@ -38,7 +38,6 @@ const reglages = {
   // Le modèle qui résume les originaux (build_parlia.py) : la préparation le nomme.
   modeleResumes: String(r.modeleResumes || '').slice(0, 100),
 };
-if (reglages.candidatsMin > reglages.candidatsMax) reglages.candidatsMin = reglages.candidatsMax;
 
 const lundi = $now.startOf('week');
 const semaine = {

@@ -171,9 +171,10 @@ for (const axe of PARLIA.AXES) {
 }
 L.push('');
 if (sel.cnil) {
+  const pasUneFiche = sel.cnil.horsTheme ? ', classé hors thème par le tri : pour information, pas un candidat'
+    : ', noté ' + sel.cnil.p + '/10 par le tri : signalé ici, sans fiche (une fiche demande une note de 6 ou plus)';
   L.push('**La CNIL et le CEPD cette semaine** : « ' + sel.cnil.titre + ' » (' + sel.cnil.source + ')'
-    + (sel.cnil.n ? ', fiche ' + sel.cnil.n : sel.cnil.horsTheme ? ', classé hors thème par le tri : pour information, pas un candidat' : '')
-    + ' — ' + sel.cnil.url);
+    + (sel.cnil.n ? ', fiche ' + sel.cnil.n : pasUneFiche) + ' — ' + sel.cnil.url);
 } else {
   L.push("**La CNIL et le CEPD cette semaine** : aucun texte lu depuis la dernière préparation.");
 }
@@ -228,7 +229,7 @@ if (total) {
     L.push('- Pourquoi cette fiche : ' + (c.raison || 'sélection') + (c.aussi && c.aussi.length ? '. Couvert aussi par : ' + c.aussi.map((a) => a.s + ' (' + a.u + ')').join(', ') : '') + '.');
   }
 } else {
-  L.push("Aucun candidat cette semaine : aucune source n'a publié d'article noté 5 ou plus dans le thème. Une séance courte peut partir de la réserve.");
+  L.push("Aucun candidat cette semaine : aucune source n'a publié d'article noté 6 ou plus dans le thème. Une séance courte peut partir de la réserve.");
 }
 L.push('');
 L.push('### Réserve');
@@ -283,7 +284,7 @@ if (total) {
   }).filter(Boolean);
   O.push(axes.join(' · '));
 } else {
-  O.push("Rien de neuf noté 5 ou plus dans le thème cette semaine. La réserve est ci-dessous s'il y en a une.");
+  O.push("Rien de neuf noté 6 ou plus dans le thème cette semaine. La réserve est ci-dessous s'il y en a une.");
 }
 if (derniere && derniere.aSurveiller.length) {
   const pts = derniere.aSurveiller;

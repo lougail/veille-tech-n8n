@@ -1,11 +1,14 @@
-// La sélection de la semaine : de 10 à 15 candidats (réglable), d'après les règles de sources.md, section 6.2.
+// La sélection de la semaine : au plus 8 fiches (réglable), sans minimum, choisies sur leur note, d'après les règles
+// de sources.md, section 6.2. Une semaine calme en donne moins ; les autres articles notés 4 ou plus vont en réserve.
+// Jusqu'au 16 novembre 2026, elle en proposait de 10 à 15 : elle complétait avec des notes de 5 et forçait deux
+// fiches par axe.
 // Elle puise dans le registre les articles triés depuis la dernière préparation (14 jours au plus, 7 la première fois).
-// 1. Toujours un texte de la CNIL ou du CEPD : le plus pertinent de la semaine est proposé même s'il est noté bas,
-//    et rappelé sur une ligne à part (« la CNIL et le CEPD cette semaine »).
+// 1. La CNIL ou le CEPD : le texte le plus pertinent de la semaine est toujours rappelé sur une ligne à part (« la
+//    CNIL et le CEPD cette semaine »), même noté bas ; il ne devient une fiche que s'il est noté 6 ou plus.
 // 2. Toujours les drapeaux vérifiés : retrait ou changement de prix d'un modèle suivi ; nouveau modèle de décision
 //    annoncé par une source primaire ; échéance réglementaire avant la fin de janvier 2027 (la soutenance).
-// 3. Seuil : les articles notés 6 ou plus, par note décroissante ; moins de 10 : on complète avec les meilleurs 5.
-// 4. Équilibre : au moins 2 articles par axe quand l'axe en a de notés 5 ou plus ; au plus 5 par axe.
+// 3. Seuil : les articles notés 6 ou plus, par note décroissante, jusqu'au maximum.
+// 4. Au plus 5 fiches par axe, sans minimum par axe.
 // 5. Plafonds : au plus 3 prépublications arXiv, au plus 2 articles d'une même source.
 // 6. Un événement, une ligne : la source primaire en tête, « couvert aussi par » ensuite ; un article non primaire
 //    n'entre que si l'original manque, marqué « à recouper ».
@@ -20,8 +23,7 @@ const sd = $getWorkflowStaticData('global');
 const plan = $('Que faire ?').first().json;
 if (!plan.preparation) return [];
 const reglages = plan.reglages || {};
-const MAX = reglages.candidatsMax || 15;
-const MIN = Math.min(reglages.candidatsMin || 10, MAX);
+const MAX = reglages.candidatsMax || 8;
 const maintenant = $now.toMillis();
 const J = 24 * 3600 * 1000;
 const aujourdhui = $now.toISODate();
@@ -112,9 +114,9 @@ function ajouter(c, raison, force) {
   if (c.arxiv) arxiv++;
   return true;
 }
-// Règle 1.
+// Règle 1 : une fiche à partir de 6 ; plus bas, seulement la ligne à part (cnil, en sortie).
 const cnil = candidats.filter((c) => c.cnil).sort(parScore)[0] || null;
-if (cnil && !cnil.horsTheme) ajouter(cnil, 'la CNIL et le CEPD cette semaine', true);
+if (cnil && !cnil.horsTheme && cnil.p >= 6) ajouter(cnil, 'la CNIL et le CEPD cette semaine', true);
 // Règle 2.
 for (const c of dansLeTheme) {
   const f = c.drapeaux;
@@ -122,19 +124,8 @@ for (const c of dansLeTheme) {
   else if (f.nouveau_modele_decision && c.primaire) ajouter(c, 'nouveau modèle de décision', true);
   else if (f.echeance_reglementaire && c.dateEffet && c.dateEffet >= aujourdhui && c.dateEffet <= FIN_FORMATION) ajouter(c, 'échéance réglementaire', true);
 }
-// Règle 4 : au moins 2 par axe.
-for (const axe of PARLIA.AXES) {
-  for (const c of dansLeTheme.filter((x) => x.axe === axe && x.p >= 5)) {
-    if ((parAxe[axe] || 0) >= 2) break;
-    ajouter(c, "équilibre des axes", false);
-  }
-}
-// Règle 3.
+// Règles 3 et 4 : les plafonds par axe, par source et pour arXiv sont vérifiés par ajouter().
 for (const c of dansLeTheme.filter((x) => x.p >= 6)) ajouter(c, 'note de 6 ou plus', false);
-for (const c of dansLeTheme.filter((x) => x.p === 5)) {
-  if (choisis.length >= MIN) break;
-  ajouter(c, 'complément : note de 5', false);
-}
 
 const rang = (axe) => PARLIA.AXES.indexOf(axe);
 choisis.sort((x, y) => (rang(x.axe) - rang(y.axe)) || parScore(x, y));

@@ -31,7 +31,7 @@ Toutes les 30 min, de 7 h 15 à 22 h 45, quand le Mac est allumé
       │    → Registre (16 jours)
       │    → Journal officiel (archives de la DILA) → Alertes immédiates → Discord
       ├─ Notes de séance : relues sans écriture, seulement avant la préparation ou le rappel
-      ├─ Préparation : au premier passage à partir du lundi 6 h, de 10 à 15 fiches
+      ├─ Préparation : au premier passage à partir du lundi 6 h, 8 fiches au plus, sans minimum
       │    → Originaux : l'original de chaque fiche, lu, puis résumé par le modèle choisi, une demande par fiche
       │    → fichier AAAA-MM-JJ-preparation.md → Discord : ouverture, fiches guidées, réserve
       ├─ Rappel : au premier passage à partir du jeudi 16 h 30, si les notes ne montrent pas la séance de la semaine
@@ -113,25 +113,27 @@ résumés d'arXiv étaient coupés au milieu, comme celui de la fiche 9 de la se
 
 `selection-parlia.js` applique les règles de l'étude (§6.2) aux articles triés depuis la dernière préparation :
 
-1. toujours un texte de la CNIL ou du CEPD, même noté bas, rappelé sur sa ligne ;
+1. toujours un texte de la CNIL ou du CEPD, rappelé sur sa ligne même s'il est noté bas ; il ne devient une fiche
+   que s'il est noté 6 ou plus ;
 2. toujours les drapeaux vérifiés : retrait ou prix d'un modèle suivi, nouveau modèle de décision annoncé par une
    source primaire, échéance réglementaire avant le 31 janvier 2027 ;
-3. les notes de 6 ou plus, par ordre décroissant ; moins de 10, on complète avec les meilleures notes de 5 ; jamais
-   plus de 15 ;
-4. au moins 2 articles par axe quand l'axe en a de notés 5 ou plus, au plus 5 ;
+3. les notes de 6 ou plus, par ordre décroissant, 8 fiches au plus et sans minimum : une semaine calme en donne
+   moins ;
+4. au plus 5 fiches par axe, sans minimum par axe ;
 5. au plus 3 prépublications arXiv et 2 articles d'une même source ;
 6. un événement, une ligne : la source primaire en tête, « couvert aussi par » ensuite ;
 7. les points « à surveiller » de la dernière séance reviennent en tête, hors quota (lus dans les notes, voir plus
    bas) ;
 8. hors thème : jamais.
 
-Le reste, noté 4 ou plus, va dans la réserve. Les échéances des 90 jours suivants (retraits de modèles, dates du
-règlement IA) sont rappelées en pied de préparation, avec l'ancienne date quand la source l'a changée ; celles que
-la source a changées ou retirées sans date lisible sont mises à part, à vérifier.
+Le reste, noté 4 ou plus, va dans la réserve. Jusqu'au 16 novembre 2026, la sélection proposait de 10 à 15 fiches :
+elle complétait avec des notes de 5 et forçait deux fiches par axe. Les échéances des 90 jours suivants (retraits de
+modèles, dates du règlement IA) sont rappelées en pied de préparation, avec l'ancienne date quand la source l'a
+changée ; celles que la source a changées ou retirées sans date lisible sont mises à part, à vérifier.
 
 ### La lecture des originaux
 
-Avant d'écrire la préparation, le bot lit l'original de chaque fiche retenue, une dizaine par semaine
+Avant d'écrire la préparation, le bot lit l'original de chaque fiche retenue, 8 au plus par semaine
 (`originaux-parlia.js`), puis un modèle en écrit le résumé (`resumes-parlia.js`). Le tri ne voit que le titre et un
 extrait ; la lecture des originaux de la semaine 46 avait corrigé huit fiches sur dix.
 
@@ -153,7 +155,7 @@ extrait ; la lecture des originaux de la semaine 46 avait corrigé huit fiches s
 - **Les contrôles** : une erreur ou une réponse illisible, et la fiche garde le résumé du tri, avec le motif ; le
   résumé du tri reste à côté de celui de l'original. Une date de publication trouvée date la fiche (et la signale si
   elle précède la période lue) ; une autre date d'effet met à jour l'échéance, qui garde l'ancienne.
-- **Coût** : une dizaine de demandes par semaine, de 1 200 à 4 500 jetons chacune (21 000 environ pour les dix fiches
+- **Coût** : 8 demandes par semaine au plus, de 1 200 à 4 500 jetons chacune (21 000 environ pour les dix fiches
   de la semaine 46) : moins d'un centime de dollar par semaine avec Mistral Small 3.2.
 
 ### Le fichier de préparation
@@ -263,7 +265,7 @@ les alertes envoyées et la préparation de la semaine.
 | `PARLIA_PREPARATION_JOUR`, `PARLIA_PREPARATION_HEURE` | jour (1 = lundi) et heure de la préparation | 1 et 06:00 |
 | `PARLIA_RAPPEL_JOUR`, `PARLIA_RAPPEL_HEURE` | jour et heure du rappel | 4 et 16:30 |
 | `PARLIA_COLLECTE_HEURES` | une collecte toutes les N heures au plus | 4 |
-| `PARLIA_CANDIDATS_MIN`, `PARLIA_CANDIDATS_MAX` | le nombre de fiches | 10 et 15 |
+| `PARLIA_CANDIDATS_MAX` | le nombre maximal de fiches (aucun minimum) | 8 |
 
 `.env` n'est pas suivi par Git : les chemins du Mac et le webhook n'entrent jamais dans le dépôt public.
 
@@ -383,7 +385,7 @@ les hypothèses du tri restaient souvent générales (« pourrait influencer la 
 6. **Quand mettre en service, et la mise à jour de n8n.** Avis : l'essai en mode test, puis la publication, un même
    matin de semaine, sur n8n 2.10.3, où les nœuds ont été vérifiés ; la mise à jour vers 2.45.6 un autre matin, avec
    un nouvel essai.
-7. **Le modèle qui résume les originaux** (`MODEL_RESUMES` dans `build_parlia.py`). Une dizaine de demandes par
+7. **Le modèle qui résume les originaux** (`MODEL_RESUMES` dans `build_parlia.py`). Au plus 8 demandes par
    semaine : le coût reste de l'ordre du centime, et le choix porte sur la justesse des résumés. Mistral Small 3.2
    par défaut.
 
