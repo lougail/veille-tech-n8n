@@ -17,6 +17,8 @@
 // (16 novembre 2026).
 // Un site qui refuse les programmes répond 403 (Légifrance, l'aide d'OpenAI, vérifié le 13 novembre 2026) : la
 // fiche dit pourquoi l'original n'a pas été lu, et garde le résumé du tri ; de même pour une page introuvable.
+// Un original en PDF (un avis, des lignes directrices) n'est pas lu : son texte arrivait au modèle illisible. La fiche
+// le dit, pour que Louis l'ouvre lui-même.
 // Sortie : une demande de résumé par original lu, pour la chaîne « Résumé des originaux », un appel après l'autre ;
 // le premier élément porte aussi la lecture de chaque candidat (lectures). Sans aucun original lu, une seule demande,
 // vide, que le nœud suivant ignore : une chaîne sans élément arrêterait la préparation.
@@ -49,13 +51,17 @@ const enTexte = (lignes, retenue = -1) => lignes.map((l, k) => (k === retenue ? 
   + (l.startsWith('§T ') ? '## ' + l.slice(3) : l.startsWith('§L ') ? '- ' + l.slice(3) : l)).join('\n');
 // Le titre du bloc retenu, sans le nom de la source que la collecte met devant (« TypeSafe AI, blog — … »).
 const titreDuBloc = (c) => String(c.titre || '').replace(/^.*? — /, '').replace(/…$/, '').trim();
+// La réponse : son code, son texte, et si c'est un PDF (par l'en-tête Content-Type, ou par la signature « %PDF- »).
 async function lire(url) {
   const r = await http.httpRequest({
     url, method: 'GET', timeout: 20000, returnFullResponse: true, ignoreHttpStatusErrors: true,
     headers: { 'User-Agent': PARLIA.UA, 'Accept-Language': 'fr,en;q=0.8' },
   });
-  return { code: Number(r && r.statusCode || 0), corps: texteDe(r && r.body) };
+  const corps = texteDe(r && r.body);
+  const type = String((r && r.headers && (r.headers['content-type'] || r.headers['Content-Type'])) || '');
+  return { code: Number(r && r.statusCode || 0), corps, pdf: /application\/pdf/i.test(type) || corps.slice(0, 8).includes('%PDF-') };
 }
+const PDF = "l'original est un PDF, que le bot ne sait pas lire : l'ouvrir à la main";
 function refus(url, code) {
   const d = domaineDe(url);
   const site = REFUS.find((r) => d === r.domaine || d.endsWith('.' + r.domaine));
@@ -166,11 +172,13 @@ async function original(c) {
     const markdown = MARKDOWN[c.url];
     let r = await lire(markdown || c.url);
     if (r.code !== 200) return Object.assign(base, { motif: refus(c.url, r.code) });
+    if (r.pdf) return Object.assign(base, { motif: PDF });
     if (kind === 'page' && LISTES.includes(c.sid)) {
       const lien = lienDuTitre(r.corps, titreDuBloc(c), c.url);
       if (!lien) return Object.assign(base, { motif: "le billet n'a pas été retrouvé sur la page qui le liste" });
       r = await lire(lien);
       if (r.code !== 200) return Object.assign(base, { adresse: lien, motif: refus(lien, r.code) });
+      if (r.pdf) return Object.assign(base, { adresse: lien, motif: PDF });
       const lignesBillet = estHtml(r.corps) ? lignesDe(r.corps, { article: true }) : lignesDuMarkdown(r.corps);
       const texte = enTexte(lignesBillet);
       return Object.assign(base, { lu: !!texte, comment: 'billet', adresse: lien, texte, motif: texte ? '' : 'le billet est sans texte lisible',

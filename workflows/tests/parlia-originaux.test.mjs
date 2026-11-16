@@ -129,6 +129,15 @@ test("le catalogue d'OpenRouter : pas d'original à lire, aucune demande au rés
   assert.equal(appels.length, 0);
 });
 
+// La relecture du 16 novembre 2026 : un avis publié en PDF partait au modèle comme du texte illisible.
+test("un original en PDF n'est pas lu : la fiche dit de l'ouvrir à la main, sans demande de résumé", async () => {
+  const url = 'https://www.edpb.europa.eu/system/files/2026-11/edpb_statement_202603_en.pdf';
+  const pdf = '%PDF-1.7\n%\u00e2\u00e3\u00cf\u00d3\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n' + 'stream x\u009c\u00ed\u00bd endstream '.repeat(40);
+  const { demandes, lectures } = await lire([cand(4, { sid: 'A09', url })], { [url]: { statusCode: 200, body: pdf } });
+  assert.deepEqual([lectures[0].lu, lectures[0].motif], [false, "l'original est un PDF, que le bot ne sait pas lire : l'ouvrir à la main"]);
+  assert.equal(demandes[0].vide, true);
+});
+
 // Les deux dépôts Hugging Face de Perplexity de l'essai du 16 novembre 2026 : la page du dépôt n'a pas de texte lisible
 // pour un programme ; sa fiche (README.md), si. Extrait de la vraie fiche, avec son en-tête YAML.
 test("un dépôt Hugging Face : sa fiche (README) est lue, sans l'en-tête ; sans fiche, la page du dépôt, comme avant", async () => {

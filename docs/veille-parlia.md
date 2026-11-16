@@ -168,8 +168,9 @@ extrait ; la lecture des originaux de la semaine 46 avait corrigé huit fiches s
 - **Une page qui a changé** depuis la collecte (OpenAI a refait sa page des retraits entre le 6 et le 15 novembre
   2026) : le bloc est cherché par le nom de modèle le plus long de son titre (« gpt-5.5-cyber »), et la fiche le dit.
 - **Ce qui n'est pas lu, et pourquoi** : Légifrance et l'aide d'OpenAI refusent les programmes (erreur 403) ; une
-  page introuvable ou trop lente ; le catalogue d'OpenRouter, dont les chiffres sont relevés par le programme
-  (« sans objet »). La fiche le dit, et garde le résumé du tri.
+  page introuvable ou trop lente ; un original en PDF (un avis, des lignes directrices), que le bot ne sait pas lire ;
+  le catalogue d'OpenRouter, dont les chiffres sont relevés par le programme (« sans objet »). La fiche le dit, et
+  garde le résumé du tri.
 - **Le résumé** : une demande par original, une après l'autre, au modèle choisi (`MODEL_RESUMES` dans
   `build_parlia.py`, Mistral Small 3.2 en secours s'il en est un autre). La demande reprend l'état du projet (le
   même bloc que la consigne du tri : `PARLIA.ETAT_DU_PROJET`, dans `outils.js`), la proposition du tri et le texte
