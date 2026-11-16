@@ -3,7 +3,8 @@
 
 La veille ParlIA a son propre workflow, à côté de la veille personnelle (v2 et v3) : sa mémoire, ses erreurs et sa
 mise en service restent séparées (docs/veille-parlia.md). Chaque nœud Code qui en a besoin reçoit en tête les
-outils communs (src-parlia/outils.js) : n8n ne permet pas d'importer un module.
+modules communs dont il se sert : les outils (src-parlia/outils.js), puis la lecture des pages
+(src-parlia/lecture-pages.js), qui se sert des outils. n8n ne permet pas d'importer un module.
 
 Usage :
   python3 build_parlia.py            # production : workflows/veille-parlia.json
@@ -24,6 +25,9 @@ WORKFLOW_ID_TEST = "VeilleParlIAtest"
 CREDENTIALS = {"openRouterApi": {"id": "w6TWAQpgn7TIxlYq", "name": "OpenRouter account"}}
 ERROR_WORKFLOW = "yrUX1IcjTyIwpWqG"
 MODEL_TRI = "mistralai/mistral-small-3.2-24b-instruct"
+# Le modèle qui résume les originaux des candidats retenus (une dizaine de demandes par semaine) : le choix de Louis.
+# Un autre que celui du tri reçoit Mistral Small 3.2 en secours (refus ou « too many requests » d'OpenRouter).
+MODEL_RESUMES = MODEL_TRI
 
 # Décalé de 15 minutes par rapport à la v3 (« 0 */30 7-22 * * * ») : les deux veilles ne tournent pas ensemble.
 CRON = "0 15,45 7-22 * * *"
@@ -43,6 +47,7 @@ REGLAGES = [
     ("statut", "={{ $env.DISCORD_WEBHOOK_STATUS ? '1' : '0' }}"),
     ("mention", "={{ $env.PARLIA_DISCORD_MENTION || '' }}"),
     ("essai", "0"),
+    ("modeleResumes", MODEL_RESUMES),
 ]
 
 DISCORD_PARLIA_URL = (
@@ -60,6 +65,9 @@ OUTILS_NOMS = (
     "PARLIA", "texteSimple", "tronquer", "hacher", "domaineDe", "cleAdresse", "cellule", "pourDiscord",
     "MOIS_FR", "dateLongue", "MOIS_EN", "datesDansTexte", "dateDansTexte", "noterSante", "pousserAlerte",
 )
+LECTURE = (SRC / "lecture-pages.js").read_text(encoding="utf-8")
+LECTURE_NOMS = ("texteDe", "lignesDe", "lignesDuMarkdown", "texteDuBloc", "sansMarque", "estRangee", "FORMAT_PAGES")
+MODULES = ("outils.js", "lecture-pages.js")
 
 
 def slug(name: str) -> str:
@@ -67,11 +75,15 @@ def slug(name: str) -> str:
     return "parlia-" + re.sub(r"[^a-z0-9]+", "-", sans_accents.lower()).strip("-")
 
 
+def utilise(code: str, noms) -> bool:
+    return any(re.search(r"\b" + nom + r"\b", code) for nom in noms)
+
+
 def js(filename: str) -> str:
     code = (SRC / filename).read_text(encoding="utf-8")
-    if any(re.search(r"\b" + nom + r"\b", code) for nom in OUTILS_NOMS):
-        return OUTILS + "\n" + code
-    return code
+    lecture = utilise(code, LECTURE_NOMS)
+    outils = lecture or utilise(code, OUTILS_NOMS)
+    return (OUTILS + "\n" if outils else "") + (LECTURE + "\n" if lecture else "") + code
 
 
 def code_node(name, filename, pos):
@@ -113,11 +125,46 @@ def discord_node(name, url_expr, pos, disabled=False):
     return node
 
 
+def chain_node(name, pos, fallback=False):
+    # Un lot après l'autre, sans appels en parallèle. n8n 2.10.3 n'applique « delayBetweenBatches » qu'aux lots de
+    # plus d'un élément, et un nœud « Wait » serait enregistré en base à chaque pause à partir de n8n 2.16 : pas de
+    # pause, il n'en faut pas ici.
+    node = {
+        "parameters": {"promptType": "define", "text": "={{ $json.prompt }}", "batching": {"batchSize": 1}},
+        "id": slug(name),
+        "name": name,
+        "type": "@n8n/n8n-nodes-langchain.chainLlm",
+        "typeVersion": 1.9,
+        "position": pos,
+        "continueOnFail": True,
+        "retryOnFail": True,
+        "maxTries": 3,
+        "waitBetweenTries": 5000,
+    }
+    if fallback:
+        # Second modèle, branché sur l'entrée « Fallback Model » (ai_languageModel, index 1), comme dans la v2.
+        node["parameters"]["needsFallback"] = True
+    return node
+
+
+def model_node(name, model, pos):
+    return {
+        "parameters": {"model": model, "options": {"temperature": 0.1}},
+        "id": slug(name),
+        "name": name,
+        "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+        "typeVersion": 1,
+        "position": pos,
+        "credentials": CREDENTIALS,
+    }
+
+
 def build(mode: str):
     test_mode = mode == "test"
     reglages = [
         (k, "1" if test_mode and k in ("essai", "discord", "statut") else v) for k, v in REGLAGES
     ]
+    secours = MODEL_RESUMES != MODEL_TRI
     nodes = [
         {
             "parameters": {"rule": {"interval": [{"field": "cronExpression", "expression": CRON}]}},
@@ -166,34 +213,9 @@ def build(mode: str):
         code_node("Pages et API", "collecte-pages-api.js", [1000, 80]),
         code_node("Normaliser", "normaliser-parlia.js", [1200, 80]),
         code_node("Consigne de tri", "consigne-tri-parlia.js", [1400, 0]),
-        {
-            "parameters": {
-                "promptType": "define",
-                "text": "={{ $json.prompt }}",
-                # Un lot après l'autre, sans appels en parallèle : une à trois demandes par collecte. n8n 2.10.3
-                # n'applique « delayBetweenBatches » qu'aux lots de plus d'un élément, et un nœud « Wait » serait
-                # enregistré en base à chaque pause à partir de n8n 2.16 : pas de pause, il n'en faut pas ici.
-                "batching": {"batchSize": 1},
-            },
-            "id": slug("Tri Mistral Small"),
-            "name": "Tri Mistral Small",
-            "type": "@n8n/n8n-nodes-langchain.chainLlm",
-            "typeVersion": 1.9,
-            "position": [1600, 0],
-            "continueOnFail": True,
-            "retryOnFail": True,
-            "maxTries": 3,
-            "waitBetweenTries": 5000,
-        },
-        {
-            "parameters": {"model": MODEL_TRI, "options": {"temperature": 0.1}},
-            "id": slug("OpenRouter Mistral Small"),
-            "name": "OpenRouter Mistral Small",
-            "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
-            "typeVersion": 1,
-            "position": [1600, 200],
-            "credentials": CREDENTIALS,
-        },
+        # Le tri : une à trois demandes par collecte, un lot de 12 articles après l'autre.
+        chain_node("Tri Mistral Small", [1600, 0]),
+        model_node("OpenRouter Mistral Small", MODEL_TRI, [1600, 200]),
         code_node("Lire le tri", "lire-tri-parlia.js", [1800, 0]),
         code_node("Registre", "registre-parlia.js", [2000, 0]),
         code_node("Journal officiel", "jorf-parlia.js", [1400, 320]),
@@ -232,9 +254,14 @@ def build(mode: str):
             "alwaysOutputData": True,
         },
         code_node("Notes", "notes-parlia.js", [1200, 440]),
-        # Branche 3 : la préparation de la semaine. Le fichier d'abord (branche haute), puis Discord.
+        # Branche 3 : la préparation de la semaine. Les originaux des candidats sont lus et résumés, puis le fichier
+        # est écrit (branche haute), puis Discord.
         code_node("Sélection", "selection-parlia.js", [600, 640]),
-        code_node("Préparation", "preparation-parlia.js", [800, 640]),
+        code_node("Originaux", "originaux-parlia.js", [800, 640]),
+        chain_node("Résumé des originaux", [1000, 640], fallback=secours),
+        model_node("OpenRouter résumés", MODEL_RESUMES, [1000, 800]),
+        code_node("Lire les résumés", "resumes-parlia.js", [1200, 640]),
+        code_node("Préparation", "preparation-parlia.js", [1400, 640]),
         {
             "parameters": {
                 "operation": "toText",
@@ -246,7 +273,7 @@ def build(mode: str):
             "name": "Convertir en fichier",
             "type": "n8n-nodes-base.convertToFile",
             "typeVersion": 1.1,
-            "position": [1000, 560],
+            "position": [1600, 560],
         },
         {
             # Écrit dans /home/node/.n8n-files/parlia, le seul dossier que n8n 2.x autorise par défaut
@@ -262,13 +289,13 @@ def build(mode: str):
             "name": "Écrire le fichier",
             "type": "n8n-nodes-base.readWriteFile",
             "typeVersion": 1.1,
-            "position": [1200, 560],
+            "position": [1800, 560],
             "continueOnFail": True,
         },
-        code_node("Ouverture", "ouverture-parlia.js", [1000, 720]),
-        discord_node("Discord ouverture", DISCORD_PARLIA_URL, [1200, 720], disabled=test_mode),
-        code_node("Fiches", "fiches-parlia.js", [1400, 720]),
-        discord_node("Discord fiches", DISCORD_PARLIA_URL, [1600, 720], disabled=test_mode),
+        code_node("Ouverture", "ouverture-parlia.js", [1600, 720]),
+        discord_node("Discord ouverture", DISCORD_PARLIA_URL, [1800, 720], disabled=test_mode),
+        code_node("Fiches", "fiches-parlia.js", [2000, 720]),
+        discord_node("Discord fiches", DISCORD_PARLIA_URL, [2200, 720], disabled=test_mode),
         # Branche 4 : le rappel du jeudi, seulement si les notes ne montrent pas de séance cette semaine.
         code_node("Rappel", "rappel-parlia.js", [600, 880]),
         discord_node("Discord rappel", DISCORD_PARLIA_URL, [800, 880], disabled=test_mode),
@@ -276,6 +303,8 @@ def build(mode: str):
         code_node("Statut", "statut-parlia.js", [600, 1040]),
         discord_node("Discord statut", DISCORD_STATUS_URL, [800, 1040], disabled=test_mode),
     ]
+    if secours:
+        nodes.append(model_node("OpenRouter résumés secours", MODEL_TRI, [1180, 800]))
     if test_mode:
         nodes.append({
             "parameters": {},
@@ -309,7 +338,11 @@ def build(mode: str):
         "Notes à lire ?": {"main": [main("Lire les notes")]},
         "Lire les notes": {"main": [main("Texte des notes")]},
         "Texte des notes": {"main": [main("Notes")]},
-        "Sélection": {"main": [main("Préparation")]},
+        "Sélection": {"main": [main("Originaux")]},
+        "Originaux": {"main": [main("Résumé des originaux")]},
+        "OpenRouter résumés": {"ai_languageModel": [[{"node": "Résumé des originaux", "type": "ai_languageModel", "index": 0}]]},
+        "Résumé des originaux": {"main": [main("Lire les résumés")]},
+        "Lire les résumés": {"main": [main("Préparation")]},
         "Préparation": {"main": [main("Convertir en fichier", "Ouverture")]},
         "Convertir en fichier": {"main": [main("Écrire le fichier")]},
         "Ouverture": {"main": [main("Discord ouverture")]},
@@ -320,6 +353,8 @@ def build(mode: str):
     }
     if test_mode:
         connections["Essai manuel"] = {"main": [main("Réglages")]}
+    if secours:
+        connections["OpenRouter résumés secours"] = {"ai_languageModel": [[{"node": "Résumé des originaux", "type": "ai_languageModel", "index": 1}]]}
 
     workflow = {
         "id": WORKFLOW_ID_TEST if test_mode else WORKFLOW_ID_PROD,

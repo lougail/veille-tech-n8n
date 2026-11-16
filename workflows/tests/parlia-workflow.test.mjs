@@ -6,29 +6,28 @@ import { mkdtempSync, readFileSync, readdirSync, existsSync, rmSync } from 'node
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { OUTILS, source } from './aide-parlia.mjs';
+import { MODULES, assembler, source } from './aide-parlia.mjs';
 
 const racine = new URL('../../', import.meta.url);
 const lire = (chemin) => readFileSync(new URL(chemin, racine), 'utf8');
 const [wf] = JSON.parse(lire('workflows/veille-parlia.json'));
 const parNom = Object.fromEntries(wf.nodes.map((n) => [n.name, n]));
-const fichiers = readdirSync(new URL('workflows/src-parlia/', racine)).filter((f) => f.endsWith('.js') && f !== 'outils.js');
+const fichiers = readdirSync(new URL('workflows/src-parlia/', racine)).filter((f) => f.endsWith('.js') && !MODULES.includes(f));
 const codes = wf.nodes.filter((n) => n.type === 'n8n-nodes-base.code');
 const AsyncFunction = (async () => {}).constructor;
-const OUTILS_NOMS = ['PARLIA', 'texteSimple', 'tronquer', 'hacher', 'domaineDe', 'cleAdresse', 'cellule', 'pourDiscord', 'MOIS_FR',
-  'dateLongue', 'MOIS_EN', 'datesDansTexte', 'dateDansTexte', 'noterSante', 'pousserAlerte'];
 
-test('le JSON est à jour : chaque nœud Code reprend son fichier de src-parlia/, outils en tête quand il en a besoin', () => {
+test('le JSON est à jour : chaque nœud Code reprend son fichier de src-parlia/, les modules communs en tête quand il en a besoin', () => {
   const utilises = new Set();
   for (const n of codes) {
     const code = n.parameters.jsCode;
     const fichier = fichiers.find((f) => code.endsWith(source(f)));
     assert.ok(fichier, 'nœud « ' + n.name + " » : aucun fichier de src-parlia/ ne correspond (relancer build_parlia.py)");
     utilises.add(fichier);
-    const besoin = OUTILS_NOMS.some((nom) => new RegExp('\\b' + nom + '\\b').test(source(fichier)));
-    assert.equal(code, (besoin ? OUTILS + '\n' : '') + source(fichier), 'nœud « ' + n.name + ' » pas à jour (relancer build_parlia.py)');
+    assert.equal(code, assembler(fichier), 'nœud « ' + n.name + ' » pas à jour (relancer build_parlia.py)');
   }
   assert.deepEqual([...utilises].sort(), fichiers.sort());
+  // La lecture des pages n'alourdit que les deux nœuds qui lisent des pages : la collecte et les originaux.
+  assert.deepEqual(codes.filter((n) => n.parameters.jsCode.includes('---- Lecture des pages')).map((n) => n.name), ['Pages et API', 'Originaux']);
 });
 
 test('chaque nœud Code se compile comme dans n8n (corps de fonction asynchrone)', () => {
@@ -83,6 +82,27 @@ test("la chaîne LLM : un lot après l'autre, avec Mistral Small 3.2", () => {
   assert.deepEqual(wf.connections['OpenRouter Mistral Small'].ai_languageModel[0].map((c) => c.node), ['Tri Mistral Small']);
 });
 
+test("les originaux : lus entre la sélection et la préparation, résumés un par un par le modèle choisi, avec un secours", () => {
+  const suite = ['Sélection', 'Originaux', 'Résumé des originaux', 'Lire les résumés', 'Préparation'];
+  suite.slice(0, -1).forEach((nom, i) => assert.deepEqual(wf.connections[nom].main[0].map((c) => c.node), [suite[i + 1]], nom));
+  const chaine = parNom['Résumé des originaux'];
+  assert.deepEqual(chaine.parameters.batching, { batchSize: 1 });
+  assert.equal(chaine.continueOnFail, true);
+  const modele = parNom['OpenRouter résumés'].parameters.model;
+  assert.deepEqual(wf.connections['OpenRouter résumés'].ai_languageModel[0], [{ node: 'Résumé des originaux', type: 'ai_languageModel', index: 0 }]);
+  const reglages = Object.fromEntries(parNom['Réglages'].parameters.assignments.assignments.map((a) => [a.name, a.value]));
+  assert.equal(reglages.modeleResumes, modele);
+  const tri = parNom['OpenRouter Mistral Small'].parameters.model;
+  if (modele === tri) {
+    assert.equal(chaine.parameters.needsFallback, undefined);
+    assert.equal(parNom['OpenRouter résumés secours'], undefined);
+  } else {
+    assert.equal(chaine.parameters.needsFallback, true);
+    assert.equal(parNom['OpenRouter résumés secours'].parameters.model, tri);
+    assert.deepEqual(wf.connections['OpenRouter résumés secours'].ai_languageModel[0], [{ node: 'Résumé des originaux', type: 'ai_languageModel', index: 1 }]);
+  }
+});
+
 test('Discord et OpenRouter : adresses lues dans les variables d\'environnement, erreurs tolérées, un seul identifiant', () => {
   const discord = wf.nodes.filter((n) => n.name.startsWith('Discord '));
   assert.equal(discord.length, 5);
@@ -93,7 +113,8 @@ test('Discord et OpenRouter : adresses lues dans les variables d\'environnement,
   }
   assert.equal(parNom['Écrire le fichier'].continueOnFail, true);
   const identifiants = wf.nodes.filter((n) => n.credentials).map((n) => JSON.stringify(n.credentials));
-  assert.deepEqual(identifiants, ['{"openRouterApi":{"id":"w6TWAQpgn7TIxlYq","name":"OpenRouter account"}}']);
+  assert.ok(identifiants.length >= 2);
+  assert.deepEqual([...new Set(identifiants)], ['{"openRouterApi":{"id":"w6TWAQpgn7TIxlYq","name":"OpenRouter account"}}']);
   assert.equal(parNom['OpenRouter Mistral Small'].parameters.model, 'mistralai/mistral-small-3.2-24b-instruct');
   const reglages = Object.fromEntries(parNom['Réglages'].parameters.assignments.assignments.map((a) => [a.name, a.value]));
   assert.equal(reglages.essai, '0');
@@ -103,7 +124,7 @@ test('Discord et OpenRouter : adresses lues dans les variables d\'environnement,
 
 test('aucun secret ni chemin personnel dans ce qui est versionné', () => {
   const textes = [lire('workflows/veille-parlia.json'), lire('workflows/build_parlia.py'), lire('.env.example'), lire('docker-compose.yml')]
-    .concat(fichiers.concat(['outils.js']).map(source));
+    .concat(fichiers.concat(MODULES).map(source));
   if (existsSync(new URL('docs/veille-parlia.md', racine))) textes.push(lire('docs/veille-parlia.md'));
   const interdits = [/discord(app)?\.com\/api\/webhooks\/\d/i, /sk-or-v1-[0-9a-f]{16,}/i, /\bsk-[A-Za-z0-9]{24,}/, /Bearer [A-Za-z0-9._-]{20,}/,
     /\/Users\//, /[A-Za-z0-9_-]{24}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27,}/];

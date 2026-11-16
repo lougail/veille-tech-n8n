@@ -83,7 +83,7 @@ const candidats = evenements.map((e) => {
   for (const m of e.membres) for (const [k, v] of Object.entries(m.f || {})) if (v) f[k] = true;
   const suivi = e.membres.some((m) => m.v || PARLIA.NOMS_SUIVIS.test(m.t + ' ' + (m.r || '')));
   return {
-    id: tete.id, titre: tete.t, url: tete.u, source: tete.s, sid: tete.sid, axe: tete.axe, p,
+    id: tete.id, titre: tete.t, url: tete.u, source: tete.s, sid: tete.sid, kind: tete.k || '', axe: tete.axe, p,
     primaire: !!tete.pr, nature: tete.na || 'inconnu', resume: tete.r || '', aChercher: tete.c || '', hypothese: tete.h || '',
     drapeaux: f, dateEffet: e.membres.map((m) => m.de).find(Boolean) || null, date: tete.d || '',
     vu: jourDe(tete.vu), avantPeriode: !!tete.d && tete.d < jourDebut, dateAvant: tete.da || '',

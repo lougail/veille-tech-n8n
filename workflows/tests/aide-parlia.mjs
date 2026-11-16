@@ -1,12 +1,25 @@
-// Aide aux tests de la veille ParlIA : exécute un nœud Code comme le fait n8n, outils communs en tête,
-// avec $input, $getWorkflowStaticData, $now (Luxon, heure de Paris), $ (les sorties des nœuds précédents)
-// et helpers (httpRequest simulé).
+// Aide aux tests de la veille ParlIA : exécute un nœud Code comme le fait n8n, assemblé comme le fait
+// build_parlia.py (les modules communs dont il se sert en tête), avec $input, $getWorkflowStaticData, $now (Luxon,
+// heure de Paris), $ (les sorties des nœuds précédents) et helpers (httpRequest simulé).
 import { readFileSync } from 'node:fs';
 import { DateTime } from 'luxon';
 
 const dossier = new URL('../src-parlia/', import.meta.url);
 export const source = (nom) => readFileSync(new URL(nom, dossier), 'utf8');
 export const OUTILS = source('outils.js');
+export const LECTURE = source('lecture-pages.js');
+export const MODULES = ['outils.js', 'lecture-pages.js'];
+const OUTILS_NOMS = ['PARLIA', 'texteSimple', 'tronquer', 'hacher', 'domaineDe', 'cleAdresse', 'cellule', 'pourDiscord', 'MOIS_FR',
+  'dateLongue', 'MOIS_EN', 'datesDansTexte', 'dateDansTexte', 'noterSante', 'pousserAlerte'];
+const LECTURE_NOMS = ['texteDe', 'lignesDe', 'lignesDuMarkdown', 'texteDuBloc', 'sansMarque', 'estRangee', 'FORMAT_PAGES'];
+const utilise = (code, noms) => noms.some((nom) => new RegExp('\\b' + nom + '\\b').test(code));
+// Le code d'un nœud, tel que build_parlia.py l'assemble : la lecture des pages se sert des outils.
+export function assembler(nom) {
+  const code = source(nom);
+  const lecture = utilise(code, LECTURE_NOMS);
+  const outils = lecture || utilise(code, OUTILS_NOMS);
+  return (outils ? OUTILS + '\n' : '') + (lecture ? LECTURE + '\n' : '') + code;
+}
 const AsyncFunction = (async () => {}).constructor;
 
 export const paris = (iso) => DateTime.fromISO(iso, { zone: 'Europe/Paris' });
@@ -45,7 +58,7 @@ export function plan(extra = {}) {
 
 // Exécute un nœud et renvoie la liste des json de sortie.
 export async function executer(nom, { input = [], sd = {}, maintenant = '2026-11-02T09:15', sorties = {}, helpers = null } = {}) {
-  const f = new AsyncFunction('$input', '$getWorkflowStaticData', '$now', '$', 'helpers', OUTILS + '\n' + source(nom));
+  const f = new AsyncFunction('$input', '$getWorkflowStaticData', '$now', '$', 'helpers', assembler(nom));
   const res = await f(entree(input), () => sd, paris(maintenant), noeuds(sorties), helpers);
   return (res || []).map((o) => o.json);
 }

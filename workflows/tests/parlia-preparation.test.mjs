@@ -219,3 +219,31 @@ test("les dates : inconnue, avec le jour où le bot l'a vu ; avant la période l
   const carte = s.discord.fiches[0].payload.components[0].components;
   assert.match(carte[0].content, /\n-# date inconnue \(vu le 28 octobre 2026\) · Source 1 · /);
 });
+
+test("les originaux : lus ou non, et pourquoi, fiche par fiche ; ce que l'original contredit ; hors thème d'après l'original", async () => {
+  const sel = Object.assign({}, SEL, {
+    candidats: [
+      cand(1, 'fournisseurs', { original: { lu: true, comment: 'billet', taille: 12166, resume: 'original' }, resume: "Un billet d'opinion.",
+        ecart: "Aucun nouveau modèle de décision : un billet d'opinion." }),
+      cand(2, 'fournisseurs', { original: { lu: false, motif: 'Légifrance refuse les programmes (erreur 403)', resume: 'tri' } }),
+      cand(3, 'qualite', { original: { lu: true, comment: 'page', taille: 2439, retrouvePar: 'gpt-5.5-cyber', resume: 'original' }, horsThemeOriginal: true, hypothese: 'rien' }),
+      cand(4, 'conformite', { original: { sansObjet: true, motif: "la fiche vient du catalogue d'OpenRouter, relevé par le programme", resume: 'tri' } }),
+    ],
+    originaux: { modele: 'anthropic/claude-haiku-5.5' },
+  });
+  const { s } = await preparer(sel);
+  const md = s.markdown;
+  assert.match(md, /> Le bot a lu l'original de 2 fiches sur 4 et en a écrit le résumé \(anthropic\/claude-haiku-5\.5\) ; pour les autres, /);
+  assert.match(md, /- Originaux lus et résumés par le bot : 2 sur 4 ; résumé du tri, sur un extrait : la fiche 2\./);
+  assert.match(md, /- Fiche 2 : l'original n'a pas été lu : Légifrance refuse les programmes \(erreur 403\) ; le résumé vient du tri, sur le titre et un extrait\./);
+  const fiche = (n) => md.slice(md.indexOf('#### Fiche ' + n + ' '), md.indexOf('#### Fiche ' + (n + 1) + ' ') > 0 ? md.indexOf('#### Fiche ' + (n + 1) + ' ') : undefined);
+  assert.match(fiche(1), /- L'original : lu par le bot \(le billet, 12 166 caractères\)\.\n- En deux lignes \(d'après l'original, résumé automatique\) : Un billet d'opinion\./);
+  assert.match(fiche(1), /- Ce que l'original contredit dans le tri : Aucun nouveau modèle de décision : un billet d'opinion\./);
+  assert.match(fiche(2), /- L'original : non lu : Légifrance refuse les programmes \(erreur 403\) ; le résumé vient du tri, sur le titre et un extrait\.\n- En deux lignes \(résumé du tri, sur un extrait ; à vérifier dans l'original\) : Résumé 2\./);
+  assert.match(fiche(3), /partie retrouvée par « gpt-5\.5-cyber »/);
+  assert.match(fiche(3), /- D'après l'original, aucun lien concret avec ParlIA : à écarter, sauf avis contraire en séance\./);
+  assert.match(fiche(4), /- L'original : sans objet : la fiche vient du catalogue d'OpenRouter, relevé par le programme\./);
+  const carte = JSON.stringify(s.discord.fiches[0].payload.components);
+  assert.match(carte, /Ce que l'original contredit dans le tri/);
+  assert.match(carte, /résumé d'après l'original/);
+});

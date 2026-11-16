@@ -1,14 +1,19 @@
 # Veille ParlIA — la séance de la semaine, préparée par le bot
 
-Mise à jour du 3 novembre 2026. Le workflow « Veille ParlIA » (`VeilleParlIAprod`, 33 nœuds) prépare chaque
+Mise à jour du 15 novembre 2026. Le workflow « Veille ParlIA » (`VeilleParlIAprod`, 37 nœuds) prépare chaque
 semaine la séance de veille du projet ParlIA : Louis la tient pour l'épreuve E2 de sa certification (une heure de
-veille par semaine, une note datée par séance). Le bot collecte, trie et prépare ; Louis lit les originaux, classe
-chaque point (rien, à surveiller, décision à ouvrir) et écrit la note. Le code est dans `workflows/src-parlia/`,
+veille par semaine, une note datée par séance). Le bot collecte, trie, lit l'original des fiches retenues et
+prépare ; Louis lit les originaux, classe chaque point (rien, à surveiller, décision à ouvrir) et écrit la note.
+Le code est dans `workflows/src-parlia/`,
 assemblé par `workflows/build_parlia.py`. Le workflow a sa propre mémoire : la veille personnelle (v2 en service,
 v3) ne change pas.
 
-**État** : essayé dans n8n en mode test le 4 novembre 2026, corrigé, vérifié par `npm test` (130 tests) ; la mise en
-service attend le webhook du salon (section « Installer »).
+**État** : en service depuis le 4 novembre 2026 (préparations des semaines 45 et 46). Le 13 novembre, la lecture des
+originaux de la semaine 46 a corrigé huit fiches sur dix : une consigne qui croyait ParlIA équipé de modèles de
+décision, des lignes de tableau lues sans leurs en-têtes, des dates de collecte prises pour des dates de
+publication, une échéance repoussée par sa source et restée à l'ancienne date. Les corrections du 15 novembre (la
+consigne, les extraits et les dates, la lecture des originaux) sont vérifiées par `npm test` (156 tests) ; elles
+entrent en service quand le workflow est réimporté (section « Importer et publier »).
 
 Thème : « Étiqueter les questions écrites du Sénat avec un modèle de langage commercial : choisir, mesurer et pouvoir
 remplacer le fournisseur, dans le respect du RGPD et du règlement européen sur l'IA. » Quatre axes : fournisseurs et
@@ -27,6 +32,7 @@ Toutes les 30 min, de 7 h 15 à 22 h 45, quand le Mac est allumé
       │    → Journal officiel (archives de la DILA) → Alertes immédiates → Discord
       ├─ Notes de séance : relues sans écriture, seulement avant la préparation ou le rappel
       ├─ Préparation : au premier passage à partir du lundi 6 h, de 10 à 15 fiches
+      │    → Originaux : l'original de chaque fiche, lu, puis résumé par le modèle choisi, une demande par fiche
       │    → fichier AAAA-MM-JJ-preparation.md → Discord : ouverture, fiches guidées, réserve
       ├─ Rappel : au premier passage à partir du jeudi 16 h 30, si les notes ne montrent pas la séance de la semaine
       └─ Statut → #status, en silence sauf problème
@@ -44,6 +50,7 @@ Les 32 sources « à retenir » de l'étude des sources du 29 octobre 2026 (§4.
 | `sources-parlia.js` | 18 flux : journal d'OpenRouter ; OpenAI (filtré sur l'API) ; notes de version d'Anthropic ; Mistral ; Google « Developer tools » ; Simon Willison (filtré) ; journal de Workers AI (Cloudflare) ; trois requêtes arXiv ciblées (étiquetage par modèle de langage, modèles de décision et calibration, textes parlementaires ou administratifs) ; Hamel Husain ; Hugging Face (filtré) ; CNIL ; CEPD ; Commission européenne (filtrée sur l'IA) ; dossier de la loi DDADUE au Sénat ; data.senat.fr. Les communiqués de l'Élysée ne sont jamais triés : ils servent de détecteur de remaniement de secours |
 | `collecte-pages-api.js` | Une fois par jour : 12 pages sans flux (journaux et pages de retraits d'OpenAI, d'Anthropic, de Mistral et de Google ; blog et page des modèles de TypeSafe ; Liquid AI ; service d'assistance et Bureau de l'IA de la Commission ; dossier DDADUE à l'Assemblée), le catalogue d'OpenRouter, la fiche data.gouv.fr des questions du Sénat, les comptes Hugging Face de Cloudflare et de Perplexity |
 | `jorf-parlia.js` | Les archives quotidiennes du Journal officiel, deux par jour |
+| `lecture-pages.js` | Le découpage d'une page en lignes (paragraphes, éléments de liste, rangées de tableau avec leurs en-têtes), en HTML ou en Markdown ; commun aux nœuds qui lisent des pages, ajouté en tête de leur code par le builder |
 
 Une page sans flux est comparée à celle de la veille : les lignes nouvelles qui se suivent forment un article. Le
 premier passage apprend la page sans rien proposer ; une page qui perd plus de 70 % de ses lignes est une panne, une
@@ -122,6 +129,33 @@ Le reste, noté 4 ou plus, va dans la réserve. Les échéances des 90 jours sui
 règlement IA) sont rappelées en pied de préparation, avec l'ancienne date quand la source l'a changée ; celles que
 la source a changées ou retirées sans date lisible sont mises à part, à vérifier.
 
+### La lecture des originaux
+
+Avant d'écrire la préparation, le bot lit l'original de chaque fiche retenue, une dizaine par semaine
+(`originaux-parlia.js`), puis un modèle en écrit le résumé (`resumes-parlia.js`). Le tri ne voit que le titre et un
+extrait ; la lecture des originaux de la semaine 46 avait corrigé huit fiches sur dix.
+
+- **Ce qui est lu** : pour une prépublication d'arXiv, le résumé de l'étude, par l'API d'arXiv (l'article entier
+  est un PDF) ; pour une page sans flux, la partie de la page où se trouve le bloc retenu, avec son intertitre et
+  les en-têtes du tableau, la ligne retenue marquée ; pour la page d'un blog qui liste ses billets, le billet
+  lui-même, retrouvé par le lien qui porte son titre (le blog de TypeSafe ne date pas ses billets, le billet, si) ;
+  pour les autres, la page de l'article (`<article>`, sinon `<main>`), 12 000 caractères au plus.
+- **Une page qui a changé** depuis la collecte (OpenAI a refait sa page des retraits entre le 6 et le 15 novembre
+  2026) : le bloc est cherché par le nom de modèle le plus long de son titre (« gpt-5.5-cyber »), et la fiche le dit.
+- **Ce qui n'est pas lu, et pourquoi** : Légifrance et l'aide d'OpenAI refusent les programmes (erreur 403) ; une
+  page introuvable ou trop lente ; le catalogue d'OpenRouter, dont les chiffres sont relevés par le programme
+  (« sans objet »). La fiche le dit, et garde le résumé du tri.
+- **Le résumé** : une demande par original, une après l'autre, au modèle choisi (`MODEL_RESUMES` dans
+  `build_parlia.py`, Mistral Small 3.2 en secours s'il en est un autre). La demande reprend l'état du projet (le
+  même bloc que la consigne du tri : `PARLIA.ETAT_DU_PROJET`, dans `outils.js`), la proposition du tri et le texte
+  lu ; le modèle rend le résumé, ce qu'il faut encore chercher, l'hypothèse (« rien » sans lien concret), s'il est
+  hors thème, les dates de publication et d'effet, et ce que l'original contredit dans le tri.
+- **Les contrôles** : une erreur ou une réponse illisible, et la fiche garde le résumé du tri, avec le motif ; le
+  résumé du tri reste à côté de celui de l'original. Une date de publication trouvée date la fiche (et la signale si
+  elle précède la période lue) ; une autre date d'effet met à jour l'échéance, qui garde l'ancienne.
+- **Coût** : une dizaine de demandes par semaine, de 1 200 à 4 500 jetons chacune (21 000 environ pour les dix fiches
+  de la semaine 46) : moins d'un centime de dollar par semaine avec Mistral Small 3.2.
+
 ### Le fichier de préparation
 
 `preparation-parlia.js` écrit `AAAA-MM-JJ-preparation.md`, à la date du jour, dans le dossier monté sur
@@ -131,8 +165,9 @@ la reprendre telle quelle :
 - en tête, « Depuis la dernière séance » : la dernière séance tenue, celle de la semaine précédente, ses points
   « à surveiller » et la piste notée ;
 - « Sources interrogées », « Candidats, par axe » en tableaux, « Ce qui n'a pas pu être vérifié » ;
-- les fiches guidées : deux lignes, ce qu'il faut chercher dans l'original, deux questions (« Qu'est-ce qui sort ? »,
-  « Est-ce que ça pourrait servir à ParlIA ? »), l'hypothèse du tri, le lien ;
+- les fiches guidées : l'original, lu ou non (et pourquoi) ; deux lignes, d'après l'original quand il a été lu ; ce
+  qu'il faut chercher dans l'original ; ce que l'original contredit dans le tri ; deux questions (« Qu'est-ce qui
+  sort ? », « Est-ce que ça pourrait servir à ParlIA ? ») ; l'hypothèse ; le lien ;
 - la réserve, les échéances des 90 jours, les alertes depuis la dernière préparation.
 
 Le fichier est signé et daté : c'est le travail du bot, pas une lecture. Le bot ne commite jamais : aucun dossier
@@ -348,9 +383,13 @@ les hypothèses du tri restaient souvent générales (« pourrait influencer la 
 6. **Quand mettre en service, et la mise à jour de n8n.** Avis : l'essai en mode test, puis la publication, un même
    matin de semaine, sur n8n 2.10.3, où les nœuds ont été vérifiés ; la mise à jour vers 2.45.6 un autre matin, avec
    un nouvel essai.
+7. **Le modèle qui résume les originaux** (`MODEL_RESUMES` dans `build_parlia.py`). Une dizaine de demandes par
+   semaine : le coût reste de l'ordre du centime, et le choix porte sur la justesse des résumés. Mistral Small 3.2
+   par défaut.
 
 ## Ce qui reste à faire
 
+- Réimporter le workflow avec les corrections du 15 novembre 2026, après un essai en mode test.
 - Rejouer le jeu de contrôle du tri (étude, §5.5) à chaque changement de la consigne ou du modèle.
 - La revue mensuelle des sources (règle 10) : étendre `outils/rendement-sources.py` à ParlIA.
 - La matière de la synthèse mensuelle.
@@ -360,6 +399,8 @@ les hypothèses du tri restaient souvent générales (« pourrait influencer la 
 ## Tests
 
 `npm test` lance aussi les tests de ParlIA (`workflows/tests/parlia-*.test.mjs`) : planification, collecte et
-normalisation, pages sans flux et API, Journal officiel, tri et registre, sélection, préparation, notes de séance,
-envois Discord et #status, outils communs, et le workflow généré (à jour, connexions et ordre d'exécution, aucun
-secret ni chemin personnel, mode test).
+normalisation, pages sans flux et API, Journal officiel, tri et registre, sélection, lecture et résumé des
+originaux, préparation, notes de séance, envois Discord et #status, outils communs, et le workflow généré (à jour,
+connexions et ordre d'exécution, aucun secret ni chemin personnel, mode test). Les cas de la semaine 46 y sont
+repris : la ligne de tableau de la fiche 4, la date de la fiche 1, l'échéance repoussée de la fiche 3, une consigne
+qui ne dit jamais qu'un modèle est utilisé par ParlIA.

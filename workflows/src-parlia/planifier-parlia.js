@@ -35,6 +35,8 @@ const reglages = {
   statut: String(r.statut) === '1',
   mention: /^\d{5,25}$/.test(String(r.mention || '')) ? String(r.mention) : '',
   essai: String(r.essai) === '1',
+  // Le modèle qui résume les originaux (build_parlia.py) : la préparation le nomme.
+  modeleResumes: String(r.modeleResumes || '').slice(0, 100),
 };
 if (reglages.candidatsMin > reglages.candidatsMax) reglages.candidatsMin = reglages.candidatsMax;
 

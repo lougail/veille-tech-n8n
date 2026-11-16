@@ -13,6 +13,8 @@
 // préparation repart au passage suivant (trois essais par semaine au plus).
 // La date d'un candidat : celle de sa publication, signalée quand elle précède la période lue ; sans date donnée
 // par la source, « date inconnue », avec le jour où le bot l'a vu (jamais ce jour à la place de la date).
+// L'original de chaque fiche (nœuds Originaux et Lire les résumés) : lu ou non, et pourquoi ; lu, le résumé, ce
+// qu'il faut chercher et l'hypothèse viennent de lui, sinon du tri, sur le titre et un extrait.
 const sd = $getWorkflowStaticData('global');
 const plan = $('Que faire ?').first().json;
 const reglages = plan.reglages || {};
@@ -51,6 +53,20 @@ const hypothese = (c) => {
 };
 const quand = (c) => (c.date ? dateLongue(c.date) + (c.avantPeriode ? ', avant la période lue' : '')
   : 'date inconnue' + (c.vu ? ' (vu le ' + dateLongue(c.vu) + ')' : ''));
+const avecOriginaux = candidats.some((c) => c.original);
+const QUOI = { arxiv: "le résumé de l'étude sur arXiv, pas l'article entier", page: 'la partie de la page où se trouve le bloc', billet: 'le billet', article: "la page de l'article" };
+const milliers = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+function etatOriginal(c) {
+  const o = c.original;
+  if (!o) return '';
+  if (o.sansObjet) return 'sans objet : ' + o.motif;
+  if (!o.lu) return 'non lu : ' + (o.motif || 'motif inconnu') + ' ; le résumé vient du tri, sur le titre et un extrait';
+  let t = 'lu par le bot (' + (QUOI[o.comment] || "l'original") + ', ' + milliers(o.taille) + ' caractères)';
+  if (o.retrouvePar) t += ' ; la page a changé depuis la collecte, partie retrouvée par « ' + o.retrouvePar + ' »';
+  if (o.echec) t += ', mais son résumé automatique a échoué (' + o.echec + ') : le résumé vient du tri';
+  return t;
+}
+const deLOriginal = (c) => !!(c.original && c.original.resume === 'original');
 
 // ---- Sources interrogées ----
 const carnet = sd.semaine || { collectes: 0, parSource: {} };
@@ -109,7 +125,16 @@ L.push('# ' + (essai ? '[ESSAI] ' : '') + 'Préparation de la veille ParlIA — 
 L.push('');
 L.push('> Écrit par le bot de veille le ' + instant($now) + " (heure de Paris). C'est le fichier du bot : la note de séance s'écrit à part, à la date réelle de la lecture.");
 L.push('> Période lue : du ' + instant(depuisDt) + ' au ' + instant($now) + '.');
-L.push("> Les résumés, les « à chercher » et les hypothèses viennent du tri automatique (Mistral Small 3.2) : à vérifier dans l'original, à confirmer ou à écarter en séance.");
+const lusOriginaux = candidats.filter(deLOriginal).length;
+if (avecOriginaux && lusOriginaux) {
+  const modele = (sel.originaux && sel.originaux.modele) || '';
+  L.push("> Le bot a lu l'original de " + lusOriginaux + ' fiche' + (lusOriginaux > 1 ? 's' : '') + ' sur ' + total + ' et en a écrit le résumé'
+    + (modele ? ' (' + modele + ')' : '') + " ; pour les autres, le résumé, ce qu'il faut chercher et l'hypothèse viennent du tri automatique (Mistral Small 3.2), sur le titre et un extrait. Tout reste à vérifier dans l'original, à confirmer ou à écarter en séance.");
+} else if (avecOriginaux) {
+  L.push("> Aucun résumé d'après l'original cette fois (voir « Ce qui n'a pas pu être vérifié ») : les résumés, les « à chercher » et les hypothèses viennent du tri automatique (Mistral Small 3.2), sur le titre et un extrait. À vérifier dans l'original, à confirmer ou à écarter en séance.");
+} else {
+  L.push("> Les résumés, les « à chercher » et les hypothèses viennent du tri automatique (Mistral Small 3.2) : à vérifier dans l'original, à confirmer ou à écarter en séance.");
+}
 L.push('');
 L.push('Thème : ' + PARLIA.THEME + " Quatre axes : fournisseurs et coûts, qualité de l'étiquetage, conformité, exploitation.");
 L.push('');
@@ -155,11 +180,19 @@ if (sel.cnil) {
 L.push('');
 L.push("### Ce qui n'a pas pu être vérifié");
 L.push('');
-const nonVerifie = ["Aucun original n'a été ouvert par le bot : les résumés et les hypothèses s'appuient sur le titre et l'extrait donnés par la source."];
+const nonVerifie = [];
+if (!avecOriginaux) {
+  nonVerifie.push("Aucun original n'a été ouvert par le bot : les résumés et les hypothèses s'appuient sur le titre et l'extrait donnés par la source.");
+} else {
+  const sansResume = candidats.filter((c) => !deLOriginal(c) && !(c.original && c.original.sansObjet)).map((c) => c.n);
+  nonVerifie.push('Originaux lus et résumés par le bot : ' + lusOriginaux + ' sur ' + total
+    + (sansResume.length ? ' ; résumé du tri, sur un extrait : ' + listeNumeros(sansResume) : '') + '.');
+}
 for (const id of Object.keys(sante)) {
   if (sante[id].echecs > 0) nonVerifie.push(sante[id].s + ' : ' + sante[id].echecs + ' échec(s) de suite à la dernière lecture' + (sante[id].detail ? ' (' + sante[id].detail + ')' : '') + '.');
 }
 for (const c of candidats) {
+  if (c.original && !deLOriginal(c) && !c.original.sansObjet) nonVerifie.push('Fiche ' + c.n + " : l'original " + (c.original.lu ? 'a été ' : "n'a pas été lu : ") + etatOriginal(c).replace(/^non lu : /, '') + '.');
   if (c.secours) nonVerifie.push('Fiche ' + c.n + " : le tri automatique n'a pas répondu (" + c.secours + ') ; note de secours, à lire en entier.');
   if (!c.primaire) nonVerifie.push('Fiche ' + c.n + " : source non primaire ; l'original reste à trouver.");
   if (!c.date) nonVerifie.push('Fiche ' + c.n + ' : date de publication inconnue' + (c.vu ? " ; le bot l'a vue le " + dateLongue(c.vu) : '') + '.');
@@ -182,8 +215,12 @@ if (total) {
     L.push('');
     L.push('**« ' + c.titre + ' »** — ' + quand(c) + ' — ' + c.source);
     L.push('');
-    L.push("- En deux lignes (résumé automatique, à vérifier dans l'original) : " + (c.resume || "pas de résumé : lire l'original."));
+    if (c.original) L.push("- L'original : " + etatOriginal(c) + '.');
+    const deQui = !c.original ? "résumé automatique, à vérifier dans l'original" : deLOriginal(c) ? "d'après l'original, résumé automatique" : "résumé du tri, sur un extrait ; à vérifier dans l'original";
+    L.push('- En deux lignes (' + deQui + ') : ' + (c.resume || "pas de résumé : lire l'original."));
     L.push("- À chercher dans l'original : " + (c.aChercher || 'la date, les chiffres et ce qui change concrètement.'));
+    if (c.ecart) L.push("- Ce que l'original contredit dans le tri : " + c.ecart);
+    if (c.horsThemeOriginal) L.push("- D'après l'original, aucun lien concret avec ParlIA : à écarter, sauf avis contraire en séance.");
     L.push("- Qu'est-ce qui sort ?");
     L.push('- Est-ce que ça pourrait servir à ParlIA ?');
     L.push("- L'hypothèse du tri : " + hypothese(c));
@@ -274,10 +311,13 @@ function carte(c) {
   comps.push({ type: 10, content: '### Fiche ' + c.n + '/' + total + ' · ' + PARLIA.NOM_AXE[c.axe] + '\n**' + md(tronquer(c.titre, 200)) + '**\n-# '
     + [quand(c), md(c.source), nature(c), 'note du tri ' + c.p + '/10'].join(' · ') });
   comps.push({ type: 10, content: '**En deux lignes** : ' + md(tronquer(c.resume || "pas de résumé : lire l'original.", 400))
+    + (c.ecart ? "\n**Ce que l'original contredit dans le tri** : " + md(tronquer(c.ecart, 300)) : '')
     + "\n**À chercher dans l'original** : " + md(tronquer(c.aChercher || 'la date, les chiffres et ce qui change concrètement.', 400)) });
   comps.push({ type: 10, content: "**Deux questions** : qu'est-ce qui sort ? Est-ce que ça pourrait servir à ParlIA ?\n**L'hypothèse du tri** : "
     + md(tronquer(hypothese(c), 400)) });
   const notes = [];
+  if (c.original) notes.push(c.original.sansObjet ? 'original sans objet' : deLOriginal(c) ? "résumé d'après l'original" : 'original non résumé : ' + (c.original.echec || c.original.motif));
+  if (c.horsThemeOriginal) notes.push("d'après l'original, sans lien concret avec ParlIA");
   if (c.aussi && c.aussi.length) notes.push('couvert aussi par ' + c.aussi.map((a) => md(a.s)).join(', '));
   if (c.secours) notes.push("tri de secours : le modèle n'a pas répondu");
   if (c.raison) notes.push('pourquoi cette fiche : ' + c.raison);

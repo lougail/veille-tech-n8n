@@ -34,7 +34,7 @@ Automatisation de veille technologique avec N8N (self-hosted) et Discord.
 | Veille Pro v2, avec le rattrapage du résumé et du bilan | `VeilleProV2story` | **actif** — 8 h, 13 h et 18 h 30, en retard quand le Mac dort ; la v3 (59 nœuds : collecte au réveil du Mac, brief après 8 h 30, bilan le dimanche) la remplacera |
 | Veille Stack (26 nœuds) | `VeilleStackHlmr1` | **actif** — 9h30 Paris, digest lundi ; org via `GITHUB_STACK_ORG`, token `GITHUB_STACK_TOKEN`, sortie `DISCORD_WEBHOOK_STACK` |
 | Error Handler - Discord Alert | `yrUX1IcjTyIwpWqG` | actif |
-| Veille ParlIA (33 nœuds) | `VeilleParlIAprod` | prête, pas encore importée ; essai : `VeilleParlIAtest` — `docs/veille-parlia.md` |
+| Veille ParlIA (37 nœuds) | `VeilleParlIAprod` | **actif** depuis le 4 novembre 2026 ; les corrections du 15 novembre (consigne, extraits et dates, lecture des originaux) attendent d'être réimportées ; essai : `VeilleParlIAtest` — `docs/veille-parlia.md` |
 | Veille Pro v1 | `OfUjCc9fcrInTX3M` | désactivé (rollback) |
 | Brief Simplon phases 1-2 | — | désactivés (archive) |
 

@@ -59,7 +59,7 @@ for (const item of $input.all()) {
     pr: !!t.source_primaire, na: t.nature, r: sansTextes ? '' : t.resume, c: sansTextes ? '' : t.a_chercher,
     h: sansTextes ? '' : t.hypothese, f: t.drapeaux, de: t.date_effet, d: String(a.date || '').slice(0, 10), vu: maintenant,
     ax: !!a.source.arxiv, cn: !!a.source.cnil, dc: !!a.source.decision, sec: t.secours || '',
-    v: a.verifie ? 1 : 0, pl: (t.plafonds || []).join(', '), da: a.maj ? a.maj.date : '',
+    v: a.verifie ? 1 : 0, pl: (t.plafonds || []).join(', '), da: a.maj ? a.maj.date : '', k: a.source.kind || '',
   });
   const retrait = t.drapeaux && t.drapeaux.retrait_modele && t.date_effet && t.date_effet >= aujourdhui && t.date_effet <= dans90;
   const suivi = a.verifie || PARLIA.NOMS_SUIVIS.test(a.titre + ' ' + (a.extrait || ''));

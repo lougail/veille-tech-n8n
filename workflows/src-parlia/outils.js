@@ -19,6 +19,14 @@ const PARLIA = {
   ],
   // Les mêmes, et les modèles de décision, tels qu'on les reconnaît dans un titre ou un extrait.
   NOMS_SUIVIS: /\b(gpt-6-luna|gpt-6 luna|decisions api|claude haiku 5\.5|claude-haiku-5\.5|mistral small 3\.2|mistral-small-3\.2|gpt-4o mini|gpt-4o-mini|gpt-6\.1[- ]terra|gemini 4 argon|gemini-4-argon|jev|clef|clef-flash|d1|d1-ultra|decider)\b/i,
+  // L'état du projet, écrit sans date : le seul bloc à mettre à jour quand le projet avance (le comparatif commencé,
+  // un service choisi…). Il entre dans la consigne du tri (consigne-tri-parlia.js) et dans la demande de résumé des
+  // originaux (originaux-parlia.js) : changer alors leur version (VERSION, VERSION_RESUME).
+  ETAT_DU_PROJET: `- ParlIA propose les trois ministères les plus probables pour une question écrite de sénateur, à partir du titre et du texte de la question (données publiques du Sénat). Ces propositions viennent du modèle que Louis entraîne lui-même : l'application n'utilise aucun service d'IA du marché.
+- Une étape à venir : un service d'IA du marché, modèle de langage ou modèle de décision, pourrait étiqueter, hors ligne, les questions sans réponse publiée, en choisissant un ministère dans une liste fermée, avec un score de confiance ; une personne validerait chaque proposition. Le comparatif qui choisira ce service n'a pas commencé : aucun service n'est choisi.
+- Les candidats à l'étude pour ce comparatif, dont aucun n'est utilisé : la Decisions API d'OpenAI (GPT-6 Luna), Jev de TypeSafe AI, Clef de Cloudflare et d1 de Liquid AI, qui sont des modèles de décision, et les modèles de langage de la liste de suivi.
+- Le protocole prévu pour le comparatif : mesurer d'abord l'accord du service avec 3 267 questions dont le ministère est connu ; consigner la version du modèle et la date de chaque appel ; garder la réponse brute ; ne jamais mettre une étiquette du service dans le jeu de test ; garder l'étiquetage assisté seulement s'il améliore le macro-F1.
+- L'épreuve E5 porte sur un remaniement du Gouvernement qui change la liste des ministères. La soutenance a lieu en janvier 2027.`,
   UA: 'veille-parlia/1.0 (veille de certification de Louis; +https://github.com/lougail)',
 };
 

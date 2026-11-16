@@ -55,6 +55,11 @@ if (p.alertes && p.alertes.nouvelles) {
 if (p.preparation) {
   const prep = p.preparation;
   lignes.push('📂 Préparation de la semaine ' + plan.semaine.numero + ' : ' + prep.candidats + ' candidat(s), ' + prep.reserve + ' en réserve');
+  if (p.originaux && p.originaux.total) {
+    const o = p.originaux;
+    lignes.push('📖 Originaux : ' + o.resumes + '/' + o.total + ' lus et résumés' + (o.nonLus.length ? ' · non lus : fiche(s) ' + o.nonLus.join(', ') : '')
+      + (o.echecs.length ? ' · ⚠️ résumé échoué : fiche(s) ' + o.echecs.join(', ') : ''));
+  }
   const ecrit = sortieDe(() => $('Écrire le fichier'));
   if (ecrit && !ecrit.err.length) lignes.push('📄 ' + prep.fichier + ' écrit dans le dossier d\'export');
   else {

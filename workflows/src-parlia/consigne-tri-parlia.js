@@ -2,20 +2,15 @@
 // chaque article, Mistral Small 3.2 propose l'axe, une pertinence sur 10, une hypothèse, la nature de la source, un
 // résumé de deux lignes, ce qu'il faut chercher dans l'original, quatre drapeaux et une date d'effet ; Louis décide
 // en séance.
-// L'état du projet est un bloc à part, ETAT_DU_PROJET, écrit sans date : c'est lui qu'on met à jour quand le projet
-// avance (le comparatif commencé, un service choisi…), en changeant VERSION en même temps, pour que chaque tri garde
-// la trace de la consigne qui l'a produit. La version du 29 octobre affirmait : « Le 8 novembre 2026, Louis compare
-// des services d'étiquetage », dont Jev, Clef, d1 et la Decisions API ; le modèle en concluait que ParlIA les
-// utilisait (préparation de la semaine 46).
+// L'état du projet est un bloc à part, écrit sans date, dans outils.js (PARLIA.ETAT_DU_PROJET) : c'est lui qu'on met
+// à jour quand le projet avance (le comparatif commencé, un service choisi…), en changeant VERSION en même temps,
+// pour que chaque tri garde la trace de la consigne qui l'a produit. La version du 29 octobre affirmait : « Le
+// 8 novembre 2026, Louis compare des services d'étiquetage », dont Jev, Clef, d1 et la Decisions API ; le modèle en
+// concluait que ParlIA les utilisait (préparation de la semaine 46).
 // Les articles partent par lots de 12, un lot après l'autre (option « Batch Processing » de la chaîne LLM, lots
 // d'un élément) : une à trois demandes par collecte, sans appels en parallèle ni nœud « Wait ».
 // Rien à trier : la branche du tri s'arrête ici ; celle du Journal officiel continue.
 const VERSION = 'sources.md 5.2 du 15 novembre 2026';
-const ETAT_DU_PROJET = `- ParlIA propose les trois ministères les plus probables pour une question écrite de sénateur, à partir du titre et du texte de la question (données publiques du Sénat). Ces propositions viennent du modèle que Louis entraîne lui-même : l'application n'utilise aucun service d'IA du marché.
-- Une étape à venir : un service d'IA du marché, modèle de langage ou modèle de décision, pourrait étiqueter, hors ligne, les questions sans réponse publiée, en choisissant un ministère dans une liste fermée, avec un score de confiance ; une personne validerait chaque proposition. Le comparatif qui choisira ce service n'a pas commencé : aucun service n'est choisi.
-- Les candidats à l'étude pour ce comparatif, dont aucun n'est utilisé : la Decisions API d'OpenAI (GPT-6 Luna), Jev de TypeSafe AI, Clef de Cloudflare et d1 de Liquid AI, qui sont des modèles de décision, et les modèles de langage de la liste de suivi.
-- Le protocole prévu pour le comparatif : mesurer d'abord l'accord du service avec 3 267 questions dont le ministère est connu ; consigner la version du modèle et la date de chaque appel ; garder la réponse brute ; ne jamais mettre une étiquette du service dans le jeu de test ; garder l'étiquetage assisté seulement s'il améliore le macro-F1.
-- L'épreuve E5 porte sur un remaniement du Gouvernement qui change la liste des ministères. La soutenance a lieu en janvier 2027.`;
 const articles = $input.all().map((i) => i.json).filter((a) => a && a.id && !a._rien);
 if (!articles.length) return [];
 const LISTE_DE_SUIVI = PARLIA.SUIVI.join(', ')
@@ -107,7 +102,7 @@ const lots = [];
 for (let i = 0; i < articles.length; i += TAILLE) lots.push(articles.slice(i, i + TAILLE));
 return lots.map((lot) => ({ json: {
   prompt: CONSIGNE
-    .replace('{ETAT_DU_PROJET}', () => ETAT_DU_PROJET)
+    .replace('{ETAT_DU_PROJET}', () => PARLIA.ETAT_DU_PROJET)
     .replace('{LISTE_DE_SUIVI}', () => LISTE_DE_SUIVI)
     .replace('{DATE}', () => date)
     .replace('{ARTICLES}', () => lot.map(bloc).join('\n\n')),
