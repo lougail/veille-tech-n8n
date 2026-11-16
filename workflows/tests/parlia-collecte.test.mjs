@@ -39,6 +39,25 @@ test("l'étiquetage : la fiche de la source, une erreur, un flux vide", async ()
   assert.equal(sortie[2]._vide, true);
 });
 
+// Le billet de Cloudflare du 5 novembre 2026 (fiche 3 de la semaine 46) : seize modèles de texte, puis huit autres.
+test("un billet de retraits de Cloudflare : l'extrait ne garde que les modèles de texte ; les autres billets ne changent pas", async () => {
+  const flux = src('X01', { s: 'Cloudflare, journal de Workers AI', decision: true });
+  const content = '<p>Starting November 20, 2026, these models will stop returning responses.</p><h3>LLMs</h3><ul>'
+    + '<li>@cf/meta/llama-3.2-1b-instruct</li><li>@cf/qwen/qwq-32b</li></ul><h3>Other models</h3><ul>'
+    + '<li>@cf/myshell-ai/melotts → @cf/deepgram/aura-2-en</li><li>@cf/stabilityai/stable-diffusion-xl-base-1.0 → @cf/black-forest-labs/flux-2-klein-9b</li></ul>';
+  const [retraits, autre] = await executer('tag-source-parlia.js', {
+    input: [
+      { title: 'Workers AI - Planned model deprecations on Workers AI', link: 'https://developers.cloudflare.com/changelog/post/2026-11-05-planned-model-deprecations/', content, contentSnippet: 'Le texte complet du billet.' },
+      { title: 'Workers AI - EmbeddingGemma 2 now available on Workers AI', link: 'https://developers.cloudflare.com/changelog/post/2026-11-12-embeddinggemma-2/', content: '<p>@cf/google/embeddinggemma-2 is now available.</p>', contentSnippet: '@cf/google/embeddinggemma-2 is now available.' },
+    ],
+    sorties: { 'Flux ParlIA': [flux] },
+  });
+  assert.equal(retraits.contentSnippet, 'Starting November 20, 2026, these models will stop returning responses. · LLMs · @cf/meta/llama-3.2-1b-instruct · @cf/qwen/qwq-32b · Other models');
+  assert.equal(retraits.content, undefined);
+  assert.equal(autre.contentSnippet, '@cf/google/embeddinggemma-2 is now available.');
+  assert.equal(autre.content, '<p>@cf/google/embeddinggemma-2 is now available.</p>');
+});
+
 test('la fenêtre part de la dernière collecte, 48 heures au moins, 14 jours au plus, 7 jours la première fois', async () => {
   const s = src('A04');
   const items = [1, 3, 6, 9, 20].map((j) => article('Article de il y a ' + j + ' jours', 'https://anthropic.com/a' + j, j, s));

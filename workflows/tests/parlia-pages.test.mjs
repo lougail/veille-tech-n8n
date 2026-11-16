@@ -29,7 +29,7 @@ const BASE_MD = Array.from({ length: 12 }, (_, i) => ['October ' + (25 - i) + ',
 const modele = (id, extra = {}) => Object.assign({ id, name: id, created: 1790000000, context_length: 128000,
   pricing: { prompt: '0.0000001', completion: '0.0000005' }, description: 'Un modèle.' }, extra);
 const BOURRE = Array.from({ length: 60 }, (_, i) => modele('autre/modele-' + i));
-const SUIVIS = ['openai/gpt-6-luna', 'anthropic/claude-haiku-5.5', 'mistralai/mistral-small-3.2-24b-instruct', 'openai/gpt-4o-mini', 'openai/gpt-6.1-terra', 'google/gemini-4-argon'];
+const SUIVIS = ['openai/gpt-6-luna', 'anthropic/claude-haiku-5.5', 'mistralai/mistral-small-3.2-24b-instruct', 'openai/gpt-4o-mini', 'openai/gpt-6.1-terra', 'google/gemini-4-argon', 'mistralai/mistral-large-4-0'];
 const catalogue = (extra = [], modifier = (m) => m) => ({ data: BOURRE.concat(SUIVIS.map((id) => modifier(modele(id))), extra) });
 const fiche = (ressources, lm = '2026-03-25T10:00:00') => ({ page: 'https://www.data.gouv.fr/fr/datasets/questions-du-senat/', last_modified: lm,
   last_update: new Date().toISOString(), resources: ressources.map(([id, title, format]) => ({ id, title, format, last_modified: new Date().toISOString() })) });
@@ -198,23 +198,44 @@ const pageRetraits = (remplacant) => page([
 ].concat(BASE));
 const SUNBURST = '<code>gpt-image-2.6-sunburst</code> or <code>gpt-image-2.6-flare</code>';
 
-// Fiche 4 de la semaine 46 : le 4 novembre 2026, OpenAI a remplacé dans ce tableau le remplaçant conseillé. Lues sans
-// leurs en-têtes, les cellules nouvelles avaient fait annoncer l'arrêt des remplaçants, daté du jour de l'arrêt.
-test("fiche 4 (semaine 46) : une rangée de tableau garde ses en-têtes ; sa date est celle de l'avis, pas celle de l'arrêt", async () => {
+// Fiche 4 de la semaine 46 : le 4 novembre 2026, OpenAI a remplacé dans ce tableau le remplaçant conseillé des modèles
+// d'image. Lues sans leurs en-têtes, les cellules nouvelles avaient fait annoncer l'arrêt des remplaçants. Depuis le
+// 16 novembre 2026, les lignes des modèles d'image n'entrent plus dans aucun article (PARLIA.RETRAITS_TEXTE).
+test("fiche 4 (semaine 46) : sur la page des retraits d'OpenAI, les lignes des modèles d'image ne font plus d'article", async () => {
   const sd = {};
   await passer(sd, table({ [PAGES[1]]: { statusCode: 200, body: pageRetraits('<code>gpt-image-2</code>') } }));
   const { articles } = await passer(sd, table({ [PAGES[1]]: { statusCode: 200, body: pageRetraits(SUNBURST) } }));
+  assert.equal(articles.length, 0);
+});
+
+// Le même changement sur des modèles de texte, avec une ligne d'image ajoutée en tête : l'article ne garde que les
+// rangées des modèles de texte, chacune avec ses en-têtes, datées par l'avis.
+const retraitsTexte = (remplacant, enTete = []) => page([
+  '<p>Une phrase d\'introduction sur les retraits de modèles, assez longue pour faire une vraie ligne de la page.</p>',
+  '<h2>Upcoming deprecations</h2><div><table><thead><tr><th>Shutdown date</th><th>Affected model</th><th>Status</th>'
+    + '<th>Recommended replacement</th><th>Notice date</th></tr></thead><tbody>',
+].concat(enTete, [
+  rangeeRetrait('Jan 14, 2027', 'gpt-4o', remplacant, 'Oct 14, 2026'),
+  rangeeRetrait('Jan 14, 2027', 'gpt-4o-mini', remplacant, 'Oct 14, 2026'),
+  rangeeRetrait('Jan 14, 2027', 'gpt-4.1-mini', remplacant, 'Oct 14, 2026'),
+  rangeeRetrait('Dec 1, 2026', 'gpt-image-1-mini', SUNBURST, 'Jun 2, 2026'),
+  '</tbody></table></div>',
+], BASE));
+test("une rangée de tableau garde ses en-têtes ; sa date est celle de l'avis, pas celle de l'arrêt ; les modèles d'image restent dehors", async () => {
+  const sd = {};
+  await passer(sd, table({ [PAGES[1]]: { statusCode: 200, body: retraitsTexte('<code>gpt-5.6-terra</code>') } }));
+  const image = rangeeRetrait('Feb 10, 2027', 'gpt-image-2', SUNBURST, 'Nov 10, 2026');
+  const { articles } = await passer(sd, table({ [PAGES[1]]: { statusCode: 200, body: retraitsTexte('<code>gpt-6-luna</code>', [image]) } }));
   assert.equal(articles.length, 1);
   const a = articles[0];
-  assert.ok(a.title.startsWith('OpenAI, retraits de modèles — Shutdown date : Dec 1, 2026 · Affected model : gpt-image-1-mini · Status : Deprecated'), a.title);
+  assert.ok(a.title.startsWith('OpenAI, retraits de modèles — Shutdown date : Jan 14, 2027 · Affected model : gpt-4o · Status : Deprecated'), a.title);
   assert.ok(a.contentSnippet.startsWith('Sous « Upcoming deprecations » : '));
-  assert.ok(a.contentSnippet.includes('Affected model : chatgpt-image-latest · Status : Deprecated · Recommended replacement : gpt-image-2.6-sunburst or gpt-image-2.6-flare · Notice date : Jun 2, 2026'));
+  assert.ok(a.contentSnippet.includes('Affected model : gpt-4.1-mini · Status : Deprecated · Recommended replacement : gpt-6-luna · Notice date : Oct 14, 2026'));
   // Chaque remplaçant est annoncé comme tel ; les rangées sont séparées par « ; ».
-  const sunburst = a.contentSnippet.split('gpt-image-2.6-sunburst').length - 1;
-  assert.equal(sunburst, 3);
-  assert.equal(a.contentSnippet.split('Recommended replacement : gpt-image-2.6-sunburst').length - 1, sunburst);
+  assert.equal(a.contentSnippet.split('Recommended replacement : gpt-6-luna').length - 1, 3);
   assert.equal(a.contentSnippet.split(' ; ').length, 3);
-  assert.equal(a.isoDate, '2026-06-02T12:00:00.000Z');
+  assert.doesNotMatch(a.title + a.contentSnippet, /gpt-image/);
+  assert.equal(a.isoDate, '2026-10-14T12:00:00.000Z');
 });
 
 test("Anthropic : le nom du modèle, écrit dans un bouton, est gardé ; une rangée sans date passée n'est pas datée", async () => {
@@ -267,11 +288,11 @@ test("le format des lignes change : chaque page est réapprise une fois, sans ri
 
 test("une échéance relevée sur une page : quand ses lignes disparaissent de la page, elle est marquée changée", async () => {
   const sd = {};
-  await passer(sd, table({ [PAGES[1]]: { statusCode: 200, body: pageRetraits('<code>gpt-image-2</code>') } }));
-  const { articles } = await passer(sd, table({ [PAGES[1]]: { statusCode: 200, body: pageRetraits(SUNBURST) } }));
-  sd.echeances = [{ date: '2026-12-01', titre: articles[0].title, url: PAGES[1], s: 'OpenAI', page: 'F02', lignes: articles[0]._lignes }];
-  await passer(sd, table({ [PAGES[1]]: { statusCode: 200, body: pageRetraits(SUNBURST) } }));
+  await passer(sd, table({ [PAGES[1]]: { statusCode: 200, body: retraitsTexte('<code>gpt-5.6-terra</code>') } }));
+  const { articles } = await passer(sd, table({ [PAGES[1]]: { statusCode: 200, body: retraitsTexte('<code>gpt-6-luna</code>') } }));
+  sd.echeances = [{ date: '2027-01-14', titre: articles[0].title, url: PAGES[1], s: 'OpenAI', page: 'F02', lignes: articles[0]._lignes }];
+  await passer(sd, table({ [PAGES[1]]: { statusCode: 200, body: retraitsTexte('<code>gpt-6-luna</code>') } }));
   assert.equal(sd.echeances[0].changee, undefined); // les lignes sont toujours là
-  await passer(sd, table({ [PAGES[1]]: { statusCode: 200, body: pageRetraits('<code>gpt-image-3</code>') } }));
+  await passer(sd, table({ [PAGES[1]]: { statusCode: 200, body: retraitsTexte('<code>gpt-6.1-terra</code>') } }));
   assert.equal(sd.echeances[0].changee, '2026-11-02');
 });

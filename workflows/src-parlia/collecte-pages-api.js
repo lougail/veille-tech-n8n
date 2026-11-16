@@ -10,6 +10,8 @@
 //   2026 · Affected model : chatgpt-image-latest · Recommended replacement : gpt-image-2.6-sunburst ». Sans les
 //   en-têtes, le tri avait pris le 6 novembre 2026 les remplaçants pour les modèles arrêtés (fiche 4, semaine 46).
 //   La date de publication d'un bloc est sa première date déjà passée : une date à venir est une date d'effet.
+//   Sur la page des retraits d'OpenAI (PARLIA.RETRAITS_TEXTE), une ligne qui ne nomme que des modèles d'image, de
+//   son, de vidéo, de plongements ou de modération n'entre dans aucun bloc (16 novembre 2026).
 // - Le catalogue d'OpenRouter (A02) : les nouveaux modèles des fournisseurs suivis ; pour la liste de suivi
 //   (sources.md, 4.4), un changement de prix, une date de retrait annoncée, une disparition. Ces deux drapeaux
 //   sont calculés par le programme (_verifie) : le tri ne peut pas les oublier.
@@ -98,7 +100,8 @@ function dateDuBloc(texte, avant) {
   return '';
 }
 // Compare la page à la veille. etat : { h : empreintes des 400 premières lignes, n : nombre de lignes, v : format }.
-function comparer(lignes, etat) {
+// ignorer : les lignes qui n'entrent dans aucun bloc ; elles restent dans l'empreinte de la page.
+function comparer(lignes, etat, ignorer) {
   const tete = lignes.slice(0, 400);
   const empreintes = tete.map((l) => hacher(l));
   const nouveau = { h: empreintes.join(','), n: lignes.length, v: FORMAT_PAGES };
@@ -116,6 +119,7 @@ function comparer(lignes, etat) {
   let attente = [];
   let dernierTitre = '';
   tete.forEach((l, i) => {
+    if (ignorer && ignorer(l)) return;
     const titre = l.startsWith('§T ') ? l.slice(3) : '';
     const texte = titre || l;
     if (neuves[i]) {
@@ -142,7 +146,7 @@ async function page(p) {
   const corps = texteDe(await lire(p.u, p.anglais));
   const lignes = p.markdown ? lignesDuMarkdown(corps) : lignesDe(corps);
   if (!sd.pages) sd.pages = {};
-  const r = comparer(lignes, sd.pages[p.id]);
+  const r = comparer(lignes, sd.pages[p.id], deRetraitsTexte(p.id, '', p.s) ? ligneHorsTexte : null);
   if (r.erreur) throw new Error(r.erreur);
   sd.pages[p.id] = r.nouveau;
   // Les échéances relevées sur cette page : si plus aucune de leurs lignes n'y figure, la source les a changées ou

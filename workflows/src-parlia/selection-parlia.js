@@ -44,7 +44,9 @@ const depuis = plan.essai || !prep.at ? maintenant - 7 * J : Math.max(Number(pre
 // Le jour (heure de Paris) d'un instant passé, en millisecondes.
 const jourDe = (t) => (t ? $now.minus({ milliseconds: Math.max(0, maintenant - Number(t)) }).toISODate() : '');
 const jourDebut = jourDe(depuis);
-const fenetre = (sd.registre || []).filter((a) => (a.vu || 0) > depuis);
+// Une ligne des retraits d'OpenAI qui ne nomme que des modèles d'image, de son ou de vidéo, triée avant le 16 novembre
+// 2026, ne revient pas : la collecte n'en garde plus que les modèles de texte (PARLIA.RETRAITS_TEXTE).
+const fenetre = (sd.registre || []).filter((a) => (a.vu || 0) > depuis && !(deRetraitsTexte(a.sid, a.t, a.s) && ligneHorsTexte(a.t)));
 const stats = { lus: fenetre.length, horsTheme: 0, secours: 0, parAxe: {}, notes6: 0 };
 for (const a of fenetre) {
   if (a.axe === 'hors_theme') stats.horsTheme++;

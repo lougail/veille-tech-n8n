@@ -25,11 +25,15 @@ test('la consigne : des lots de 12, la date du jour, la liste de suivi, les arti
   const p = lots[0].prompt;
   assert.match(p, /Nous sommes le 2 novembre 2026\./);
   assert.match(p, /openai\/gpt-6-luna/);
+  // Mistral Large 4, Kev et Zuse, depuis le 16 novembre 2026.
+  assert.match(p, /mistralai\/mistral-large-4-0/);
+  assert.match(p, /Kev, une reproduction ouverte de Jev/);
+  assert.match(p, /Zuse de Bineric \(Zuse 9B et Zuse 27B\)/);
   assert.match(p, /--- ARTICLE id=a0 ---/);
   assert.match(p, /Un extrait avec \$& et \{DATE\} dedans/);
   assert.doesNotMatch(p, /\{ARTICLES\}|\{LISTE_DE_SUIVI\}/);
   assert.doesNotMatch(p, /\{ETAT_DU_PROJET\}|\{DATE\}\./);
-  assert.equal(lots[0]._version, 'sources.md 5.2 du 15 novembre 2026');
+  assert.equal(lots[0]._version, 'sources.md 5.2 du 16 novembre 2026');
   assert.deepEqual(await executer('consigne-tri-parlia.js', { input: [{ _rien: true }] }), []);
 });
 
@@ -51,7 +55,8 @@ test("la consigne ne dit jamais qu'un modèle est utilisé par ParlIA : les mod�
   const candidats = etat.split('\n').filter((l) => /Decisions API|Jev|Clef|\bd1\b/.test(l) && !l.startsWith('Modèles suivis'));
   assert.equal(candidats.length, 1);
   assert.match(candidats[0], /^- Les candidats à l'étude pour ce comparatif, dont aucun n'est utilisé : /);
-  for (const nom of ["la Decisions API d'OpenAI", 'Jev de TypeSafe AI', 'Clef de Cloudflare', 'd1 de Liquid AI']) assert.ok(candidats[0].includes(nom), nom);
+  for (const nom of ["la Decisions API d'OpenAI", 'Jev de TypeSafe AI', 'Kev (une reproduction ouverte de Jev)', 'Clef de Cloudflare', 'Zuse de Bineric',
+    'd1 de Liquid AI', 'dont Mistral Large 4']) assert.ok(candidats[0].includes(nom), nom);
   // L'état du projet ne porte aucune date au jour près : il ne peut pas vieillir comme celui du 29 octobre.
   const sansAujourdhui = etat.replace(/Nous sommes le .*\./, '');
   assert.doesNotMatch(sansAujourdhui, /\b\d{1,2}(er)? (janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre) 20\d{2}\b|\b20\d{2}-\d{2}-\d{2}\b/);

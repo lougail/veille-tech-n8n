@@ -129,6 +129,18 @@ test('la fenêtre : depuis la dernière préparation, 14 jours au plus ; 7 jours
   assert.deepEqual(ids(await choisir(reg, { prep: { semaine: '2026-S44', at: ms('2026-10-28T09:00') } }, { essai: true })), ['conformite', 'qualite']);
 });
 
+// Fiche 4 de la semaine 46 : une ligne de modèles d'image, triée avant le 16 novembre 2026, peut rester au registre.
+test("une ligne des retraits d'OpenAI qui ne nomme que des modèles d'image ne revient pas ; un billet de Cloudflare qui n'est pas un retrait, si", async () => {
+  const reg = [
+    r('fournisseurs', 7, { sid: 'F02', s: 'OpenAI, retraits de modèles', t: 'OpenAI, retraits de modèles — gpt-image-2.6-sunburst or gpt-image-2.6-flare' }),
+    r('fournisseurs', 7, { sid: 'F02', s: 'OpenAI, retraits de modèles', t: 'OpenAI, retraits de modèles — 2026-11-05: GPT-5.5-Cyber' }),
+    r('fournisseurs', 7, { sid: 'X01', s: 'Cloudflare, journal de Workers AI', t: 'Workers AI - EmbeddingGemma 2 now available on Workers AI' }),
+  ];
+  const s = await choisir(reg);
+  assert.deepEqual(s.candidats.map((c) => c.titre).sort(), [reg[1].t, reg[2].t].sort());
+  assert.equal(s.stats.lus, 2);
+});
+
 test("par où commencer : les trois mieux notés, d'axes différents si possible", async () => {
   const reg = [r('fournisseurs', 10), r('fournisseurs', 9), r('qualite', 7), r('conformite', 6), r('exploitation', 8)];
   const s = await choisir(reg);

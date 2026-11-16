@@ -60,10 +60,15 @@ page dont plus de 40 % des lignes changent a été refaite et n'est pas proposé
 replacement : gpt-image-2.6-sunburst or gpt-image-2.6-flare · Notice date : Jun 2, 2026 ». Sans les en-têtes, le tri
 avait annoncé l'arrêt des remplaçants (fiche 4 de la semaine 46). Le même découpage lit les tableaux Markdown de
 Gemini et garde le nom des modèles d'Anthropic, écrit dans un bouton. Depuis ce changement (15 novembre 2026),
-chaque page est réapprise une fois, sans rien proposer. Le catalogue d'OpenRouter donne les
-nouveaux modèles des fournisseurs du thème et, pour la liste de suivi (GPT-6 Luna, Claude Haiku 5.5, Mistral
-Small 3.2, GPT-4o mini, GPT-6.1 Terra, Gemini 4 Argon), les changements de prix, les retraits annoncés et les
-disparitions : ces drapeaux sont calculés par le programme, le tri ne peut pas les oublier.
+chaque page est réapprise une fois, sans rien proposer. Sur la page des retraits d'OpenAI et dans les billets de
+retraits du journal de Workers AI (Cloudflare), le bot ne garde que les lignes des modèles de texte : une ligne qui
+ne nomme que des modèles d'image, de son, de vidéo, de plongements ou de modération n'entre dans aucun article ni
+dans aucun original lu (`PARLIA.RETRAITS_TEXTE` et `ligneHorsTexte`, dans `outils.js`, depuis le 16 novembre 2026).
+Le catalogue d'OpenRouter donne les nouveaux modèles des fournisseurs du thème et, pour la liste de suivi (GPT-6
+Luna, Claude Haiku 5.5, Mistral Small 3.2, GPT-4o mini, GPT-6.1 Terra, Gemini 4 Argon et, depuis le 16 novembre
+2026, Mistral Large 4), les changements de prix, les retraits annoncés et les disparitions : ces drapeaux sont
+calculés par le programme, le tri ne peut pas les oublier. Les modèles de décision suivis (Jev, Kev, Clef, Zuse, d1,
+Decider) sont reconnus par leur nom dans les titres et les extraits (`NOMS_SUIVIS`).
 
 Les dates :
 
@@ -83,10 +88,11 @@ Les dates :
 
 ### Le tri
 
-La consigne (`consigne-tri-parlia.js`) est celle de l'étude (§5.2), dans sa version du 15 novembre 2026
-(`VERSION` : « sources.md 5.2 du 15 novembre 2026 »). L'état du projet y forme un bloc à part, `ETAT_DU_PROJET`,
+La consigne (`consigne-tri-parlia.js`) est celle de l'étude (§5.2), dans sa version du 16 novembre 2026
+(`VERSION` : « sources.md 5.2 du 16 novembre 2026 »). L'état du projet y forme un bloc à part, `ETAT_DU_PROJET`,
 écrit sans date : ParlIA n'utilise aucun service du marché, le comparatif n'a pas commencé, et la Decisions API, Jev,
-Clef et d1 sont des candidats à l'étude. C'est ce bloc qu'on met à jour quand le projet avance, en changeant
+Kev, Clef, Zuse et d1, avec les modèles de langage de la liste de suivi, dont Mistral Large 4, sont des candidats à
+l'étude. C'est ce bloc qu'on met à jour quand le projet avance, en changeant
 `VERSION` en même temps. Suivent le thème et ses axes, le lien concret avec ParlIA (sans lien : l'axe « hors_theme »
 et l'hypothèse « rien »), un barème de pertinence sur 10, des plafonds, la lecture d'une ligne de tableau de retraits
 (le modèle arrêté, puis son remplaçant), cinq exemples, la liste de suivi. La version du 29 octobre disait que Louis

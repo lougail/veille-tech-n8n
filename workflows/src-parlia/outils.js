@@ -13,21 +13,28 @@ const PARLIA = {
   },
   THEME: "« Étiqueter les questions écrites du Sénat avec un modèle de langage commercial : choisir, mesurer et pouvoir remplacer le fournisseur, dans le respect du RGPD et du règlement européen sur l'IA. »",
   // Les modèles suivis (sources.md, 4.4) : leurs changements de prix et leurs retraits sont toujours proposés.
+  // Mistral Large 4 depuis le 16 novembre 2026 : un candidat possible du comparatif (séances 02 et 03).
   SUIVI: [
     'openai/gpt-6-luna', 'anthropic/claude-haiku-5.5', 'mistralai/mistral-small-3.2-24b-instruct',
-    'openai/gpt-4o-mini', 'openai/gpt-6.1-terra', 'google/gemini-4-argon',
+    'openai/gpt-4o-mini', 'openai/gpt-6.1-terra', 'google/gemini-4-argon', 'mistralai/mistral-large-4-0',
   ],
-  // Les mêmes, et les modèles de décision, tels qu'on les reconnaît dans un titre ou un extrait.
-  NOMS_SUIVIS: /\b(gpt-6-luna|gpt-6 luna|decisions api|claude haiku 5\.5|claude-haiku-5\.5|mistral small 3\.2|mistral-small-3\.2|gpt-4o mini|gpt-4o-mini|gpt-6\.1[- ]terra|gemini 4 argon|gemini-4-argon|jev|clef|clef-flash|d1|d1-ultra|decider)\b/i,
+  // Les mêmes, et les modèles de décision, tels qu'on les reconnaît dans un titre ou un extrait ; Kev et Zuse depuis
+  // le 16 novembre 2026 (séance 03). L'institut Zuse de Berlin n'est pas le modèle de Bineric.
+  NOMS_SUIVIS: /\b(gpt-6-luna|gpt-6 luna|decisions api|claude haiku 5\.5|claude-haiku-5\.5|mistral small 3\.2|mistral-small-3\.2|gpt-4o mini|gpt-4o-mini|gpt-6\.1[- ]terra|gemini 4 argon|gemini-4-argon|mistral large 4|mistral-large-4|jev|kev|clef|clef-flash|zuse(?![- ]institut)|d1|d1-ultra|decider)\b/i,
   // L'état du projet, écrit sans date : le seul bloc à mettre à jour quand le projet avance (le comparatif commencé,
   // un service choisi…). Il entre dans la consigne du tri (consigne-tri-parlia.js) et dans la demande de résumé des
   // originaux (originaux-parlia.js) : changer alors leur version (VERSION, VERSION_RESUME).
   ETAT_DU_PROJET: `- ParlIA propose les trois ministères les plus probables pour une question écrite de sénateur, à partir du titre et du texte de la question (données publiques du Sénat). Ces propositions viennent du modèle que Louis entraîne lui-même : l'application n'utilise aucun service d'IA du marché.
 - Une étape à venir : un service d'IA du marché, modèle de langage ou modèle de décision, pourrait étiqueter, hors ligne, les questions sans réponse publiée, en choisissant un ministère dans une liste fermée, avec un score de confiance ; une personne validerait chaque proposition. Le comparatif qui choisira ce service n'a pas commencé : aucun service n'est choisi.
-- Les candidats à l'étude pour ce comparatif, dont aucun n'est utilisé : la Decisions API d'OpenAI (GPT-6 Luna), Jev de TypeSafe AI, Clef de Cloudflare et d1 de Liquid AI, qui sont des modèles de décision, et les modèles de langage de la liste de suivi.
+- Les candidats à l'étude pour ce comparatif, dont aucun n'est utilisé : la Decisions API d'OpenAI (GPT-6 Luna), Jev de TypeSafe AI, Kev (une reproduction ouverte de Jev), Clef de Cloudflare, Zuse de Bineric et d1 de Liquid AI, qui sont des modèles de décision, et les modèles de langage de la liste de suivi, dont Mistral Large 4.
 - Le protocole prévu pour le comparatif : mesurer d'abord l'accord du service avec 3 267 questions dont le ministère est connu ; consigner la version du modèle et la date de chaque appel ; garder la réponse brute ; ne jamais mettre une étiquette du service dans le jeu de test ; garder l'étiquetage assisté seulement s'il améliore le macro-F1.
 - L'épreuve E5 porte sur un remaniement du Gouvernement qui change la liste des ministères. La soutenance a lieu en janvier 2027.`,
   UA: 'veille-parlia/1.0 (veille de certification de Louis; +https://github.com/lougail)',
+  // Les retraits d'OpenAI (sa page des retraits, F02) et de Cloudflare (les billets de retraits du journal de Workers
+  // AI, X01) : le bot n'en garde que les lignes des modèles de texte (ligneHorsTexte). Le 5 novembre 2026, Cloudflare
+  // arrêtait seize modèles de texte et huit autres (son, image, vision, plongements) ; la page d'OpenAI mêle aux
+  // modèles de texte ceux d'image, de son, de vidéo, de plongements et de modération.
+  RETRAITS_TEXTE: ['F02', 'X01'],
 };
 
 // Texte lisible : sans balises ni entités, espaces réduits.
@@ -113,6 +120,33 @@ function datesDansTexte(texte) {
 // La première date écrite dans un texte, ou une chaîne vide.
 function dateDansTexte(texte) {
   return datesDansTexte(texte)[0] || '';
+}
+// ---- Les modèles de texte, sur les pages de retraits (PARLIA.RETRAITS_TEXTE) ----
+// Un modèle d'image, de son, de vidéo, de plongements (embeddings) ou de modération se reconnaît à son nom : chez
+// OpenAI gpt-image-1-mini, chatgpt-image-latest, dall-e-3, tts-1, whisper-1, gpt-realtime, gpt-4o-mini-transcribe,
+// sora-2, text-embedding-3-small, omni-moderation ; chez Cloudflare melotts, stable-diffusion, dreamshaper, flux,
+// llava, embeddinggemma, deepgram/aura, deepgram/nova.
+const MODELES_HORS_TEXTE = /image|dall-?e|flux|stable-diffusion|sdxl|dreamshaper|inpaint|tts|whisper|transcri|audio|realtime|speech|voice|sora|video|embedding|similarity|search-(ada|babbage|curie|davinci)|rerank|moderation|llama-guard|llava|resnet|detr|uform|deepgram\/|^aura\b|^nova-\d/i;
+// Un modèle de texte se reconnaît à sa famille : gpt-6-luna, o3, claude-haiku-5.5, llama-3.2-1b-instruct, qwq-32b…
+const MODELES_TEXTE = /^(gpt-|o\d|chatgpt-|codex|babbage-002|davinci-002|claude|llama|meta-llama|mistral|mixtral|ministral|magistral|codestral|devstral|qwen|qwq|gemma|gemini|deepseek|phi-\d|hermes|openhermes|falcon|tinyllama|openchat|zephyr|starling|sqlcoder|discolm|granite|kimi|glm|nemotron|jev|kev|clef|zuse|decider)/i;
+// Une ligne qui nomme au moins un modèle d'image, de son, de vidéo, de plongements ou de modération, et aucun modèle
+// de texte : « Affected model : gpt-image-1-mini · Recommended replacement : gpt-image-2.6-sunburst », ou
+// « @cf/myshell-ai/melotts → @cf/deepgram/aura-2-en ». Une ligne qui ne nomme aucun modèle est gardée.
+function ligneHorsTexte(ligne) {
+  let texte = 0;
+  let autre = 0;
+  for (const jeton of String(ligne || '').match(/[@\w][\w@./:-]*/g) || []) {
+    const nom = jeton.toLowerCase().replace(/[.:-]+$/, '');
+    const dernier = nom.split('/').pop();
+    if (MODELES_HORS_TEXTE.test(nom) || MODELES_HORS_TEXTE.test(dernier)) autre++;
+    else if (MODELES_TEXTE.test(dernier)) texte++;
+  }
+  return autre > 0 && texte === 0;
+}
+// Un article d'une source de PARLIA.RETRAITS_TEXTE qui porte sur des retraits : toute la page des retraits d'OpenAI ;
+// dans le journal de Workers AI, les seuls billets de retraits (« Planned model deprecations »).
+function deRetraitsTexte(sid, titre, source) {
+  return PARLIA.RETRAITS_TEXTE.includes(sid) && /deprecat|retir|retrait|sunset|shut ?down/i.test(String(titre || '') + ' ' + String(source || ''));
 }
 // La santé d'une source : un échec de plus, ou un retour. Au troisième échec de suite, une seule alerte
 // (sd._passage.flux, lue par le message de #status) ; au retour, un message de retour.

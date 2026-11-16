@@ -10,7 +10,7 @@ export const OUTILS = source('outils.js');
 export const LECTURE = source('lecture-pages.js');
 export const MODULES = ['outils.js', 'lecture-pages.js'];
 const OUTILS_NOMS = ['PARLIA', 'texteSimple', 'tronquer', 'hacher', 'domaineDe', 'cleAdresse', 'cellule', 'pourDiscord', 'MOIS_FR',
-  'dateLongue', 'MOIS_EN', 'datesDansTexte', 'dateDansTexte', 'noterSante', 'pousserAlerte'];
+  'dateLongue', 'MOIS_EN', 'datesDansTexte', 'dateDansTexte', 'noterSante', 'pousserAlerte', 'ligneHorsTexte', 'deRetraitsTexte'];
 const LECTURE_NOMS = ['texteDe', 'lignesDe', 'lignesDuMarkdown', 'texteDuBloc', 'sansMarque', 'estRangee', 'FORMAT_PAGES'];
 const utilise = (code, noms) => noms.some((nom) => new RegExp('\\b' + nom + '\\b').test(code));
 // Le code d'un nœud, tel que build_parlia.py l'assemble : la lecture des pages se sert des outils.

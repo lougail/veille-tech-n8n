@@ -93,13 +93,27 @@ const pageRetraits = page('<h1>Deprecations</h1><p>Une introduction sur les retr
   + '</tbody></table><h2>Model deprecation notice periods</h2><p>Une autre partie de la page.</p>');
 const RETRAITS = 'https://developers.openai.com/api/docs/deprecations';
 
-test("fiche 4 (semaine 46) : sur une page sans flux, la partie du bloc, avec les en-têtes du tableau et la ligne retenue", async () => {
-  const titre = 'OpenAI, retraits de modèles — Shutdown date : Dec 1, 2026 · Affected model : gpt-image-1-mini · Status : Deprecated · Recommended replacement : gpt-image-2.6-sunburst or gpt-image-2.6-flare · Notice…';
-  const { demandes, lectures } = await lire([cand(4, { sid: 'F02', kind: 'page', url: RETRAITS, titre })], { [RETRAITS]: { statusCode: 200, body: pageRetraits } });
+test("une page sans flux : la partie du bloc, avec les en-têtes du tableau et la ligne retenue, sans les modèles d'image", async () => {
+  const titre = 'OpenAI, retraits de modèles — Shutdown date : Feb 1, 2027 · Affected model : gpt-5.5-cyber-preview · Status : Deprecated · Recommended replacement : The most capable cyber model available to you. · Notice…';
+  const { demandes, lectures } = await lire([cand(2, { sid: 'F02', kind: 'page', url: RETRAITS, titre })], { [RETRAITS]: { statusCode: 200, body: pageRetraits } });
   assert.deepEqual([lectures[0].comment, lectures[0].retrouvePar], ['page', '']);
   const p = demandes[0].prompt;
-  assert.match(p, /<<<\n## Upcoming deprecations\n\[ligne retenue\] - Shutdown date : Dec 1, 2026 · Affected model : gpt-image-1-mini · Status : Deprecated · Recommended replacement : gpt-image-2\.6-sunburst or gpt-image-2\.6-flare · Notice date : Jun 2, 2026\n/);
+  assert.match(p, /<<<\n## Upcoming deprecations\n\[ligne retenue\] - Shutdown date : Feb 1, 2027 · Affected model : gpt-5\.5-cyber-preview · Status : Deprecated · Recommended replacement : The most capable cyber model available to you\. · Notice date : Nov 5, 2026\n/);
+  // Les deux rangées des modèles d'image, juste au-dessus, ne sont pas lues (PARLIA.RETRAITS_TEXTE).
+  assert.doesNotMatch(p.slice(p.indexOf('<<<')), /gpt-image|chatgpt-image/);
   assert.doesNotMatch(p, /Une autre partie de la page/); // l'intertitre suivant arrête la partie
+});
+
+test("un billet de retraits de Cloudflare : l'original est lu sans les modèles de son ni d'image", async () => {
+  const billet = 'https://developers.cloudflare.com/changelog/post/2026-11-05-planned-model-deprecations/';
+  const corps = page('<article><h1>Planned model deprecations on Workers AI</h1><p>Starting November 20, 2026, these models will stop returning responses.' + PHRASES + '</p>'
+    + '<h3>LLMs</h3><ul><li>@cf/meta/llama-3.2-1b-instruct</li><li>@cf/qwen/qwq-32b</li></ul><h3>Other models</h3>'
+    + '<ul><li>@cf/myshell-ai/melotts → @cf/deepgram/aura-2-en</li><li>@cf/lykon/dreamshaper-8-lcm → @cf/black-forest-labs/flux-2-klein-9b</li></ul></article>');
+  const { demandes, lectures } = await lire([cand(3, { sid: 'X01', source: 'Cloudflare, journal de Workers AI', url: billet, titre: 'Workers AI - Planned model deprecations on Workers AI' })], { [billet]: { statusCode: 200, body: corps } });
+  assert.deepEqual([lectures[0].lu, lectures[0].comment], [true, 'article']);
+  const texte = demandes[0].prompt.slice(demandes[0].prompt.indexOf('<<<'));
+  assert.match(texte, /@cf\/meta\/llama-3\.2-1b-instruct\n@cf\/qwen\/qwq-32b/);
+  assert.doesNotMatch(texte, /melotts|dreamshaper|aura-2|flux-2/);
 });
 
 test("fiche 2 (semaine 46) : la page a changé depuis la collecte ; la partie est retrouvée par le nom du modèle", async () => {

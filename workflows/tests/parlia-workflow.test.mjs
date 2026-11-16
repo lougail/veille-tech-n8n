@@ -26,8 +26,9 @@ test('le JSON est à jour : chaque nœud Code reprend son fichier de src-parlia/
     assert.equal(code, assembler(fichier), 'nœud « ' + n.name + ' » pas à jour (relancer build_parlia.py)');
   }
   assert.deepEqual([...utilises].sort(), fichiers.sort());
-  // La lecture des pages n'alourdit que les deux nœuds qui lisent des pages : la collecte et les originaux.
-  assert.deepEqual(codes.filter((n) => n.parameters.jsCode.includes('---- Lecture des pages')).map((n) => n.name), ['Pages et API', 'Originaux']);
+  // La lecture des pages n'alourdit que les nœuds qui découpent une page ou un billet en lignes : l'étiquetage des flux
+  // (les billets de retraits de Cloudflare), la collecte des pages et les originaux.
+  assert.deepEqual(codes.filter((n) => n.parameters.jsCode.includes('---- Lecture des pages')).map((n) => n.name), ['Étiqueter la source', 'Pages et API', 'Originaux']);
 });
 
 test('chaque nœud Code se compile comme dans n8n (corps de fonction asynchrone)', () => {

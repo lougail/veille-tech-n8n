@@ -1,4 +1,4 @@
-// La consigne de tri : le texte de sources.md, section 5.2, dans sa version du 15 novembre 2026 (VERSION). Pour
+// La consigne de tri : le texte de sources.md, section 5.2, dans sa version du 16 novembre 2026 (VERSION). Pour
 // chaque article, Mistral Small 3.2 propose l'axe, une pertinence sur 10, une hypothèse, la nature de la source, un
 // résumé de deux lignes, ce qu'il faut chercher dans l'original, quatre drapeaux et une date d'effet ; Louis décide
 // en séance.
@@ -10,11 +10,11 @@
 // Les articles partent par lots de 12, un lot après l'autre (option « Batch Processing » de la chaîne LLM, lots
 // d'un élément) : une à trois demandes par collecte, sans appels en parallèle ni nœud « Wait ».
 // Rien à trier : la branche du tri s'arrête ici ; celle du Journal officiel continue.
-const VERSION = 'sources.md 5.2 du 15 novembre 2026';
+const VERSION = 'sources.md 5.2 du 16 novembre 2026';
 const articles = $input.all().map((i) => i.json).filter((a) => a && a.id && !a._rien);
 if (!articles.length) return [];
 const LISTE_DE_SUIVI = PARLIA.SUIVI.join(', ')
-  + " ; et, chez leurs éditeurs : Jev 1.14 de TypeSafe AI (jev-1.14.0 et jev-latest), Clef et Clef-flash de Cloudflare, d1 et d1-ultra de Liquid AI, Decider v1.2 de Perplexity, la Decisions API d'OpenAI";
+  + " ; et, chez leurs éditeurs : Jev 1.14 de TypeSafe AI (jev-1.14.0 et jev-latest), Kev, une reproduction ouverte de Jev, Clef et Clef-flash de Cloudflare, Zuse de Bineric (Zuse 9B et Zuse 27B), d1 et d1-ultra de Liquid AI, Decider v1.2 de Perplexity, la Decisions API d'OpenAI";
 const CONSIGNE = `Tu tries la veille de Louis pour son projet ParlIA. Tu proposes ; Louis décide en séance.
 
 L'ÉTAT DU PROJET

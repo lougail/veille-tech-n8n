@@ -9,6 +9,8 @@
 //   le lien qui porte son titre : le blog de TypeSafe ne date pas ses billets, le billet, si ;
 // - les autres : la page de l'article, le texte de <article>, sinon de <main>.
 // Le catalogue d'OpenRouter n'a pas d'original à lire : ses chiffres sont relevés par le programme.
+// Sur la page des retraits d'OpenAI et dans les billets de retraits de Cloudflare (PARLIA.RETRAITS_TEXTE), seules les
+// lignes des modèles de texte sont lues (16 novembre 2026).
 // Un site qui refuse les programmes répond 403 (Légifrance, l'aide d'OpenAI, vérifié le 13 novembre 2026) : la
 // fiche dit pourquoi l'original n'a pas été lu, et garde le résumé du tri ; de même pour une page introuvable.
 // Sortie : une demande de résumé par original lu, pour la chaîne « Résumé des originaux », un appel après l'autre ;
@@ -18,7 +20,7 @@ const sel = $input.first().json || {};
 const candidats = sel.candidats || [];
 const http = (typeof helpers !== 'undefined' && helpers) || this.helpers;
 const aujourdhui = $now.toISODate();
-const VERSION_RESUME = "résumé de l'original, version du 15 novembre 2026";
+const VERSION_RESUME = "résumé de l'original, version du 16 novembre 2026";
 const MAX_TEXTE = 12000;
 const REFUS = [{ domaine: 'legifrance.gouv.fr', nom: 'Légifrance' }, { domaine: 'help.openai.com', nom: "L'aide d'OpenAI" }];
 // Les pages construites dans le navigateur : leur version Markdown porte le texte (comme pour la collecte).
@@ -158,7 +160,8 @@ async function original(c) {
       return Object.assign(base, { lu: !!texte, comment: 'billet', adresse: lien, texte, motif: texte ? '' : 'le billet est sans texte lisible',
         datePage: dateDeLaPage(r.corps) || dateSousLeTitre(lignesBillet, titreDuBloc(c)) });
     }
-    const lignes = markdown ? lignesDuMarkdown(r.corps) : lignesDe(r.corps, { article: kind !== 'page' });
+    const lues = markdown ? lignesDuMarkdown(r.corps) : lignesDe(r.corps, { article: kind !== 'page' });
+    const lignes = deRetraitsTexte(c.sid, c.titre, c.source) ? lues.filter((l) => !ligneHorsTexte(l)) : lues;
     if (kind === 'page') {
       const partie = partieDuBloc(lignes, titreDuBloc(c));
       if (!partie) return Object.assign(base, { motif: "le bloc retenu n'est plus sur la page" });
