@@ -4,6 +4,9 @@
 // Plafonds, appliqués ici plutôt que confiés au modèle :
 // - une source non primaire ne dépasse pas 6 ; une prépublication (arXiv) ne dépasse pas 8 ;
 // - une annonce d'éditeur publiée hors d'un domaine officiel : 2 au plus.
+// L'hypothèse est contrôlée (hypotheseFautive, outils.js) : une hypothèse qui dit ParlIA équipé d'un service, ou qui
+// prête un retrait à un modèle suivi absent du titre et de l'extrait, est écartée ; le motif suit l'article jusqu'à
+// sa fiche (hypothese_ecartee).
 // Les drapeaux calculés par le programme (prix et retraits des modèles suivis) s'ajoutent à ceux du modèle.
 // La réponse brute et la version de la consigne sont gardées, pour pouvoir rejouer le tri.
 const lots = $('Consigne de tri').all().map((i) => i.json);
@@ -46,6 +49,7 @@ function secours(a, motif) {
     drapeaux: { changement_prix: false, retrait_modele: false, nouveau_modele_decision: false, echeance_reglementaire: false },
     date_effet: null,
     secours: motif,
+    hypothese_ecartee: '',
   };
 }
 
@@ -55,10 +59,12 @@ function valider(a, p) {
   if (!AXES.includes(p.axe) || !Number.isInteger(pertinence) || pertinence < 0 || pertinence > 10) return null;
   const drapeaux = {};
   for (const d of DRAPEAUX) drapeaux[d] = !!(p.drapeaux && p.drapeaux[d] === true);
+  const hypothese = texteCourt(p.hypothese, 320);
+  const ecartee = hypotheseFautive(hypothese, a.titre + ' ' + (a.extrait || ''));
   return {
     axe: p.axe,
     pertinence,
-    hypothese: texteCourt(p.hypothese, 320),
+    hypothese: ecartee ? '' : hypothese,
     source_primaire: typeof p.source_primaire === 'boolean' ? p.source_primaire : !!a.source.primaire,
     // « inconnu », ou une nature hors de la liste : celle que la liste des sources donne pour cette source.
     nature: PARLIA.NATURES.includes(p.nature) && p.nature !== 'inconnu' ? p.nature : (a.source.nature || 'inconnu'),
@@ -67,6 +73,7 @@ function valider(a, p) {
     drapeaux,
     date_effet: /^\d{4}-\d{2}-\d{2}$/.test(String(p.date_effet || '')) ? p.date_effet : null,
     secours: '',
+    hypothese_ecartee: ecartee,
   };
 }
 

@@ -27,6 +27,18 @@ test("pas de préparation due : pas de sélection", async () => {
   assert.equal(await choisir([r('fournisseurs', 9)], {}, { preparation: false }), undefined);
 });
 
+test("une hypothèse écartée par le contrôle du tri suit sa fiche, avec son motif", async () => {
+  const motif = "elle dit « utilisés par ParlIA », alors qu'aucun service n'est utilisé ni choisi";
+  const s = await choisir([r('fournisseurs', 8, { h: '', he: motif }), r('qualite', 7)]);
+  assert.deepEqual(s.candidats.map((c) => [c.hypothese, c.hypotheseEcartee]), [['', motif], [s.candidats[1].hypothese, '']]);
+});
+
+test("un retrait de gpt-4o-mini-tts, un modèle de voix, n'est pas le retrait d'un modèle suivi : pas de fiche d'office", async () => {
+  const s = await choisir([r('fournisseurs', 9), r('fournisseurs', 4, { f: { retrait_modele: true }, de: '2027-01-06', t: 'Shutdown of gpt-4o-mini-tts on Jan 6' })]);
+  assert.equal(s.candidats.length, 1);
+  assert.deepEqual(s.reserve.map((x) => x.titre), ['Shutdown of gpt-4o-mini-tts on Jan 6']);
+});
+
 test('au plus 8 fiches, les mieux notées, au plus 5 par axe, et jamais hors thème', async () => {
   const reg = [];
   for (const axe of ['fournisseurs', 'qualite', 'conformite', 'exploitation']) for (let i = 0; i < 7; i++) reg.push(r(axe, 6 + (i % 4)));
@@ -79,6 +91,8 @@ test('la CNIL ou le CEPD : toujours sur sa ligne à part ; une fiche seulement �
   const bas = await choisir([r('fournisseurs', 9), texteCnil(4)]);
   assert.ok(!bas.candidats.some((c) => c.cnil));
   assert.deepEqual([bas.cnil.n, bas.cnil.p, bas.cnil.horsTheme], [null, 4, false]);
+  // Signalé sur sa ligne à part, il ne revient pas une seconde fois dans la réserve.
+  assert.ok(!bas.reserve.some((x) => x.titre === 'La CNIL publie ses recommandations'));
   const haut = await choisir([r('fournisseurs', 9), texteCnil(6)]);
   const fiche = haut.candidats.find((c) => c.cnil);
   assert.equal(fiche.raison, 'la CNIL et le CEPD cette semaine');

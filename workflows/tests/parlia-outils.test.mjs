@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { OUTILS } from './aide-parlia.mjs';
 
-const o = new Function(OUTILS + '\nreturn { PARLIA, texteSimple, tronquer, hacher, domaineDe, cleAdresse, cellule, pourDiscord, dateLongue, dateDansTexte, noterSante, pousserAlerte, ligneHorsTexte, deRetraitsTexte };')();
+const o = new Function(OUTILS + '\nreturn { PARLIA, texteSimple, tronquer, hacher, domaineDe, cleAdresse, cellule, pourDiscord, dateLongue, dateDansTexte, noterSante, pousserAlerte, nomsSuivisDans, ligneHorsTexte, lignesHorsTexte, deRetraitsTexte, hypotheseFautive };')();
 
 test('le texte lisible : sans balises ni entités, espaces réduits ; coupé au mot, avec des points de suspension', () => {
   assert.equal(o.texteSimple('<p>Le&nbsp;prix &amp; la <b>date</b>&#39;</p>\n  suite'), "Le prix & la date ' suite");
@@ -103,4 +103,90 @@ test("les retraits d'OpenAI et de Cloudflare : une ligne qui ne nomme que des mo
   assert.equal(o.deRetraitsTexte('X01', 'Workers AI - Planned model deprecations on Workers AI', ''), true);
   assert.equal(o.deRetraitsTexte('X01', 'Workers AI - EmbeddingGemma 2 now available on Workers AI', 'Cloudflare, journal de Workers AI'), false);
   assert.equal(o.deRetraitsTexte('F13', '', 'Google, retraits de modèles Gemini'), false);
+});
+
+// La relecture du 16 novembre 2026 : une ligne sur un modèle suivi, écrit seul, était écartée pour un mot de son
+// (« realtime », « audio »), même écrit avec un trait d'union typographique ; « tts » et « voice » comptaient au milieu
+// d'un nom (mattshumer, invoice). gpt-4o-mini-tts, lui, reste un modèle de voix : ce n'est pas gpt-4o-mini.
+test("les retraits : un modèle suivi écrit seul garde sa ligne ; tts et voice ne comptent pas au milieu d'un nom", () => {
+  for (const l of [
+    'Decisions API realtime : a lower-latency mode for streaming decisions',
+    'Shutdown date : Mar 3, 2027 · Affected model : GPT\u20116 Luna audio',
+    '@cf/mattshumer/reflection-llama-3.1-70b',
+    'Affected model : invoice-parser-7b',
+  ]) assert.equal(o.ligneHorsTexte(l), false, l);
+  for (const l of [
+    'Affected model : gpt-4o-mini-tts · Recommended replacement : gpt-realtime-2.1-mini',
+    '@cf/myshell-ai/melotts → @cf/deepgram/aura-2-en',
+  ]) assert.equal(o.ligneHorsTexte(l), true, l);
+});
+
+test("les retraits : la section d'un intertitre qui ne nomme que des modèles d'image est écartée jusqu'à l'intertitre suivant", () => {
+  assert.deepEqual(o.lignesHorsTexte([
+    '§T Upcoming deprecations', 'On November 5, 2026, we notified developers.',
+    '§T 2026-11-10: gpt-image-2 and dall-e-3', 'On November 10, 2026, we notified developers using these models.',
+    '§L Shutdown date : Feb 10, 2027 · Notice date : Nov 10, 2026',
+    '§T 2026-10-14: GPT-4o and GPT-4.1', '§L Shutdown date : Jan 14, 2027 · Affected model : tts-1',
+  ]), [false, false, true, true, true, false, true]);
+});
+
+// Le contrôle des hypothèses (sources.md, 5.3), sur les cas réels : le rejeu de la semaine 46 et l'essai du
+// 16 novembre 2026 (182 hypothèses, 5 écartées, toutes à raison), puis les tournures qui doivent rester.
+test("le contrôle des hypothèses : aucun service n'est utilisé par ParlIA ; un retrait n'est prêté qu'à un modèle nommé", () => {
+  const billet = 'Workers AI - Planned model deprecations on Workers AI Starting November 20, 2026, these models will stop returning responses. · LLMs · @cf/meta/llama-3.2-1b-instruct · @cf/qwen/qwq-32b';
+  const usage = "elle dit « utilisés par ParlIA », alors qu'aucun service n'est utilisé ni choisi";
+  assert.equal(o.hypotheseFautive("Le retrait de gpt-5.5-cyber-preview au 1er février 2027 pourrait impacter les services d'OpenAI utilisés par ParlIA si un modèle suivi est concerné.", 'OpenAI, retraits de modèles'), usage);
+  assert.equal(o.hypotheseFautive('Les résultats pourraient inspirer des optimisations pour les modèles de décision utilisés par ParlIA.', 'From Large Language Models to Efficient System One Models'), usage);
+  assert.equal(o.hypotheseFautive('Si Clef ou Clef-flash de Cloudflare entraient au comparatif, leur retrait prévu le 15 novembre 2026 obligerait à les remplacer.', billet),
+    "elle prête un retrait à Clef, que l'article ne nomme pas");
+  assert.equal(o.hypotheseFautive('Cela pourrait remettre en cause le choix de ParlIA pour Jev.', 'Jev 1.14'),
+    "elle dit « choix de ParlIA pour Jev », alors qu'aucun service n'est utilisé ni choisi");
+  // La condition est dans la proposition d'avant : celle-ci affirme.
+  assert.match(o.hypotheseFautive('Si ce retrait se confirmait, ParlIA utilise déjà la Decisions API et devrait migrer.', billet), /« ParlIA utilise »/);
+  for (const h of [
+    "Si ParlIA utilise des modèles de Workers AI, il faudrait mettre à jour les références avant le 20 novembre 2026 pour éviter des erreurs d'API.",
+    "Le modèle Drex, s'il entrait au comparatif, pourrait être une alternative open-weight aux modèles de décision suivis (Jev, d1, etc.) pour ParlIA.",
+    "Si Muse Ember entrait au comparatif, son prix compétitif et ses performances en extraction de texte pourraient influencer le choix de ParlIA pour l'étiquetage.",
+    "Le cadre AAELI pourrait optimiser le budget d'audit humain, en utilisant des processus de confiance séquentiels pour décider quand valider une étiquette.",
+    "Gemini 4 Carbon pourrait, s'il entrait au comparatif, être utilisé par ParlIA pour des tâches de décision.",
+    'Ces modèles, qui ne sont pas utilisés par ParlIA, pourraient servir de point de comparaison.',
+    // Ce qui est vrai : ParlIA utilise le modèle que Louis entraîne.
+    'Cette méthode pourrait améliorer le modèle utilisé par ParlIA, celui que Louis entraîne.',
+    "ParlIA utilise son propre modèle : ce prix ne change rien aujourd'hui.",
+    'Un changement de format des données du Sénat utilisées par ParlIA pourrait casser la collecte.',
+    "Clef n'est pas concerné par ce retrait, qui ne vise que des modèles de texte de Workers AI.",
+    'Si Clef entrait au comparatif, son prix pourrait compter.',
+    'rien',
+  ]) assert.equal(o.hypotheseFautive(h, billet), '', h);
+  // La Decisions API d'OpenAI repose sur GPT-6 Luna : un retrait de l'une concerne l'autre.
+  assert.equal(o.hypotheseFautive("L'arrêt de GPT-6 Luna arrêterait aussi la Decisions API, candidate du comparatif.", 'Affected model : gpt-6-luna'), '');
+});
+
+// La relecture du lot, le 16 novembre 2026 : le point d'un nombre, les négations, une condition, une relative, un
+// trait d'union typographique, un nom de modèle prolongé.
+test("les modèles suivis qu'un texte nomme : une clé par modèle ; gpt-4o-mini-tts n'est pas gpt-4o-mini, jev-1.14.0 est Jev", () => {
+  assert.deepEqual([...o.nomsSuivisDans('Retiring gpt-4o-mini-tts and jev-1.14.0; GPT\u20116 Luna and gpt-6-luna stay').entries()],
+    [['jev', 'jev'], ['gpt 6 luna', 'GPT-6 Luna']]);
+});
+
+test("le contrôle des hypothèses : décimales, négations, conditions, relatives et traits d'union", () => {
+  for (const h of [
+    'ParlIA utilise Mistral Small 3.2 pour étiqueter les questions.',
+    'Claude Haiku 5.5 utilisé par ParlIA pourrait coûter plus cher.',
+    'Louis a choisi GPT-6.1 Terra pour le comparatif.',
+    'La Decisions API que ParlIA utilise pourrait changer de prix.',
+  ]) assert.match(o.hypotheseFautive(h, 'un article'), /^elle dit « /, h);
+  assert.equal(o.hypotheseFautive('Le retrait de GPT\u20116 Luna obligerait à changer de service.', 'OpenAI retire gpt-4.1-mini'),
+    "elle prête un retrait à GPT-6 Luna, que l'article ne nomme pas");
+  assert.equal(o.hypotheseFautive('Le retrait de gpt-4o-mini pourrait toucher le comparatif.', 'Shutdown date : Jan 6, 2027 · Affected model : gpt-4o-mini-tts'),
+    "elle prête un retrait à gpt-4o-mini, que l'article ne nomme pas");
+  for (const h of [
+    "Aucun service du marché n'est utilisé par ParlIA : ce retrait ne change rien.",
+    'Si les modèles de Workers AI sont utilisés par ParlIA, il faudrait les remplacer.',
+    "Aucun candidat (Clef, Jev) n'est concerné par ce retrait.",
+    'Ce retrait ne concerne aucun modèle suivi (GPT-6 Luna).',
+    "Ce retrait n'affecte pas Clef.",
+    "Ce prix pourrait peser dans le choix de ParlIA pour l'étiquetage, face à Jev.",
+    "Le modèle que ParlIA utilise aujourd'hui reste celui de Louis.",
+  ]) assert.equal(o.hypotheseFautive(h, 'Workers AI - Planned model deprecations'), '', h);
 });

@@ -85,10 +85,11 @@ const candidats = evenements.map((e) => {
   const p = Math.max(...e.membres.map((m) => (m.axe === 'hors_theme' ? 0 : m.p)));
   const f = {};
   for (const m of e.membres) for (const [k, v] of Object.entries(m.f || {})) if (v) f[k] = true;
-  const suivi = e.membres.some((m) => m.v || PARLIA.NOMS_SUIVIS.test(m.t + ' ' + (m.r || '')));
+  const suivi = e.membres.some((m) => m.v || nomsSuivisDans(m.t + ' ' + (m.r || '')).size > 0);
   return {
     id: tete.id, titre: tete.t, url: tete.u, source: tete.s, sid: tete.sid, kind: tete.k || '', axe: tete.axe, p,
     primaire: !!tete.pr, nature: tete.na || 'inconnu', resume: tete.r || '', aChercher: tete.c || '', hypothese: tete.h || '',
+    hypotheseEcartee: tete.he || '',
     drapeaux: f, dateEffet: e.membres.map((m) => m.de).find(Boolean) || null, date: tete.d || '',
     vu: jourDe(tete.vu), avantPeriode: !!tete.d && tete.d < jourDebut, dateAvant: tete.da || '',
     arxiv: !!tete.ax, cnil: e.membres.some((m) => m.cn), decision: !!tete.dc, secours: tete.sec || '', verifie: e.membres.some((m) => m.v),
@@ -137,7 +138,8 @@ const parNote = choisis.slice().sort(parScore);
 const aLaUne = [];
 for (const c of parNote) if (aLaUne.length < 3 && !aLaUne.some((u) => u.axe === c.axe)) aLaUne.push(c);
 for (const c of parNote) if (aLaUne.length < 3 && !aLaUne.includes(c)) aLaUne.push(c);
-const reserve = dansLeTheme.filter((c) => !choisis.includes(c) && c.p >= 4).slice(0, 10)
+// Le texte de la CNIL ou du CEPD qui n'est pas devenu une fiche a déjà sa ligne à part : pas une seconde fois ici.
+const reserve = dansLeTheme.filter((c) => !choisis.includes(c) && c !== cnil && c.p >= 4).slice(0, 10)
   .map((c) => ({ titre: c.titre, url: c.url, source: c.source, axe: c.axe, p: c.p, primaire: c.primaire }));
 
 // ---- Les échéances des 90 jours : les dates connues, celles des articles, celles du catalogue d'OpenRouter ----

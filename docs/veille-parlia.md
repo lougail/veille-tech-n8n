@@ -8,12 +8,14 @@ Le code est dans `workflows/src-parlia/`,
 assemblé par `workflows/build_parlia.py`. Le workflow a sa propre mémoire : la veille personnelle (v2 en service,
 v3) ne change pas.
 
-**État** : en service depuis le 4 novembre 2026 (préparations des semaines 45 et 46). Le 13 novembre, la lecture des
+**État** : en service depuis le 4 novembre 2026 (préparations des semaines 45 à 47). Le 13 novembre, la lecture des
 originaux de la semaine 46 a corrigé huit fiches sur dix : une consigne qui croyait ParlIA équipé de modèles de
 décision, des lignes de tableau lues sans leurs en-têtes, des dates de collecte prises pour des dates de
-publication, une échéance repoussée par sa source et restée à l'ancienne date. Les corrections du 15 novembre (la
-consigne, les extraits et les dates, la lecture des originaux) sont vérifiées par `npm test` (156 tests) ; elles
-entrent en service quand le workflow est réimporté (section « Importer et publier »).
+publication, une échéance repoussée par sa source et restée à l'ancienne date. La version du 16 novembre 2026
+corrige ces défauts, lit l'original des fiches retenues, en propose 8 au plus, suit Mistral Large 4, Kev et Zuse,
+montre ce que chaque source a apporté aux séances et contrôle les hypothèses. Vérifiée par `npm test` (182 tests),
+par un rejeu de la semaine 46 et par un essai complet dans n8n (section « Les essais du 16 novembre 2026 »), elle est
+en service depuis le 16 novembre 2026.
 
 Thème : « Étiqueter les questions écrites du Sénat avec un modèle de langage commercial : choisir, mesurer et pouvoir
 remplacer le fournisseur, dans le respect du RGPD et du règlement européen sur l'IA. » Quatre axes : fournisseurs et
@@ -63,12 +65,18 @@ Gemini et garde le nom des modèles d'Anthropic, écrit dans un bouton. Depuis c
 chaque page est réapprise une fois, sans rien proposer. Sur la page des retraits d'OpenAI et dans les billets de
 retraits du journal de Workers AI (Cloudflare), le bot ne garde que les lignes des modèles de texte : une ligne qui
 ne nomme que des modèles d'image, de son, de vidéo, de plongements ou de modération n'entre dans aucun article ni
-dans aucun original lu (`PARLIA.RETRAITS_TEXTE` et `ligneHorsTexte`, dans `outils.js`, depuis le 16 novembre 2026).
+dans aucun original lu, ni la section entière d'un intertitre qui ne nomme qu'eux ; une ligne qui nomme un modèle
+suivi est toujours gardée (`PARLIA.RETRAITS_TEXTE`, `ligneHorsTexte` et `lignesHorsTexte`, dans `outils.js`, depuis le
+16 novembre 2026). Un billet de retraits de Cloudflare dont le titre ne nomme que ces modèles-là n'est pas trié.
+La documentation de TypeSafe répond en Markdown aux programmes : sa page des modèles est lue dans sa version
+Markdown (`models.md`), comme les pages Gemini, et toute réponse sans HTML est lue comme du Markdown (`estHtml`).
 Le catalogue d'OpenRouter donne les nouveaux modèles des fournisseurs du thème et, pour la liste de suivi (GPT-6
 Luna, Claude Haiku 5.5, Mistral Small 3.2, GPT-4o mini, GPT-6.1 Terra, Gemini 4 Argon et, depuis le 16 novembre
 2026, Mistral Large 4), les changements de prix, les retraits annoncés et les disparitions : ces drapeaux sont
 calculés par le programme, le tri ne peut pas les oublier. Les modèles de décision suivis (Jev, Kev, Clef, Zuse, d1,
-Decider) sont reconnus par leur nom dans les titres et les extraits (`NOMS_SUIVIS`).
+Decider) sont reconnus par leur nom dans les titres et les extraits (`NOMS_SUIVIS`) ; un nom prolongé en modèle de
+voix ou d'image n'est pas celui d'un modèle suivi : le retrait de gpt-4o-mini-tts ne sonne pas comme celui de
+gpt-4o-mini (`nomsSuivisDans`, dans `outils.js`, depuis le 16 novembre 2026).
 
 Les dates :
 
@@ -109,6 +117,11 @@ Le programme vérifie ce qu'il vérifie mieux que le modèle (`lire-tri-parlia.j
 - les plafonds : 6 pour une source non primaire, 8 pour une prépublication arXiv, 2 pour une annonce d'éditeur
   publiée hors de son domaine officiel (un site qui imite TypeSafe, par exemple) ;
 - les drapeaux calculés par le programme l'emportent sur ceux du modèle ;
+- l'hypothèse : celle qui dit ParlIA équipé d'un service du marché (« les services d'OpenAI utilisés par ParlIA »),
+  ou qui prête un retrait à un modèle suivi que le titre et l'extrait ne nomment pas, est écartée, et la fiche dit
+  pourquoi (`hypotheseFautive`, dans `outils.js`). Une supposition (« s'il entrait au comparatif », « si ParlIA
+  utilisait ») reste, comme un modèle cité en exemple. Sur les 182 hypothèses du rejeu de la semaine 46 et de l'essai
+  du 16 novembre 2026, le contrôle en écarte 5, toutes à raison ;
 - la réponse brute et la version de la consigne sont gardées avec l'article, pour pouvoir rejouer le tri.
 
 Coût : environ 85 articles par semaine, une dizaine de demandes, moins de 5 centimes de dollar par mois.
@@ -147,7 +160,8 @@ extrait ; la lecture des originaux de la semaine 46 avait corrigé huit fiches s
   est un PDF) ; pour une page sans flux, la partie de la page où se trouve le bloc retenu, avec son intertitre et
   les en-têtes du tableau, la ligne retenue marquée ; pour la page d'un blog qui liste ses billets, le billet
   lui-même, retrouvé par le lien qui porte son titre (le blog de TypeSafe ne date pas ses billets, le billet, si) ;
-  pour les autres, la page de l'article (`<article>`, sinon `<main>`), 12 000 caractères au plus.
+  pour un dépôt Hugging Face, sa fiche (README), sans son en-tête : la page du dépôt n'a pas de texte lisible pour
+  un programme ; pour les autres, la page de l'article (`<article>`, sinon `<main>`), 12 000 caractères au plus.
 - **Une page qui a changé** depuis la collecte (OpenAI a refait sa page des retraits entre le 6 et le 15 novembre
   2026) : le bloc est cherché par le nom de modèle le plus long de son titre (« gpt-5.5-cyber »), et la fiche le dit.
 - **Ce qui n'est pas lu, et pourquoi** : Légifrance et l'aide d'OpenAI refusent les programmes (erreur 403) ; une
@@ -161,6 +175,7 @@ extrait ; la lecture des originaux de la semaine 46 avait corrigé huit fiches s
 - **Les contrôles** : une erreur ou une réponse illisible, et la fiche garde le résumé du tri, avec le motif ; le
   résumé du tri reste à côté de celui de l'original. Une date de publication trouvée date la fiche (et la signale si
   elle précède la période lue) ; une autre date d'effet met à jour l'échéance, qui garde l'ancienne.
+  L'hypothèse tirée de l'original passe le même contrôle que celle du tri, contre le texte de l'original.
 - **Coût** : 8 demandes par semaine au plus, de 1 200 à 4 500 jetons chacune (21 000 environ pour les dix fiches
   de la semaine 46) : moins d'un centime de dollar par semaine avec Mistral Small 3.2.
 
@@ -216,7 +231,8 @@ et n'en tire que quatre choses.
 - **La « Prochaine piste »** de cette séance.
 - **Les sources sur quatre semaines** (§6.2, règle 10). Pour chaque séance tenue depuis quatre semaines sur une
   préparation du bot : les fiches de cette préparation, avec leur source, et celles que citent ses points retenus
-  (« (fiche 7) », « (candidat 2) », dans la première parenthèse du point). La préparation est celle dont la note
+  (« (fiche 7) », « (candidat 2) », « (fiches 6 à 8) », dans la première parenthèse du point ; « séance 02,
+  candidat 1 » renvoie à une autre séance et ne compte pas). La préparation est celle dont la note
   donne le lien (`preparations/2026-11-09-preparation.md`), relue dans le dossier où le bot l'a écrite (nœuds « Lire
   les préparations » et « Texte des préparations », une branche au-dessus de celle des notes) ; sans lien, la
   dernière préparation du bot des sept jours d'avant. Une séance préparée à la main n'est pas comptée : ses
@@ -249,6 +265,7 @@ dans le journal que reprend le fichier de la semaine.
 - **#status** (`DISCORD_WEBHOOK_STATUS`, le même que la veille personnelle) : quelques lignes à chaque passage
   utile, à l'heure de Paris, en silence. Le message sonne s'il y a un problème : une source en échec trois fois de
   suite (une seule alerte, puis « de retour » au premier succès), le fichier non écrit, un envoi refusé par Discord.
+  Il compte aussi les hypothèses écartées par le contrôle, au tri et dans les résumés.
 - **Plantage** : le workflow d'erreur déjà en place (`yrUX1IcjTyIwpWqG`) est désigné dans les réglages, sans
   être modifié ; il poste dans #status.
 - **Mémoire** : elle n'est enregistrée qu'après une exécution réussie ; une exécution qui échoue ne perd rien, la
@@ -389,6 +406,26 @@ Restent à voir après la mise en service : la lecture des notes à travers le m
 publiés dans un post de forum, et la qualité du tri, à rejouer sur le jeu de contrôle de l'étude. Au premier essai,
 les hypothèses du tri restaient souvent générales (« pourrait influencer la conformité RGPD »).
 
+## Les essais du 16 novembre 2026
+
+Avant la mise en service de la version du 16 novembre, deux essais dans n8n, avec le vrai Mistral Small 3.2, sans
+rien écrire dans le coffre ni publier dans Discord :
+
+- **Le rejeu de la semaine 46** : les 71 articles de la semaine, triés de nouveau avec la nouvelle consigne. La ligne
+  de tableau de la fiche 4 tombe à 3 sur 10, et les modèles d'image sont désormais écartés ; la fiche 3 prend le
+  20 novembre lu dans l'original ; l'hypothèse de Zuse n'invente plus de poids publiés. Restaient 3 hypothèses
+  fautives (« les services d'OpenAI utilisés par ParlIA », deux fois ; un retrait prêté à Clef) : le contrôle des
+  hypothèses les écarte. Avec les vraies dates, la sélection aurait proposé 7 fiches, dont 3 des 4 que Louis a
+  gardées en séance ; Zuse passe en réserve, à cause du plafond de 3 prépublications arXiv.
+- **L'essai complet**, sur les vraies sources : 2 950 éléments reçus, 99 nouveaux, 98 triés dont 40 hors thème,
+  8 fiches, 5 originaux lus sur 8, les notes et le bilan des sources lus (la séance 03 y compte). Trois défauts,
+  corrigés depuis : les dépôts Hugging Face de Perplexity sans texte lisible (le bot lit leur fiche), la page des
+  modèles de TypeSafe réduite à une ligne (lue en Markdown), data.gouv.fr au-delà de 20 secondes (45 désormais).
+
+La version est publiée le 16 novembre 2026, avec la mémoire de la précédente : la préparation de la semaine 47, faite
+le matin, n'est pas refaite. À la première lecture des pages sans flux, chaque page est réapprise une fois, sans rien
+proposer (nouveau format des lignes).
+
 ## Les décisions qui restent à Louis
 
 1. **Forum ou salon texte.** Avis : forum, un post par semaine, facile à retrouver et à montrer.
@@ -405,10 +442,16 @@ les hypothèses du tri restaient souvent générales (« pourrait influencer la 
 7. **Le modèle qui résume les originaux** (`MODEL_RESUMES` dans `build_parlia.py`). Au plus 8 demandes par
    semaine : le coût reste de l'ordre du centime, et le choix porte sur la justesse des résumés. Mistral Small 3.2
    par défaut.
+8. **Le CEPD (A09)** n'a jamais répondu au bot depuis sa mise en service (46 échecs au 16 novembre 2026, erreur
+   503) : son site bloque les programmes. La CNIL relaie ses actualités (« Actualité du CEPD »). Avis : le retirer,
+   et compter sur le relais de la CNIL.
+9. **Les retraits de Gemini (F13)** mêlent aussi des modèles d'image et de son (20 lignes sur 93). Avis : les ajouter
+   à `PARLIA.RETRAITS_TEXTE`, comme ceux d'OpenAI et de Cloudflare.
+10. **Le plafond de 3 prépublications arXiv** a fait passer Zuse, gardé en séance, dans la réserve (rejeu de la
+    semaine 46). Avis : en exempter un article qui nomme un modèle suivi, plutôt que relever le plafond.
 
 ## Ce qui reste à faire
 
-- Réimporter le workflow avec les corrections du 15 et du 16 novembre 2026, après un essai en mode test.
 - Rejouer le jeu de contrôle du tri (étude, §5.5) à chaque changement de la consigne ou du modèle.
 - La revue des sources (règle 10) : la préparation en donne le bilan sur quatre semaines ; à Louis de décider, en
   séance, des sources à espacer ou à retirer.
@@ -423,4 +466,5 @@ normalisation, pages sans flux et API, Journal officiel, tri et registre, sélec
 originaux, préparation, notes de séance, envois Discord et #status, outils communs, et le workflow généré (à jour,
 connexions et ordre d'exécution, aucun secret ni chemin personnel, mode test). Les cas de la semaine 46 y sont
 repris : la ligne de tableau de la fiche 4, la date de la fiche 1, l'échéance repoussée de la fiche 3, une consigne
-qui ne dit jamais qu'un modèle est utilisé par ParlIA.
+qui ne dit jamais qu'un modèle est utilisé par ParlIA ; et ceux du 16 novembre : les hypothèses fautives du rejeu,
+la page Markdown de TypeSafe, la fiche d'un dépôt Hugging Face de Perplexity.

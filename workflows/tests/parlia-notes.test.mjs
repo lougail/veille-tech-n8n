@@ -213,3 +213,19 @@ test("sans lien, la dernière préparation du bot des sept jours d'avant ; intro
     { cle: '2026-S51', numero: 51, lundi: '2026-12-14', dimanche: '2026-12-20' });
   assert.deepEqual([tard.depuis, tard.seances, tard.nonComptees, tard.parSource], ['2026-11-16', [], [], {}]);
 });
+
+// La relecture du 16 novembre 2026 : « (fiches 6 à 8) » ne comptait que la fiche 6, et « (séance 02, candidat 1) »,
+// un point d'une autre séance, créditait la fiche 1 de cette préparation. Une date abrégée ou en chiffres n'est pas une
+// fiche : « 01/11/2026 » et « 1 nov. 2026 » créditaient la fiche 1.
+test("les fiches citées : « fiches 6 à 8 » compte les trois ; « séance 02, candidat 1 » renvoie à une autre séance", async () => {
+  const note03 = NOTE_03.replace('(fiche 9)', '(fiches 6 à 8)').replace('(fiche 7)', '(fiche 7 ; séance 02, candidat 1)')
+    .replace('(fiche 3)', '(fiche 3, 01/11/2026)').replace('(fiche 6)', '(fiche 6, 1 nov. 2026)');
+  const b = await bilan([note('2026-11-13-seance-03.md', note03)], [prep('2026-11-09-preparation.md', PREP_0911)]);
+  assert.deepEqual(b.parSource, {
+    'TypeSafe AI, blog': { proposes: 1, gardes: 0 },
+    'Cloudflare, journal de Workers AI': { proposes: 1, gardes: 1 },
+    'arXiv : modèles de décision et calibration': { proposes: 2, gardes: 2 },
+    'CNIL, actualités': { proposes: 1, gardes: 1 },
+    'arXiv : textes parlementaires ou administratifs': { proposes: 1, gardes: 0 },
+  });
+});

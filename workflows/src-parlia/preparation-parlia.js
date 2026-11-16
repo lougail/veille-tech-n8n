@@ -18,6 +18,8 @@
 // par la source, « date inconnue », avec le jour où le bot l'a vu (jamais ce jour à la place de la date).
 // L'original de chaque fiche (nœuds Originaux et Lire les résumés) : lu ou non, et pourquoi ; lu, le résumé, ce
 // qu'il faut chercher et l'hypothèse viennent de lui, sinon du tri, sur le titre et un extrait.
+// Une hypothèse écartée par le contrôle du bot (hypotheseFautive, outils.js) est remplacée par son motif : Louis la
+// formule en séance.
 const sd = $getWorkflowStaticData('global');
 const plan = $('Que faire ?').first().json;
 const reglages = plan.reglages || {};
@@ -49,15 +51,22 @@ const laSemaine = 'semaine ' + semaine.numero + ', ' + periode(semaine.lundi, se
 const nature = (c) => (PARLIA.NOM_NATURE[c.nature] || 'nature inconnue') + ', ' + (c.primaire ? 'source primaire' : 'source non primaire, à recouper');
 const listeNumeros = (ns) => (ns.length <= 1 ? 'la fiche ' + (ns[0] || '') : 'les fiches ' + ns.slice(0, -1).join(', ') + ' et ' + ns[ns.length - 1]);
 const plage = (ns) => (ns.length === 1 ? 'fiche ' + ns[0] : (ns[ns.length - 1] === ns[0] + 1 ? 'fiches ' + ns[0] + ' et ' + ns[1] : 'fiches ' + ns[0] + ' à ' + ns[ns.length - 1]));
-// « rien » : le tri ne voit pas de lien concret avec ParlIA. Un champ vide : il n'a pas proposé d'hypothèse.
+// « rien » : le bot ne voit pas de lien concret avec ParlIA. Un champ vide : il n'a pas proposé d'hypothèse.
 const hypothese = (c) => {
-  if (/^rien\.?$/i.test(String(c.hypothese || '').trim())) return "Rien pour ParlIA, d'après le tri : à confirmer ou à contredire en séance.";
+  if (c.hypotheseEcartee) return 'Hypothèse écartée par le contrôle du bot : ' + c.hypotheseEcartee + '. À formuler en séance.';
+  if (/^rien\.?$/i.test(String(c.hypothese || '').trim())) {
+    return 'Rien pour ParlIA, ' + (deLOriginal(c) ? "d'après l'original" : "d'après le tri") + ' : à confirmer ou à contredire en séance.';
+  }
   return c.hypothese || "Pas d'hypothèse du tri : à formuler en séance.";
 };
+const titreHypothese = (c) => (deLOriginal(c) ? "L'hypothèse, d'après l'original" : "L'hypothèse du tri");
 const quand = (c) => (c.date ? dateLongue(c.date) + (c.avantPeriode ? ', avant la période lue' : '')
   : 'date inconnue' + (c.vu ? ' (vu le ' + dateLongue(c.vu) + ')' : ''));
 const avecOriginaux = candidats.some((c) => c.original);
-const QUOI = { arxiv: "le résumé de l'étude sur arXiv, pas l'article entier", page: 'la partie de la page où se trouve le bloc', billet: 'le billet', article: "la page de l'article" };
+const QUOI = {
+  arxiv: "le résumé de l'étude sur arXiv, pas l'article entier", page: 'la partie de la page où se trouve le bloc', billet: 'le billet',
+  readme: 'la fiche du dépôt sur Hugging Face', article: "la page de l'article",
+};
 const milliers = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 function etatOriginal(c) {
   const o = c.original;
@@ -90,7 +99,9 @@ let sources = 'Du ' + instant(depuisDt) + ' au ' + instant($now) + ' : ' + (carn
   + ids.length + ' sources (' + nbFlux + ' flux, ' + nbAutres + (nbAutres > 1 ? ' pages sans flux ou API' : ' page sans flux ou API')
   + '), plus le Journal officiel, ' + jo + '. ';
 sources += enEchec.length ? 'En échec au moins une fois : ' + enEchec.join(' ; ') + '. ' : 'Toutes ont répondu à chaque collecte. ';
-sources += 'Éléments lus : ' + lus + ' ; triés par le modèle : ' + (st.lus || 0) + ', dont ' + (st.horsTheme || 0) + ' hors thème'
+// Les flux redonnent à chaque collecte leurs derniers articles : seuls les nouveaux partent au tri.
+sources += 'Reçus des sources : ' + milliers(lus) + ' éléments, déjà vus compris ; nouveaux, triés par le modèle : ' + (st.lus || 0)
+  + ', dont ' + (st.horsTheme || 0) + ' hors thème'
   + (st.secours ? ' et ' + st.secours + ' au tri de secours' : '') + ' ; notés 6 ou plus : ' + (st.notes6 || 0)
   + ' ; proposés : ' + total + (sel.reserve && sel.reserve.length ? ', et ' + sel.reserve.length + ' en réserve' : '') + '.';
 if (sansCandidat.length) sources += ' Sans candidat cette semaine : ' + sansCandidat.slice(0, 25).join(', ') + (sansCandidat.length > 25 ? '…' : '') + '.';
@@ -252,7 +263,7 @@ if (total) {
     if (c.horsThemeOriginal) L.push("- D'après l'original, aucun lien concret avec ParlIA : à écarter, sauf avis contraire en séance.");
     L.push("- Qu'est-ce qui sort ?");
     L.push('- Est-ce que ça pourrait servir à ParlIA ?');
-    L.push("- L'hypothèse du tri : " + hypothese(c));
+    L.push('- ' + titreHypothese(c) + ' : ' + hypothese(c));
     L.push('- Lien : ' + c.url);
     L.push('- Pourquoi cette fiche : ' + (c.raison || 'sélection') + (c.aussi && c.aussi.length ? '. Couvert aussi par : ' + c.aussi.map((a) => a.s + ' (' + a.u + ')').join(', ') : '') + '.');
   }
@@ -346,7 +357,7 @@ function carte(c) {
   comps.push({ type: 10, content: '**En deux lignes** : ' + md(tronquer(c.resume || "pas de résumé : lire l'original.", 400))
     + (c.ecart ? "\n**Ce que l'original contredit dans le tri** : " + md(tronquer(c.ecart, 300)) : '')
     + "\n**À chercher dans l'original** : " + md(tronquer(c.aChercher || 'la date, les chiffres et ce qui change concrètement.', 400)) });
-  comps.push({ type: 10, content: "**Deux questions** : qu'est-ce qui sort ? Est-ce que ça pourrait servir à ParlIA ?\n**L'hypothèse du tri** : "
+  comps.push({ type: 10, content: "**Deux questions** : qu'est-ce qui sort ? Est-ce que ça pourrait servir à ParlIA ?\n**" + titreHypothese(c) + '** : '
     + md(tronquer(hypothese(c), 400)) });
   const notes = [];
   if (c.original) notes.push(c.original.sansObjet ? 'original sans objet' : deLOriginal(c) ? "résumé d'après l'original" : 'original non résumé : ' + (c.original.echec || c.original.motif));

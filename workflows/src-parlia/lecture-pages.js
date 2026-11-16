@@ -9,6 +9,14 @@ function texteDe(corps) {
   if (corps.type === 'Buffer' && Array.isArray(corps.data)) return new TextDecoder('utf-8').decode(Uint8Array.from(corps.data));
   return JSON.stringify(corps);
 }
+// Une réponse en HTML ? Un site de documentation peut répondre en Markdown à l'en-tête Accept de n8n
+// (« application/json, text/plain, */* ») : Mintlify, pour la page des modèles de TypeSafe (16 novembre 2026). Lue
+// comme du HTML, elle tenait sur une seule ligne. Une page HTML commence par une balise, ou en contient une <html>
+// ou <body> ; une réponse sans elles est lue comme du Markdown (lignesDuMarkdown).
+function estHtml(corps) {
+  const t = String(corps == null ? '' : corps);
+  return /^\s*</.test(t) || /<(?:html|body)\b/i.test(t);
+}
 // ---- Pages : le texte visible, en lignes ; « §T » marque un intertitre, « §L » une rangée de tableau ----
 // Le format des lignes : quand il change, chaque page est réapprise une fois, sans rien proposer (comparer).
 // 2 (15 novembre 2026) : une rangée de tableau en une seule ligne, avec les en-têtes des colonnes.

@@ -64,10 +64,10 @@ OUTILS = (SRC / "outils.js").read_text(encoding="utf-8")
 OUTILS_NOMS = (
     "PARLIA", "texteSimple", "tronquer", "hacher", "domaineDe", "cleAdresse", "cellule", "pourDiscord",
     "MOIS_FR", "dateLongue", "MOIS_EN", "datesDansTexte", "dateDansTexte", "noterSante", "pousserAlerte",
-    "ligneHorsTexte", "deRetraitsTexte",
+    "nomsSuivisDans", "ligneHorsTexte", "lignesHorsTexte", "deRetraitsTexte", "hypotheseFautive",
 )
 LECTURE = (SRC / "lecture-pages.js").read_text(encoding="utf-8")
-LECTURE_NOMS = ("texteDe", "lignesDe", "lignesDuMarkdown", "texteDuBloc", "sansMarque", "estRangee", "FORMAT_PAGES")
+LECTURE_NOMS = ("texteDe", "estHtml", "lignesDe", "lignesDuMarkdown", "texteDuBloc", "sansMarque", "estRangee", "FORMAT_PAGES")
 MODULES = ("outils.js", "lecture-pages.js")
 
 

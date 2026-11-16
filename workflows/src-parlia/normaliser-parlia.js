@@ -18,6 +18,8 @@
 //   pour plafonner une « annonce » publiée ailleurs.
 // - Les communiqués de l'Élysée ne sont jamais triés : un titre sur la nomination ou la composition du
 //   Gouvernement devient une alerte (sources.md, 6.3, le secours du Journal officiel).
+// - Un billet de retraits de Cloudflare (PARLIA.RETRAITS_TEXTE) dont le titre ne nomme que des modèles d'image, de
+//   son, de vidéo ou de plongements n'est pas trié : il ne donnerait ni fiche ni échéance dans le thème.
 // Sortie : un élément par article à trier, ou { _rien: true } pour que la suite de la branche s'exécute.
 const sd = $getWorkflowStaticData('global');
 const maintenant = $now.toMillis();
@@ -97,6 +99,7 @@ for (const item of $input.all()) {
     continue;
   }
   if (src.filtre && !new RegExp(src.filtre, 'i').test(titre + ' ' + extrait)) { stats.ecartes++; continue; }
+  if (deRetraitsTexte(src.id, titre, src.s) && ligneHorsTexte(titre)) { stats.ecartes++; continue; }
   if (sd.vus[cle] && !maj) { stats.dejaVus++; continue; }
   sd.vus[cle] = maintenant;
   stats.nouveaux++;

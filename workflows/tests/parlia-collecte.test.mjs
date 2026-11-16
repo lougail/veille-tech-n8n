@@ -58,6 +58,19 @@ test("un billet de retraits de Cloudflare : l'extrait ne garde que les modèles 
   assert.equal(autre.content, '<p>@cf/google/embeddinggemma-2 is now available.</p>');
 });
 
+// La relecture du 16 novembre 2026 : un billet de retraits de Cloudflare qui ne nomme que des modèles de son ou d'image
+// partait au tri, et pouvait y gagner une échéance.
+test("un billet de retraits de Cloudflare dont le titre ne nomme que des modèles de son ou d'image n'est pas trié", async () => {
+  const x01 = src('X01', { s: 'Cloudflare, journal de Workers AI', decision: true });
+  const sd = {};
+  const sortie = await normaliser([
+    article('Workers AI - Deprecating @cf/myshell-ai/melotts and @cf/deepgram/aura-1', 'https://developers.cloudflare.com/changelog/post/melotts/', 1, x01),
+    article('Workers AI - Planned model deprecations on Workers AI', 'https://developers.cloudflare.com/changelog/post/planned/', 1, x01),
+  ], sd);
+  assert.deepEqual(sortie.map((a) => a.titre), ['Workers AI - Planned model deprecations on Workers AI']);
+  assert.equal(sd._passage.collecteStats.ecartes, 1);
+});
+
 test('la fenêtre part de la dernière collecte, 48 heures au moins, 14 jours au plus, 7 jours la première fois', async () => {
   const s = src('A04');
   const items = [1, 3, 6, 9, 20].map((j) => article('Article de il y a ' + j + ' jours', 'https://anthropic.com/a' + j, j, s));

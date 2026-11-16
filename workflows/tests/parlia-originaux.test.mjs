@@ -129,6 +129,37 @@ test("le catalogue d'OpenRouter : pas d'original à lire, aucune demande au rés
   assert.equal(appels.length, 0);
 });
 
+// Les deux dépôts Hugging Face de Perplexity de l'essai du 16 novembre 2026 : la page du dépôt n'a pas de texte lisible
+// pour un programme ; sa fiche (README.md), si. Extrait de la vraie fiche, avec son en-tête YAML.
+test("un dépôt Hugging Face : sa fiche (README) est lue, sans l'en-tête ; sans fiche, la page du dépôt, comme avant", async () => {
+  const depot = 'https://huggingface.co/perplexity-ai/pplx-decider-v1.3';
+  const fiche = '---\nlicense: apache-2.0\nbase_model: Qwen/Qwen3.8-27B\npipeline_tag: text-classification\ntags:\n  - classification\n---\n\n# pplx-decider-v1.3\n\n'
+    + 'pplx-decider-v1.3 is the next version of [pplx-decider-v1.2](https://huggingface.co/perplexity-ai/pplx-decider-v1.2), a multimodal classification model on Qwen3.8-27B.\n'
+    + 'It comes with improved performance and robustness across decision tasks, and a new extraction capability.\n\n## Usage\n\n'
+    + 'Requirements: Python 3.12+ and a CUDA GPU with room for about 49 GiB of BF16 weights plus working memory.\n';
+  const { demandes, lectures } = await lire([
+    cand(3, { sid: 'X10', kind: 'api', url: depot, titre: 'Hugging Face : nouveau dépôt de perplexity-ai, pplx-decider-v1.3' }),
+    cand(4, { sid: 'X10', kind: 'api', url: 'https://huggingface.co/perplexity-ai/sans-fiche', titre: 'Hugging Face : nouveau dépôt de perplexity-ai, sans-fiche' }),
+  ], {
+    [depot + '/raw/main/README.md']: { statusCode: 200, body: fiche },
+    'https://huggingface.co/perplexity-ai/sans-fiche': { statusCode: 200, body: '<html><body><main><div id="app"></div></main></body></html>' },
+  });
+  assert.deepEqual([lectures[0].lu, lectures[0].comment, lectures[0].adresse], [true, 'readme', depot + '/raw/main/README.md']);
+  assert.match(demandes[0].prompt, /LE TEXTE DE L'ORIGINAL \(la fiche du dépôt sur Hugging Face, \d+ caractères\)/);
+  assert.match(demandes[0].prompt, /## pplx-decider-v1\.3\npplx-decider-v1\.3 is the next version of pplx-decider-v1\.2, a multimodal classification model/);
+  assert.doesNotMatch(demandes[0].prompt, /license: apache-2\.0|base_model/);
+  assert.deepEqual([lectures[1].lu, lectures[1].motif], [false, 'la page est sans texte lisible (construite dans le navigateur ?)']);
+});
+
+test("la page des modèles de TypeSafe : sa version Markdown est lue, et la rangée retenue retrouvée avec ses en-têtes", async () => {
+  const md = "# Models\n\nJev is TypeSafe's flagship model. Every model on this page is served by the same endpoint.\n\n## Current models\n\n"
+    + '| | Jev 1.15 | Jev 1.14 |\n| :- | :- | :- |\n| Model ID | \x60jev-1.15.0\x60 | \x60jev-1.14.0\x60 |\n| Context length | 128k per-request | 64k per-request |\n';
+  const { demandes, lectures } = await lire([cand(2, { sid: 'Y02', kind: 'page', url: 'https://docs.typesafe.ai/models',
+    titre: 'TypeSafe AI, page des modèles — Model ID · Jev 1.15 : jev-1.15.0 · Jev 1.14 : jev-1.14.0' })], { 'https://docs.typesafe.ai/models.md': { statusCode: 200, body: md } });
+  assert.deepEqual([lectures[0].lu, lectures[0].comment], [true, 'page']);
+  assert.match(demandes[0].prompt, /## Current models\n\[ligne retenue\] - Model ID · Jev 1\.15 : jev-1\.15\.0 · Jev 1\.14 : jev-1\.14\.0\n- Context length · Jev 1\.15 : 128k per-request/);
+});
+
 // ---- Les résumés ----
 const reponse = (o) => ({ text: '\x60\x60\x60json\n' + JSON.stringify(Object.assign({ resume: 'Résumé de l\'original.', a_chercher: 'rien', hypothese: 'rien', hors_theme: false, date_publication: null, date_effet: null, ecart: 'rien' }, o)) + '\n\x60\x60\x60' });
 async function resumer(candidats, lectures, reponses, sd = {}, echeances = []) {
@@ -185,8 +216,29 @@ test("aucun original lu : la demande vide ne change aucune fiche", async () => {
   assert.deepEqual([s.candidats[0].resume, s.candidats[0].original.lu, s.originaux.nonLus], ['Résumé du tri 1', false, [1]]);
 });
 
+// Fiche 3 du rejeu de la semaine 46 (16 novembre 2026) : le résumé du billet de Cloudflare prêtait un retrait à Clef,
+// que le billet ne nomme pas. Une hypothèse juste remplace celle que le contrôle du tri avait écartée.
+test("l'hypothèse tirée de l'original est contrôlée contre le texte de l'original : écartée, la fiche dit pourquoi", async () => {
+  const billet = 'Starting November 20, 2026, these models will stop returning responses.\n## LLMs\n@cf/meta/llama-3.2-1b-instruct\n@cf/qwen/qwq-32b';
+  const sel = { semaine: { cle: '2026-S46' }, jourDebut: '2026-11-04', echeances: [], reserve: [], candidats: [
+    cand(3, { sid: 'X01', titre: 'Workers AI - Planned model deprecations on Workers AI' }),
+    cand(5, { hypothese: '', hypotheseEcartee: "elle dit « utilisés par ParlIA », alors qu'aucun service n'est utilisé ni choisi" }),
+  ] };
+  const demandes = [{ n: 3, prompt: "LE TEXTE DE L'ORIGINAL (la page de l'article)\n<<<\n" + billet + '\n>>>\n\nÉcris…', lectures: [lu(3), lu(5)] },
+    { n: 5, prompt: '<<<\nLa CNIL publie sa recommandation sur les outils de rejeu de session.\n>>>' }];
+  const [s] = await executer('resumes-parlia.js', { input: [
+    reponse({ hypothese: 'Si Clef ou Clef-flash de Cloudflare figuraient dans le comparatif, leur retrait prévu le 20 novembre 2026 pourrait nécessiter leur remplacement.' }),
+    reponse({ hypothese: "Cette recommandation pourrait s'appliquer à ParlIA si l'étiquetage enregistrait des sessions." }),
+  ], maintenant: MAINTENANT, sorties: { 'Que faire ?': [plan()], 'Sélection': [sel], 'Originaux': demandes } });
+  const [f3, f5] = s.candidats;
+  assert.deepEqual([f3.hypothese, f3.hypotheseEcartee], ['', "elle prête un retrait à Clef, que l'article ne nomme pas"]);
+  assert.equal(f3.tri.hypothese, 'Hypothèse du tri 3');
+  assert.deepEqual([f5.hypothese, f5.hypotheseEcartee], ["Cette recommandation pourrait s'appliquer à ParlIA si l'étiquetage enregistrait des sessions.", '']);
+  assert.deepEqual(s.originaux.ecartees, [3]);
+});
+
 test("#status : le nombre d'originaux lus et résumés, et les fiches sans original", async () => {
-  const sd = { _passage: { preparation: { fichier: 'f.md', candidats: 10, reserve: 2 }, originaux: { total: 10, lus: 9, resumes: 8, sansObjet: 0, echecs: [4], nonLus: [9] } } };
+  const sd = { _passage: { preparation: { fichier: 'f.md', candidats: 10, reserve: 2 }, originaux: { total: 10, lus: 9, resumes: 8, sansObjet: 0, echecs: [4], nonLus: [9], ecartees: [3] } } };
   const [s] = await executer('statut-parlia.js', { sd, maintenant: MAINTENANT, sorties: { 'Que faire ?': [plan()] } });
-  assert.match(s.payload.content, /📖 Originaux : 8\/10 lus et résumés · non lus : fiche\(s\) 9 · ⚠️ résumé échoué : fiche\(s\) 4/);
+  assert.match(s.payload.content, /📖 Originaux : 8\/10 lus et résumés · non lus : fiche\(s\) 9 · ⚠️ résumé échoué : fiche\(s\) 4 · hypothèse écartée : fiche\(s\) 3/);
 });

@@ -133,6 +133,43 @@ const trie = (id, tri, extra = {}) => Object.assign(art(id, extra), { tri: Objec
   date_effet: null, secours: '', plafonds: [],
 }, tri) });
 
+// Le rejeu de la semaine 46 avec la consigne du 16 novembre 2026 : 2 hypothèses sur 71 disaient encore « les services
+// d'OpenAI utilisés par ParlIA » (fiche 2), une prêtait un retrait à Clef (fiche 3). Le contrôle les écarte, la
+// troisième reste ; le registre garde le motif pour la fiche, et le compte pour #status.
+test("une hypothèse qui dit ParlIA équipé d'un service, ou qui prête un retrait à un modèle absent de l'article, est écartée", async () => {
+  const f2 = art('f2', { titre: 'OpenAI, retraits de modèles — Shutdown date : Feb 1, 2027 · Affected model : gpt-5.5-cyber-preview',
+    extrait: 'Shutdown date : Feb 1, 2027 · Affected model : gpt-5.5-cyber-preview · Recommended replacement : The most capable cyber model available to you.' });
+  const f3 = art('f3', { titre: 'Workers AI - Planned model deprecations on Workers AI',
+    extrait: 'Starting November 20, 2026, these models will stop returning responses. · LLMs · @cf/meta/llama-3.2-1b-instruct · @cf/qwen/qwq-32b' });
+  const f7 = art('f7', { titre: 'Zuse: A Decision Model for European Languages' });
+  const reponse = { articles: [
+    avis('f2', { hypothese: "Le retrait de gpt-5.5-cyber-preview au 1er février 2027 pourrait impacter les services d'OpenAI utilisés par ParlIA si un modèle suivi est concerné." }),
+    avis('f3', { hypothese: 'Si Clef ou Clef-flash de Cloudflare entraient au comparatif, leur retrait prévu le 15 novembre 2026 obligerait à les remplacer.' }),
+    avis('f7', { hypothese: 'Si Zuse entrait au comparatif, sa calibration pourrait servir au seuil de la validation humaine.' }),
+  ] };
+  const tries = await lire([{ _articles: [f2, f3, f7], _version: 'v' }], [{ text: JSON.stringify(reponse) }]);
+  assert.deepEqual(tries.map((a) => [a.tri.hypothese, a.tri.hypothese_ecartee]), [
+    ['', "elle dit « utilisés par ParlIA », alors qu'aucun service n'est utilisé ni choisi"],
+    ['', "elle prête un retrait à Clef, que l'article ne nomme pas"],
+    ['Si Zuse entrait au comparatif, sa calibration pourrait servir au seuil de la validation humaine.', ''],
+  ]);
+  const sd = {};
+  await executer('registre-parlia.js', { sd, maintenant: MAINTENANT, input: tries });
+  assert.deepEqual(sd.registre.map((a) => a.he), [tries[0].tri.hypothese_ecartee, tries[1].tri.hypothese_ecartee, undefined]);
+  assert.equal(sd._passage.tri.hypothesesEcartees, 2);
+});
+
+// La relecture du 16 novembre 2026 : « Retiring gpt-4o-mini-tts » faisait sonner l'alerte d'un modèle suivi.
+test("le retrait de gpt-4o-mini-tts, un modèle de voix, ne sonne pas comme celui de gpt-4o-mini ; une version datée, si", async () => {
+  const sd = {};
+  const retrait = { retrait_modele: true, changement_prix: false, nouveau_modele_decision: false, echeance_reglementaire: false };
+  await executer('registre-parlia.js', { sd, maintenant: MAINTENANT, input: [
+    trie('voix', { drapeaux: retrait, date_effet: '2027-01-06' }, { titre: 'Retiring gpt-4o-mini-tts', extrait: 'Affected model : gpt-4o-mini-tts' }),
+    trie('date', { drapeaux: retrait, date_effet: '2027-01-14' }, { titre: 'Retiring gpt-4o-mini-2024-07-18' }),
+  ] });
+  assert.deepEqual(sd._alertes.map((a) => a.id), ['date']);
+});
+
 test('le registre garde 16 jours, compte les hors thème, et sonne pour un retrait de modèle suivi à moins de 90 jours', async () => {
   // Une échéance relevée par l'ancien tri (sans identifiant) est oubliée ; une échéance passée depuis plus de
   // 14 jours aussi ; une échéance passée depuis moins de 14 jours reste, pour qu'un report de dernière minute se voie.
@@ -150,7 +187,7 @@ test('le registre garde 16 jours, compte les hors thème, et sonne pour un retra
   ] });
   assert.deepEqual(sd.registre.map((a) => a.id), ['recent', 'suivi', 'loin', 'autre', 'ht']);
   assert.deepEqual(sd._alertes.map((a) => [a.type, a.id, a.date]), [['retrait', 'suivi', '2027-01-14']]);
-  assert.deepEqual(sd._passage.tri, { nouveaux: 4, secours: 0, horsTheme: 1, parAxe: { fournisseurs: 3, hors_theme: 1 }, majEcheances: 0 });
+  assert.deepEqual(sd._passage.tri, { nouveaux: 4, secours: 0, horsTheme: 1, parAxe: { fournisseurs: 3, hors_theme: 1 }, majEcheances: 0, hypothesesEcartees: 0 });
   // Les échéances sont gardées à part, jusqu'à leur date.
   assert.deepEqual(sd.echeances.map((e) => e.date), ['2026-10-25', '2026-12-01', '2027-01-14', '2027-06-01']);
   assert.ok(!sd.echeances.some((e) => /sunburst/.test(e.titre)));

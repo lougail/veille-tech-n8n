@@ -11,12 +11,15 @@
 //   en-têtes, le tri avait pris le 6 novembre 2026 les remplaçants pour les modèles arrêtés (fiche 4, semaine 46).
 //   La date de publication d'un bloc est sa première date déjà passée : une date à venir est une date d'effet.
 //   Sur la page des retraits d'OpenAI (PARLIA.RETRAITS_TEXTE), une ligne qui ne nomme que des modèles d'image, de
-//   son, de vidéo, de plongements ou de modération n'entre dans aucun bloc (16 novembre 2026).
+//   son, de vidéo, de plongements ou de modération n'entre dans aucun bloc, ni la section entière d'un intertitre
+//   qui ne nomme qu'eux (16 novembre 2026).
+//   Une page servie en Markdown est lue comme telle (markdown, ou une réponse sans HTML : estHtml).
 // - Le catalogue d'OpenRouter (A02) : les nouveaux modèles des fournisseurs suivis ; pour la liste de suivi
 //   (sources.md, 4.4), un changement de prix, une date de retrait annoncée, une disparition. Ces deux drapeaux
 //   sont calculés par le programme (_verifie) : le tri ne peut pas les oublier.
 // - La fiche data.gouv.fr des questions du Sénat (A11) : sa date de modification et la liste de ses fichiers.
-//   Les fichiers sont republiés chaque nuit : leurs dates ne comptent pas, seuls leurs noms et formats.
+//   Les fichiers sont republiés chaque nuit : leurs dates ne comptent pas, seuls leurs noms et formats. Elle a
+//   parfois mis plus de 20 secondes à répondre (essai du 16 novembre 2026) : elle en a 45.
 // - Les comptes Hugging Face de Cloudflare et de Perplexity (Y01, X10) : les nouveaux dépôts, sans les dérivés.
 // Chaque source donne un élément { _sante } que lit normaliser-parlia.js (trois échecs de suite : une alerte).
 const sd = $getWorkflowStaticData('global');
@@ -37,7 +40,9 @@ const PAGES = [
   { id: 'F12', s: "Google, journal de l'API Gemini", u: 'https://aistudio.google.com/docs/changelog.md', voir: 'https://aistudio.google.com/docs/changelog?hl=en', axe: 'fournisseurs', nature: 'editeur', anglais: true, markdown: true },
   { id: 'F13', s: 'Google, retraits de modèles Gemini', u: 'https://aistudio.google.com/docs/deprecations.md', voir: 'https://aistudio.google.com/docs/deprecations?hl=en', axe: 'fournisseurs', nature: 'editeur', anglais: true, markdown: true },
   { id: 'D02', s: 'TypeSafe AI, blog', u: 'https://typesafe.ai/blog', axe: 'fournisseurs', nature: 'editeur', decision: true },
-  { id: 'Y02', s: 'TypeSafe AI, page des modèles', u: 'https://docs.typesafe.ai/models', axe: 'fournisseurs', nature: 'editeur', decision: true },
+  // La documentation de TypeSafe (Mintlify) donne chaque page en Markdown (models.md) : un tableau par colonne de
+  // modèles, « Model ID · Jev 1.14 : jev-1.14.0 · Jev 1.13 : jev-1.13.0 ». Le lien montré reste la page lisible.
+  { id: 'Y02', s: 'TypeSafe AI, page des modèles', u: 'https://docs.typesafe.ai/models.md', voir: 'https://docs.typesafe.ai/models', axe: 'fournisseurs', nature: 'editeur', decision: true, markdown: true },
   { id: 'D04', s: 'Liquid AI, actualités des modèles', u: 'https://www.liquid.ai/news/models', axe: 'fournisseurs', nature: 'editeur', decision: true },
   { id: 'C11', s: "Service d'assistance du règlement IA, ressources", u: 'https://ai-act-service-desk.ec.europa.eu/fr/resources', axe: 'conformite', nature: 'institution' },
   { id: 'C12', s: "Commission européenne, Bureau de l'IA", u: 'https://digital-strategy.ec.europa.eu/en/policies/ai-office', axe: 'conformite', nature: 'institution' },
@@ -58,9 +63,9 @@ const source = (c, kind) => ({
   primaire: c.primaire !== false, filtre: '', cnil: false, decision: !!c.decision, arxiv: false, role: 'tri', kind,
 });
 const jsonDe = (corps) => (typeof corps === 'object' && corps && corps.type !== 'Buffer' && !(corps instanceof Uint8Array) ? corps : JSON.parse(texteDe(corps)));
-async function lire(url, anglais) {
+async function lire(url, anglais, delai = 20000) {
   const r = await http.httpRequest({
-    url, method: 'GET', timeout: 20000, returnFullResponse: true, ignoreHttpStatusErrors: true,
+    url, method: 'GET', timeout: delai, returnFullResponse: true, ignoreHttpStatusErrors: true,
     headers: Object.assign({ 'User-Agent': PARLIA.UA }, anglais ? { 'Accept-Language': 'en' } : {}),
   });
   const code = Number(r && r.statusCode || 0);
@@ -100,8 +105,9 @@ function dateDuBloc(texte, avant) {
   return '';
 }
 // Compare la page à la veille. etat : { h : empreintes des 400 premières lignes, n : nombre de lignes, v : format }.
-// ignorer : les lignes qui n'entrent dans aucun bloc ; elles restent dans l'empreinte de la page.
-function comparer(lignes, etat, ignorer) {
+// ignorees : les lignes qui n'entrent dans aucun bloc (un booléen par ligne) ; elles restent dans l'empreinte de la
+// page. Un intertitre ignoré ferme le bloc en cours : sa section ne prolonge pas celle d'avant.
+function comparer(lignes, etat, ignorees) {
   const tete = lignes.slice(0, 400);
   const empreintes = tete.map((l) => hacher(l));
   const nouveau = { h: empreintes.join(','), n: lignes.length, v: FORMAT_PAGES };
@@ -119,7 +125,14 @@ function comparer(lignes, etat, ignorer) {
   let attente = [];
   let dernierTitre = '';
   tete.forEach((l, i) => {
-    if (ignorer && ignorer(l)) return;
+    if (ignorees && ignorees[i]) {
+      if (courant && l.startsWith('§T ')) {
+        blocs.push(courant);
+        courant = null;
+        attente = [];
+      }
+      return;
+    }
     const titre = l.startsWith('§T ') ? l.slice(3) : '';
     const texte = titre || l;
     if (neuves[i]) {
@@ -144,9 +157,9 @@ function comparer(lignes, etat, ignorer) {
 }
 async function page(p) {
   const corps = texteDe(await lire(p.u, p.anglais));
-  const lignes = p.markdown ? lignesDuMarkdown(corps) : lignesDe(corps);
+  const lignes = p.markdown || !estHtml(corps) ? lignesDuMarkdown(corps) : lignesDe(corps);
   if (!sd.pages) sd.pages = {};
-  const r = comparer(lignes, sd.pages[p.id], deRetraitsTexte(p.id, '', p.s) ? ligneHorsTexte : null);
+  const r = comparer(lignes, sd.pages[p.id], deRetraitsTexte(p.id, '', p.s) ? lignesHorsTexte(lignes) : null);
   if (r.erreur) throw new Error(r.erreur);
   sd.pages[p.id] = r.nouveau;
   // Les échéances relevées sur cette page : si plus aucune de leurs lignes n'y figure, la source les a changées ou
@@ -246,7 +259,7 @@ async function openrouter() {
 
 // ---- data.gouv.fr ----
 async function datagouv() {
-  const d = jsonDe(await lire(DATAGOUV.u));
+  const d = jsonDe(await lire(DATAGOUV.u, false, 45000));
   if (!d || !Array.isArray(d.resources)) throw new Error('fiche illisible');
   const fichiers = d.resources.map((x) => tronquer(texteSimple(x.title || x.id), 80) + ' (' + (x.format || '?') + ')').sort();
   const lm = String(d.last_modified || '').slice(0, 10);

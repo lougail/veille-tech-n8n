@@ -10,7 +10,7 @@ const PAGES = [
   'https://developers.openai.com/api/docs/changelog', 'https://developers.openai.com/api/docs/deprecations',
   'https://platform.claude.com/docs/en/about-claude/model-deprecations', 'https://docs.mistral.ai/resources/changelogs',
   'https://aistudio.google.com/docs/changelog.md', 'https://aistudio.google.com/docs/deprecations.md',
-  'https://typesafe.ai/blog', 'https://docs.typesafe.ai/models', 'https://www.liquid.ai/news/models',
+  'https://typesafe.ai/blog', 'https://docs.typesafe.ai/models.md', 'https://www.liquid.ai/news/models',
   'https://ai-act-service-desk.ec.europa.eu/fr/resources', 'https://digital-strategy.ec.europa.eu/en/policies/ai-office',
   'https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N53140',
 ];
@@ -295,4 +295,47 @@ test("une échéance relevée sur une page : quand ses lignes disparaissent de l
   assert.equal(sd.echeances[0].changee, undefined); // les lignes sont toujours là
   await passer(sd, table({ [PAGES[1]]: { statusCode: 200, body: retraitsTexte('<code>gpt-6.1-terra</code>') } }));
   assert.equal(sd.echeances[0].changee, '2026-11-02');
+});
+
+// La relecture du 16 novembre 2026 : une section dont l'intertitre ne nomme que des modèles d'image était sautée, mais sa
+// phrase d'avis, qui ne nomme aucun modèle, restait, et faisait un article avec la section suivante.
+test("les retraits d'OpenAI : la section entière d'un intertitre d'image est écartée ; celle d'un modèle de texte fait un article", async () => {
+  const section = (titre, phrase) => '<h2>' + titre + '</h2><p>' + phrase + '</p>';
+  const sd = {};
+  await passer(sd, table({ [PAGES[1]]: { statusCode: 200, body: retraitsTexte('<code>gpt-6-luna</code>') } }));
+  const nouvelles = section('2026-11-10: gpt-image-2 and dall-e-3', 'On November 10, 2026, we notified developers using these models of their deprecation and removal from the API.')
+    + section('2026-11-12: gpt-4.1-nano', 'On November 12, 2026, we notified developers using gpt-4.1-nano of its deprecation and removal from the API on May 12, 2027.');
+  const corps = retraitsTexte('<code>gpt-6-luna</code>').replace('<h2>Upcoming deprecations</h2>', nouvelles + '<h2>Upcoming deprecations</h2>');
+  const { articles } = await passer(sd, table({ [PAGES[1]]: { statusCode: 200, body: corps } }));
+  assert.equal(articles.length, 1);
+  assert.match(articles[0].title, /gpt-4\.1-nano/);
+  assert.doesNotMatch(articles[0].title + articles[0].contentSnippet, /gpt-image|these models/);
+});
+
+// La page des modèles de TypeSafe (Y02) : sa documentation (Mintlify) répond en Markdown. Lue comme du HTML depuis le
+// 15 novembre 2026, elle tenait sur une seule ligne : « page presque vide (1 lignes) » (essai du 16 novembre 2026).
+// Extrait de la vraie page : un tableau par colonne de modèles, des « $ » échappés.
+const modelesTypeSafe = (colonnes) => '> ## Documentation Index\n> Fetch the complete documentation index at: https://docs.typesafe.ai/llms.txt\n\n# Models\n\n'
+  + "Jev is TypeSafe's flagship model and the first [System One model](https://docs.typesafe.ai/concepts/system-one.md). Every model on this page is served by the same endpoint.\n\n"
+  + '## Current models\n\n| | ' + colonnes.map((c) => c[0]).join(' | ') + ' |\n| :- |' + colonnes.map(() => ' :- |').join('') + '\n'
+  + '| Model ID | ' + colonnes.map((c) => '\x60' + c[1] + '\x60').join(' | ') + ' |\n'
+  + '| Price (per Btok / per Mtok) | ' + colonnes.map(() => '\\$42 / \\$0.042').join(' | ') + ' |\n'
+  + '| Context length | ' + colonnes.map(() => '64k per-request / 32k per-question').join(' | ') + ' |\n\n'
+  + BASE_MD.map(([d, t]) => '## ' + d + '\n\n- ' + t + '\n').join('\n');
+test("la page des modèles de TypeSafe, en Markdown : une colonne de modèle ajoutée fait un article, avec les en-têtes", async () => {
+  const U = 'https://docs.typesafe.ai/models.md';
+  const sd = {};
+  const un = await passer(sd, table({ [U]: { statusCode: 200, body: modelesTypeSafe([['Jev 1.14', 'jev-1.14.0'], ['Jev 1.13', 'jev-1.13.0']]) } }));
+  assert.equal(un.sante.find((s) => s._sante.id === 'Y02')._sante.ok, true);
+  const deux = await passer(sd, table({ [U]: { statusCode: 200, body: modelesTypeSafe([['Jev 1.15', 'jev-1.15.0'], ['Jev 1.14', 'jev-1.14.0'], ['Jev 1.13', 'jev-1.13.0']]) } }));
+  assert.equal(deux.articles.length, 1);
+  assert.equal(deux.articles[0].link, 'https://docs.typesafe.ai/models');
+  assert.match(deux.articles[0].contentSnippet, /Model ID · Jev 1\.15 : jev-1\.15\.0 · Jev 1\.14 : jev-1\.14\.0 · Jev 1\.13 : jev-1\.13\.0/);
+});
+
+test("une page servie en Markdown sans qu'on l'attende est lue comme du Markdown, pas comme une seule ligne", async () => {
+  const sd = {};
+  const { sante } = await passer(sd, table({ 'https://docs.mistral.ai/resources/changelogs': { statusCode: 200, body: pageMd(BASE_MD) } }));
+  assert.equal(sante.find((s) => s._sante.id === 'F09')._sante.ok, true);
+  assert.ok(sd.pages.F09.n >= 24, String(sd.pages.F09.n));
 });

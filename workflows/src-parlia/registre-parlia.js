@@ -2,6 +2,7 @@
 // Chaque article y reste 16 jours (la sélection remonte au plus 14 jours), sous une forme courte ; 400 au plus.
 // Les articles « hors thème » y sont comptés mais jamais proposés (critère C6.5) : ils n'y gardent pas leurs
 // textes longs. La mémoire d'un workflow n8n doit rester petite.
+// Une hypothèse écartée par le contrôle du tri (lire-tri-parlia.js) y garde son motif (he), pour la fiche.
 // Alerte immédiate (sources.md, 6.2, règle 9) : le retrait d'un modèle suivi, annoncé à moins de 90 jours,
 // qu'il soit calculé par le programme (catalogue d'OpenRouter) ou repéré par le tri dans un texte qui nomme
 // un modèle suivi.
@@ -30,6 +31,7 @@ let secours = 0;
 let horsTheme = 0;
 let nouveaux = 0;
 let majEcheances = 0;
+let hypothesesEcartees = 0;
 for (const item of $input.all()) {
   const a = item.json || {};
   if (!a.id || !a.tri) continue;
@@ -50,19 +52,23 @@ for (const item of $input.all()) {
   nouveaux++;
   if (t.secours) secours++;
   if (t.axe === 'hors_theme') horsTheme++;
+  else if (t.hypothese_ecartee) hypothesesEcartees++;
   parAxe[t.axe] = (parAxe[t.axe] || 0) + 1;
   const sansTextes = t.axe === 'hors_theme';
   const ancien = registre.findIndex((x) => x.id === a.id);
   if (ancien >= 0) registre.splice(ancien, 1);
-  registre.push({
+  const entree = {
     id: a.id, t: a.titre, u: a.url, s: a.source.s, sid: a.source.id, axe: t.axe, p: t.pertinence,
     pr: !!t.source_primaire, na: t.nature, r: sansTextes ? '' : t.resume, c: sansTextes ? '' : t.a_chercher,
     h: sansTextes ? '' : t.hypothese, f: t.drapeaux, de: t.date_effet, d: String(a.date || '').slice(0, 10), vu: maintenant,
     ax: !!a.source.arxiv, cn: !!a.source.cnil, dc: !!a.source.decision, sec: t.secours || '',
     v: a.verifie ? 1 : 0, pl: (t.plafonds || []).join(', '), da: a.maj ? a.maj.date : '', k: a.source.kind || '',
-  });
+  };
+  if (!sansTextes && t.hypothese_ecartee) entree.he = t.hypothese_ecartee;
+  registre.push(entree);
   const retrait = t.drapeaux && t.drapeaux.retrait_modele && t.date_effet && t.date_effet >= aujourdhui && t.date_effet <= dans90;
-  const suivi = a.verifie || PARLIA.NOMS_SUIVIS.test(a.titre + ' ' + (a.extrait || ''));
+  // gpt-4o-mini-tts, un modèle de voix, n'est pas gpt-4o-mini (nomsSuivisDans, outils.js).
+  const suivi = a.verifie || nomsSuivisDans(a.titre + ' ' + (a.extrait || '')).size > 0;
   if (retrait && suivi) {
     pousserAlerte(sd, { type: 'retrait', id: a.id, titre: a.titre, url: a.url, origine: a.source.s, date: t.date_effet, cle: hacher('retrait|' + a.id + '|' + t.date_effet) });
   }
@@ -77,5 +83,5 @@ for (const item of $input.all()) {
 }
 sd.registre = registre.slice(-400);
 sd.echeances = echeances.filter((e) => e.id).sort((x, y) => x.date.localeCompare(y.date)).slice(0, 40);
-sd._passage = Object.assign(sd._passage || {}, { tri: { nouveaux, secours, horsTheme, parAxe, majEcheances } });
+sd._passage = Object.assign(sd._passage || {}, { tri: { nouveaux, secours, horsTheme, parAxe, majEcheances, hypothesesEcartees } });
 return [{ json: { registre: sd.registre.length, nouveaux } }];

@@ -8,6 +8,9 @@
 // - une date d'effet autre que celle de l'échéance relevée : l'échéance la prend, et garde l'ancienne ;
 // - aucun lien concret avec ParlIA : la fiche le dit, et son hypothèse devient « rien » ;
 // - ce que l'original contredit dans la proposition du tri (ecart).
+// L'hypothèse tirée de l'original est contrôlée comme celle du tri (hypotheseFautive, outils.js), contre le titre et
+// le texte de l'original : écartée, la fiche dit pourquoi (hypotheseEcartee) et Louis la formule en séance. Le
+// 16 novembre 2026, le résumé d'un billet de Cloudflare prêtait un retrait à Clef, que le billet ne nomme pas.
 // La sortie a la forme de celle de la sélection : la préparation la lit telle quelle.
 const sd = $getWorkflowStaticData('global');
 const plan = $('Que faire ?').first().json;
@@ -38,9 +41,16 @@ function lireJson(texte) {
   }
 }
 const reponseDe = {};
-demandes.forEach((d, i) => { if (d.n != null && !d.vide) reponseDe[d.n] = reponses[i] || {}; });
+// Le texte de l'original, dans la demande, entre « <<< » et « >>> ».
+const texteLu = {};
+demandes.forEach((d, i) => {
+  if (d.n == null || d.vide) return;
+  reponseDe[d.n] = reponses[i] || {};
+  const p = String(d.prompt || '');
+  texteLu[d.n] = p.slice(p.indexOf('<<<') + 3, Math.max(p.indexOf('<<<') + 3, p.lastIndexOf('>>>')));
+});
 const echeances = (sel.echeances || []).map((e) => Object.assign({}, e));
-const bilan = { total: 0, lus: 0, sansObjet: 0, resumes: 0, echecs: [], nonLus: [] };
+const bilan = { total: 0, lus: 0, sansObjet: 0, resumes: 0, echecs: [], nonLus: [], ecartees: [] };
 
 const candidats = (sel.candidats || []).map((avant) => {
   const c = Object.assign({}, avant);
@@ -74,12 +84,17 @@ const candidats = (sel.candidats || []).map((avant) => {
     c.tri = { resume: c.resume, aChercher: c.aChercher, hypothese: c.hypothese };
     c.resume = resume;
     c.aChercher = rien(r.a_chercher) ? '' : texteCourt(r.a_chercher, 320);
-    c.hypothese = texteCourt(r.hypothese, 320) || 'rien';
+    const hypothese = texteCourt(r.hypothese, 320) || 'rien';
+    const ecartee = rien(hypothese) ? '' : hypotheseFautive(hypothese, c.titre + ' ' + (texteLu[c.n] || ''));
+    c.hypothese = ecartee ? '' : hypothese;
+    c.hypotheseEcartee = ecartee;
     c.original.resume = 'original';
     if (r.hors_theme === true) {
       c.horsThemeOriginal = true;
       c.hypothese = 'rien';
+      c.hypotheseEcartee = '';
     }
+    if (c.hypotheseEcartee) bilan.ecartees.push(c.n);
     const ecart = texteCourt(r.ecart, 320);
     if (ecart && !rien(ecart)) c.ecart = ecart;
   }

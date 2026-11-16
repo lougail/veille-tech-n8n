@@ -66,7 +66,8 @@ test('les sources interrogées et ce qui n\'a pas pu être vérifié', async () 
   const md = s.markdown;
   assert.match(md, /Du lundi 26 octobre 2026 à 9 h 05 au lundi 2 novembre 2026 à 9 h 15 : 9 collecte\(s\), 3 sources \(2 flux, 1 page sans flux ou API\), plus le Journal officiel, lu sans problème\./);
   assert.match(md, /En échec au moins une fois : CNIL, actualités \(2 fois sur 9 ; dernier motif : code 503\)/);
-  assert.match(md, /triés par le modèle : 40, dont 12 hors thème et 1 au tri de secours ; notés 6 ou plus : 3 ; proposés : 4, et 1 en réserve\./);
+  // Les flux redonnent leurs derniers articles à chaque collecte : les éléments reçus ne sont pas des articles lus.
+  assert.match(md, /Reçus des sources : 16 éléments, déjà vus compris ; nouveaux, triés par le modèle : 40, dont 12 hors thème et 1 au tri de secours ; notés 6 ou plus : 3 ; proposés : 4, et 1 en réserve\./);
   assert.match(md, /- CNIL, actualités : 1 échec\(s\) de suite à la dernière lecture \(code 503\)\./);
   assert.match(md, /- Fiche 2 : source non primaire ; l'original reste à trouver\./);
   assert.match(md, /- Fiche 3 : le tri automatique n'a pas répondu \(réponse illisible\)/);
@@ -261,7 +262,8 @@ test("les originaux : lus ou non, et pourquoi, fiche par fiche ; ce que l'origin
     candidats: [
       cand(1, 'fournisseurs', { original: { lu: true, comment: 'billet', taille: 12166, resume: 'original' }, resume: "Un billet d'opinion.",
         ecart: "Aucun nouveau modèle de décision : un billet d'opinion." }),
-      cand(2, 'fournisseurs', { original: { lu: false, motif: 'Légifrance refuse les programmes (erreur 403)', resume: 'tri' } }),
+      cand(2, 'fournisseurs', { original: { lu: false, motif: 'Légifrance refuse les programmes (erreur 403)', resume: 'tri' },
+        hypothese: '', hypotheseEcartee: "elle prête un retrait à Clef, que l'article ne nomme pas" }),
       cand(3, 'qualite', { original: { lu: true, comment: 'page', taille: 2439, retrouvePar: 'gpt-5.5-cyber', resume: 'original' }, horsThemeOriginal: true, hypothese: 'rien' }),
       cand(4, 'conformite', { original: { sansObjet: true, motif: "la fiche vient du catalogue d'OpenRouter, relevé par le programme", resume: 'tri' } }),
     ],
@@ -278,6 +280,10 @@ test("les originaux : lus ou non, et pourquoi, fiche par fiche ; ce que l'origin
   assert.match(fiche(2), /- L'original : non lu : Légifrance refuse les programmes \(erreur 403\) ; le résumé vient du tri, sur le titre et un extrait\.\n- En deux lignes \(résumé du tri, sur un extrait ; à vérifier dans l'original\) : Résumé 2\./);
   assert.match(fiche(3), /partie retrouvée par « gpt-5\.5-cyber »/);
   assert.match(fiche(3), /- D'après l'original, aucun lien concret avec ParlIA : à écarter, sauf avis contraire en séance\./);
+  // L'hypothèse dit d'où elle vient ; écartée par le contrôle, la fiche dit pourquoi.
+  assert.match(fiche(1), /- L'hypothèse, d'après l'original : Hypothèse 1\n/);
+  assert.match(fiche(2), /- L'hypothèse du tri : Hypothèse écartée par le contrôle du bot : elle prête un retrait à Clef, que l'article ne nomme pas\. À formuler en séance\./);
+  assert.match(fiche(3), /- L'hypothèse, d'après l'original : Rien pour ParlIA, d'après l'original : à confirmer ou à contredire en séance\./);
   assert.match(fiche(4), /- L'original : sans objet : la fiche vient du catalogue d'OpenRouter, relevé par le programme\./);
   const carte = JSON.stringify(s.discord.fiches[0].payload.components);
   assert.match(carte, /Ce que l'original contredit dans le tri/);

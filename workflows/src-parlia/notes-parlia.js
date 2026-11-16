@@ -28,9 +28,23 @@ const simple = (s) => String(s == null ? '' : s).normalize('NFD').replace(/[\u03
 const A_REMPLIR = /\[\s*(a remplir|a completer|en cours)/;
 const cellules = (ligne) => ligne.trim().replace(/^\|/, '').replace(/\|$/, '').split(/(?<!\\)\|/).map((c) => c.trim());
 const estSeparateur = (ligne) => /^\|?[\s:|-]+\|?$/.test(ligne.trim()) && ligne.includes('-');
-// Les fiches qu'un point retenu cite : « fiche 9 », « candidat n° 2 », « fiches 2 et 4 » ; pas la date qui suit
-// (« candidat 1, 29 octobre 2026 »).
-const CITES = /\b(?:candidats?|fiches?)\s*(?:n°\s*)?(\d+)((?:\s*(?:,|et)\s*\d+(?!\d)(?!\s*(?:er\s+)?(?:janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)))*)/gi;
+// Les fiches qu'un point retenu cite : « fiche 9 », « candidat n° 2 », « fiches 2 et 4 », « fiches 1 à 3 » ; pas la
+// date qui suit (« candidat 1, 29 octobre 2026 », « fiche 9, 4 nov. 2026 », « fiche 9, 2026-11-04 » ou « 04/11/2026 »),
+// ni la fiche d'une autre séance (« séance 02, candidat 10 »).
+const CITES = /\b(?:candidats?|fiches?)\s*(?:n°\s*)?(\d{1,2})(?!\d)((?:\s*(?:,|et|à)\s*\d{1,2}(?![\d-]|[/.]\d)(?!\s*(?:er\s+)?(?:janv|févr|fevr|mars|avr|mai(?!s)|juin|juil|août|aout|sept|oct|nov|déc|dec)))*)/gi;
+function fichesCitees(parenthese) {
+  const res = [];
+  const deCetteSemaine = String(parenthese).replace(/\bs[ée]ance\s*(?:n°\s*)?\d+[^;)]*/gi, ' ');
+  for (const ref of deCetteSemaine.matchAll(CITES)) {
+    for (const morceau of (ref[1] + ref[2]).split(/\s*(?:,|et)\s*/)) {
+      const plage = /^(\d+)\s*(?:à|-)\s*(\d+)$/.exec(morceau.trim());
+      const [de, a] = plage ? [Number(plage[1]), Number(plage[2])] : [0, 0];
+      if (plage && a > de && a - de <= 30) for (let k = de; k <= a; k++) res.push(k);
+      else for (const k of morceau.match(/\d+/g) || []) res.push(Number(k));
+    }
+  }
+  return res;
+}
 
 // Les sections de niveau 2 (« ## … ») : { titre simplifié, lignes }.
 function sections(texte) {
@@ -76,7 +90,7 @@ function lireNote(texte, fichier) {
     const gras = /\*\*(.+?)\*\*/.exec(m[2]);
     retenus[m[1]] = tronquer(texteSimple(gras ? gras[1] : m[2].split(/(?<=\.)\s/)[0]).replace(/\*/g, ''), 160);
     const parenthese = (/\*\*[^*]+\*\*\s*\(([^)]*)\)/.exec(m[2]) || /\(([^)]*)\)/.exec(m[2]) || [])[1] || '';
-    for (const ref of parenthese.matchAll(CITES)) for (const k of (ref[1] + ref[2]).match(/\d+/g)) fiches.add(Number(k));
+    for (const k of fichesCitees(parenthese)) fiches.add(k);
   }
   const aSurveiller = [];
   for (const c of lignesDuTableau(section(parties, 'ce que ca change'))) {

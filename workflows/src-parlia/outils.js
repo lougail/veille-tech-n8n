@@ -126,16 +126,35 @@ function dateDansTexte(texte) {
 // OpenAI gpt-image-1-mini, chatgpt-image-latest, dall-e-3, tts-1, whisper-1, gpt-realtime, gpt-4o-mini-transcribe,
 // sora-2, text-embedding-3-small, omni-moderation ; chez Cloudflare melotts, stable-diffusion, dreamshaper, flux,
 // llava, embeddinggemma, deepgram/aura, deepgram/nova.
-const MODELES_HORS_TEXTE = /image|dall-?e|flux|stable-diffusion|sdxl|dreamshaper|inpaint|tts|whisper|transcri|audio|realtime|speech|voice|sora|video|embedding|similarity|search-(ada|babbage|curie|davinci)|rerank|moderation|llama-guard|llava|resnet|detr|uform|deepgram\/|^aura\b|^nova-\d/i;
+// « tts » et « voice » ne comptent pas au milieu d'un mot : ni mattshumer, ni invoice.
+const MODELES_HORS_TEXTE = /image|dall-?e|flux|stable-diffusion|sdxl|dreamshaper|inpaint|(?<![a-z])tts|tts(?![a-z])|whisper|transcri|audio|realtime|speech|(?<![a-z])voice|sora|video|embedding|similarity|search-(ada|babbage|curie|davinci)|rerank|moderation|llama-guard|llava|resnet|detr|uform|deepgram\/|^aura\b|^nova-\d/i;
 // Un modèle de texte se reconnaît à sa famille : gpt-6-luna, o3, claude-haiku-5.5, llama-3.2-1b-instruct, qwq-32b…
 const MODELES_TEXTE = /^(gpt-|o\d|chatgpt-|codex|babbage-002|davinci-002|claude|llama|meta-llama|mistral|mixtral|ministral|magistral|codestral|devstral|qwen|qwq|gemma|gemini|deepseek|phi-\d|hermes|openhermes|falcon|tinyllama|openchat|zephyr|starling|sqlcoder|discolm|granite|kimi|glm|nemotron|jev|kev|clef|zuse|decider)/i;
+// Les modèles suivis qu'un texte nomme (PARLIA.NOMS_SUIVIS) : une table clé → graphie du texte. La clé est commune aux
+// graphies (« gpt-6-luna », « GPT‑6 Luna » : « gpt 6 luna »). Un nom prolongé en modèle d'image, de son ou de
+// plongements n'en est pas un : gpt-4o-mini-tts, un modèle de voix, n'est pas gpt-4o-mini ; jev-1.14.0 est bien Jev.
+function nomsSuivisDans(texte) {
+  const t = String(texte || '').replace(/[\u2010-\u2015]/g, '-');
+  const noms = new Map();
+  for (const m of t.matchAll(new RegExp(PARLIA.NOMS_SUIVIS.source, 'gi'))) {
+    const suite = /^[\w@./:-]*/.exec(t.slice(m.index + m[0].length))[0];
+    if (suite && MODELES_HORS_TEXTE.test(m[0] + suite)) continue;
+    const cle = m[0].toLowerCase().replace(/[\s-]+/g, ' ');
+    if (!noms.has(cle)) noms.set(cle, m[0]);
+  }
+  return noms;
+}
 // Une ligne qui nomme au moins un modèle d'image, de son, de vidéo, de plongements ou de modération, et aucun modèle
 // de texte : « Affected model : gpt-image-1-mini · Recommended replacement : gpt-image-2.6-sunburst », ou
-// « @cf/myshell-ai/melotts → @cf/deepgram/aura-2-en ». Une ligne qui ne nomme aucun modèle est gardée.
+// « @cf/myshell-ai/melotts → @cf/deepgram/aura-2-en ». Une ligne qui ne nomme aucun modèle est gardée, et une ligne
+// qui nomme un modèle suivi l'est toujours (« Decisions API realtime… »). Les traits d'union typographiques
+// (« GPT‑6 Luna », U+2011) sont lus comme des traits d'union.
 function ligneHorsTexte(ligne) {
+  const t = String(ligne || '').replace(/[\u2010-\u2015]/g, '-');
+  if (nomsSuivisDans(t).size) return false;
   let texte = 0;
   let autre = 0;
-  for (const jeton of String(ligne || '').match(/[@\w][\w@./:-]*/g) || []) {
+  for (const jeton of t.match(/[@\w][\w@./:-]*/g) || []) {
     const nom = jeton.toLowerCase().replace(/[.:-]+$/, '');
     const dernier = nom.split('/').pop();
     if (MODELES_HORS_TEXTE.test(nom) || MODELES_HORS_TEXTE.test(dernier)) autre++;
@@ -143,10 +162,85 @@ function ligneHorsTexte(ligne) {
   }
   return autre > 0 && texte === 0;
 }
+// Les lignes d'une page de retraits à écarter (un tableau de booléens) : celles de ligneHorsTexte, et toute la
+// section d'un intertitre écarté, jusqu'à l'intertitre suivant. Sinon, ses lignes qui ne nomment aucun modèle
+// (« Shutdown date : … ») restaient rattachées à l'intertitre d'avant.
+function lignesHorsTexte(lignes) {
+  let section = false;
+  return lignes.map((l) => {
+    if (String(l).startsWith('§T ')) section = ligneHorsTexte(l);
+    return section || ligneHorsTexte(l);
+  });
+}
 // Un article d'une source de PARLIA.RETRAITS_TEXTE qui porte sur des retraits : toute la page des retraits d'OpenAI ;
 // dans le journal de Workers AI, les seuls billets de retraits (« Planned model deprecations »).
 function deRetraitsTexte(sid, titre, source) {
   return PARLIA.RETRAITS_TEXTE.includes(sid) && /deprecat|retir|retrait|sunset|shut ?down/i.test(String(titre || '') + ' ' + String(source || ''));
+}
+// ---- Le contrôle des hypothèses (sources.md, 5.3) ----
+// Une hypothèse, du tri ou du résumé de l'original, est écartée, et la fiche dit pourquoi, quand :
+// - elle affirme qu'un service du marché est utilisé, choisi ou retenu par ParlIA ou par Louis : aucun ne l'est.
+//   « les services d'OpenAI utilisés par ParlIA », « les modèles de décision utilisés par ParlIA » (rejeu de la
+//   semaine 46 et essai du 16 novembre 2026), « le choix de ParlIA pour Jev » (préparation de la semaine 46). Restent
+//   une supposition ou une négation (« pourrait être utilisé par ParlIA », « si ParlIA utilise », « aucun service
+//   n'est utilisé par ParlIA ») et ce qui est vrai : ParlIA utilise son propre modèle, celui que Louis entraîne, et
+//   les données du Sénat ;
+// - elle prête un retrait à un modèle suivi que l'article ne nomme pas : « Si Clef ou Clef-flash de Cloudflare
+//   entraient au comparatif, leur retrait prévu… », pour un billet de Cloudflare qui ne cite pas Clef. Un modèle cité
+//   en exemple ou en comparaison reste (« une alternative aux modèles de décision suivis, Jev, d1 »), comme une
+//   négation (« Clef n'est pas concerné par ce retrait »).
+// texte : le titre et l'extrait de l'article (tri), ou le titre et le texte de l'original (résumé). Renvoie le motif,
+// ou une chaîne vide.
+// Un service du marché : des services, une API, un fournisseur, des modèles, un modèle de langage, de décision ou
+// d'un éditeur, un modèle suivi. « Le modèle utilisé par ParlIA », au singulier, est celui de Louis.
+const SERVICE_DU_MARCHE = new RegExp("(?<!\\p{L})(?:services?|api|fournisseurs?|modèles(?!\\p{L})|modèle\\s+(?:de\\s+langage|de\\s+décision|commercial|du\\s+marché|d'openai|d'anthropic|de\\s+mistral|de\\s+google))|"
+  + PARLIA.NOMS_SUIVIS.source, 'iu');
+const DONNEES_PUBLIQUES = /sénat|senat|journal officiel|données|data\.gouv/i;
+const SUPPOSITION_OU_NEGATION = /^(être|serait|seraient|était|étaient|soit|soient|sera|seront|ne|n'est|n'a|n'ont|n'était|n'étaient|pas|plus|jamais|ni|non|aucun|aucune)$/;
+const CONDITION = /(?<!\p{L})(?:si|s'ils?)(?!\p{L})/u;
+const RETRAIT = /retrait|retir|arrêt|arrete|deprecat|déprécié|fin de vie|supprim/i;
+const PAS_CONCERNE = /(?:n'est|ne sont|ne serait|ne seraient)\s+pas\s+(?:concerné|visé|touché|affecté|retiré)|(?:ne\s+(?:l(?:e|a|es)\s+)?|n')(?:concerne|vise|touche|affecte)\w*\s+(?:pas|ni|aucun)|aucune?\s[^.;:]*?(?:n'est|ne sont)\s+(?:concerné|visé|touché|affecté)|non\s+concerné/i;
+// La Decisions API d'OpenAI repose sur GPT-6 Luna : nommer l'une, c'est nommer l'autre.
+const LUNA = ['decisions api', 'gpt 6 luna'];
+function hypotheseFautive(hypothese, texte) {
+  const h = String(hypothese || '').replace(/[\u2018\u2019]/g, "'").replace(/[\u2010-\u2015]/g, '-');
+  const bas = h.toLowerCase();
+  const usage = (debut, fin) => 'elle dit « ' + h.slice(debut, fin) + " », alors qu'aucun service n'est utilisé ni choisi";
+  // La proposition qui précède une position (80 caractères au plus), et les cinq mots qui la suivent. Le point d'un
+  // nombre (« Mistral Small 3.2 ») ne termine pas la proposition.
+  const FIN = /[;:!?,]|\.(?=\s|$)/;
+  const avant = (i) => bas.slice(Math.max(0, i - 80), i).split(FIN).pop();
+  const apres = (i) => bas.slice(i, i + 60).split(FIN)[0].trim().split(/\s+/).slice(0, 5).join(' ');
+  // « les services d'OpenAI utilisés par ParlIA ».
+  for (const m of bas.matchAll(/(?<!\p{L})(?:utilisé|choisi|retenu|comparé|testé|employé|adopté)(?:e|s|es)?\s+par\s+(?:parlia|louis)(?!\p{L})/gu)) {
+    const sujet = avant(m.index);
+    if (SERVICE_DU_MARCHE.test(sujet) && !DONNEES_PUBLIQUES.test(sujet) && !CONDITION.test(sujet)
+      && !sujet.trim().split(/\s+/).slice(-3).some((w) => SUPPOSITION_OU_NEGATION.test(w))) {
+      return usage(m.index, m.index + m[0].length);
+    }
+  }
+  // « ParlIA utilise déjà la Decisions API », « la Decisions API que ParlIA utilise ».
+  for (const m of bas.matchAll(/(?<!\p{L})(?:parlia|louis)\s+(?:utilise|utilisent|emploie|a choisi|a retenu|a adopté)(?!\p{L})/gu)) {
+    const fin = m.index + m[0].length;
+    const debut = avant(m.index);
+    const relative = /(?<!\p{L})qu(?:e\s+|')$/u.test(debut) && SERVICE_DU_MARCHE.test(debut);
+    if (relative || (SERVICE_DU_MARCHE.test(apres(fin)) && !CONDITION.test(debut))) return usage(m.index, fin);
+  }
+  // « le choix de ParlIA pour Jev » ; « le choix de ParlIA pour l'étiquetage, face à Jev » reste.
+  const nomQuiSuit = new RegExp("^(?:la\\s+|le\\s+|l')?" + PARLIA.NOMS_SUIVIS.source, 'i');
+  for (const m of bas.matchAll(/(?<!\p{L})choix\s+(?:de\s+|d')(?:parlia|louis)\s+(?:pour|de)\s+/gu)) {
+    const fin = m.index + m[0].length;
+    const nom = nomQuiSuit.exec(bas.slice(fin));
+    if (nom) return usage(m.index, fin + nom[0].length);
+  }
+  // Un retrait prêté à un modèle suivi que l'article ne nomme pas.
+  if (RETRAIT.test(h) && !PAS_CONCERNE.test(h)) {
+    const dansLArticle = nomsSuivisDans(texte);
+    const luna = [...dansLArticle.keys()].some((k) => LUNA.includes(k));
+    const absents = [...nomsSuivisDans(h)].filter(([cle]) => !dansLArticle.has(cle) && !(luna && LUNA.includes(cle))).map(([, nom]) => nom);
+    if (absents.length) return 'elle prête un retrait à ' + absents.join(' et ') + ", que l'article ne nomme pas";
+  }
+  return '';
 }
 // La santé d'une source : un échec de plus, ou un retour. Au troisième échec de suite, une seule alerte
 // (sd._passage.flux, lue par le message de #status) ; au retour, un message de retour.

@@ -7,10 +7,14 @@
 // - une page sans flux : la page, puis la partie où se trouve le bloc retenu (son intertitre, les rangées de tableau
 //   avec leurs en-têtes) ; pour une page qui liste des billets (blog, actualités), le billet lui-même, retrouvé par
 //   le lien qui porte son titre : le blog de TypeSafe ne date pas ses billets, le billet, si ;
+// - un dépôt Hugging Face (comptes de Cloudflare et de Perplexity) : sa fiche (README.md), sans son en-tête ; la page
+//   du dépôt n'a pas de texte lisible pour un programme (essai du 16 novembre 2026) ;
 // - les autres : la page de l'article, le texte de <article>, sinon de <main>.
+// Une page servie en Markdown est lue comme telle : la page des modèles de TypeSafe, et toute réponse sans HTML.
 // Le catalogue d'OpenRouter n'a pas d'original à lire : ses chiffres sont relevés par le programme.
 // Sur la page des retraits d'OpenAI et dans les billets de retraits de Cloudflare (PARLIA.RETRAITS_TEXTE), seules les
-// lignes des modèles de texte sont lues (16 novembre 2026).
+// lignes des modèles de texte sont lues, sans les sections dont l'intertitre ne nomme que d'autres modèles
+// (16 novembre 2026).
 // Un site qui refuse les programmes répond 403 (Légifrance, l'aide d'OpenAI, vérifié le 13 novembre 2026) : la
 // fiche dit pourquoi l'original n'a pas été lu, et garde le résumé du tri ; de même pour une page introuvable.
 // Sortie : une demande de résumé par original lu, pour la chaîne « Résumé des originaux », un appel après l'autre ;
@@ -27,7 +31,10 @@ const REFUS = [{ domaine: 'legifrance.gouv.fr', nom: 'Légifrance' }, { domaine:
 const MARKDOWN = {
   'https://aistudio.google.com/docs/changelog?hl=en': 'https://aistudio.google.com/docs/changelog.md',
   'https://aistudio.google.com/docs/deprecations?hl=en': 'https://aistudio.google.com/docs/deprecations.md',
+  'https://docs.typesafe.ai/models': 'https://docs.typesafe.ai/models.md',
 };
+// Un dépôt Hugging Face : huggingface.co/<compte>/<dépôt>, hors des pages du site (blog, documentation…).
+const DEPOT_HF = /^https?:\/\/huggingface\.co\/(?!(?:blog|docs|papers|spaces|datasets|models|api|organizations|collections)\/)([\w.-]+\/[\w.-]+)\/?$/i;
 // Les pages sans flux qui listent des billets ou des actualités : l'original est le billet.
 const LISTES = ['D02', 'D04', 'C11', 'C12'];
 // Les pages sans flux (collecte-pages-api.js) : pour un article trié avant le 15 novembre 2026, le registre ne
@@ -147,6 +154,15 @@ async function original(c) {
       return Object.assign(base, { lu: true, comment: 'arxiv', datePage: champ('published').slice(0, 10),
         texte: 'Titre : ' + champ('title') + '\nAuteurs : ' + auteurs + '\nRésumé : ' + champ('summary') });
     }
+    const depot = DEPOT_HF.exec(String(c.url || ''));
+    if (depot) {
+      // Sans fiche lisible (code autre que 200, fiche presque vide, pas de réponse), la page du dépôt est lue comme les
+      // autres.
+      const fiche = 'https://huggingface.co/' + depot[1] + '/raw/main/README.md';
+      const rf = await lire(fiche).catch(() => ({ code: 0, corps: '' }));
+      const texte = rf.code === 200 ? enTexte(lignesDuMarkdown(rf.corps.replace(/^\uFEFF?---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/, ''))) : '';
+      if (texte.length >= 200) return Object.assign(base, { lu: true, comment: 'readme', adresse: fiche, texte });
+    }
     const markdown = MARKDOWN[c.url];
     let r = await lire(markdown || c.url);
     if (r.code !== 200) return Object.assign(base, { motif: refus(c.url, r.code) });
@@ -155,13 +171,14 @@ async function original(c) {
       if (!lien) return Object.assign(base, { motif: "le billet n'a pas été retrouvé sur la page qui le liste" });
       r = await lire(lien);
       if (r.code !== 200) return Object.assign(base, { adresse: lien, motif: refus(lien, r.code) });
-      const lignesBillet = lignesDe(r.corps, { article: true });
+      const lignesBillet = estHtml(r.corps) ? lignesDe(r.corps, { article: true }) : lignesDuMarkdown(r.corps);
       const texte = enTexte(lignesBillet);
       return Object.assign(base, { lu: !!texte, comment: 'billet', adresse: lien, texte, motif: texte ? '' : 'le billet est sans texte lisible',
         datePage: dateDeLaPage(r.corps) || dateSousLeTitre(lignesBillet, titreDuBloc(c)) });
     }
-    const lues = markdown ? lignesDuMarkdown(r.corps) : lignesDe(r.corps, { article: kind !== 'page' });
-    const lignes = deRetraitsTexte(c.sid, c.titre, c.source) ? lues.filter((l) => !ligneHorsTexte(l)) : lues;
+    const lues = markdown || !estHtml(r.corps) ? lignesDuMarkdown(r.corps) : lignesDe(r.corps, { article: kind !== 'page' });
+    const horsTexte = deRetraitsTexte(c.sid, c.titre, c.source) ? lignesHorsTexte(lues) : null;
+    const lignes = horsTexte ? lues.filter((l, i) => !horsTexte[i]) : lues;
     if (kind === 'page') {
       const partie = partieDuBloc(lignes, titreDuBloc(c));
       if (!partie) return Object.assign(base, { motif: "le bloc retenu n'est plus sur la page" });
@@ -175,7 +192,10 @@ async function original(c) {
   }
 }
 
-const QUOI = { arxiv: "le résumé de l'étude sur arXiv", page: 'la partie de la page où se trouve le bloc retenu', billet: 'le billet', article: "la page de l'article" };
+const QUOI = {
+  arxiv: "le résumé de l'étude sur arXiv", page: 'la partie de la page où se trouve le bloc retenu', billet: 'le billet',
+  readme: 'la fiche du dépôt sur Hugging Face', article: "la page de l'article",
+};
 const DEMANDE = `Tu lis l'original d'un article retenu pour la séance de veille de Louis sur son projet ParlIA, et tu écris sa fiche. Louis lira ta fiche avant l'original : elle doit être exacte, et ne rien ajouter à l'original.
 
 L'ÉTAT DU PROJET

@@ -34,6 +34,7 @@ if (p.collecte) {
     const axes = PARLIA.AXES.filter((a) => t.parAxe && t.parAxe[a]).map((a) => a + ' ' + t.parAxe[a]).join(' · ');
     l += ' → 🏷️ ' + (t.nouveaux - (t.horsTheme || 0)) + ' dans le thème' + (axes ? ' (' + axes + ')' : '') + ', ' + (t.horsTheme || 0) + ' hors thème';
     if (t.secours) l += ' · ⚠️ ' + t.secours + ' au tri de secours';
+    if (t.hypothesesEcartees) l += ' · ' + t.hypothesesEcartees + ' hypothèse(s) écartée(s) par le contrôle';
   }
   lignes.push(l);
   const extras = [];
@@ -58,7 +59,8 @@ if (p.preparation) {
   if (p.originaux && p.originaux.total) {
     const o = p.originaux;
     lignes.push('📖 Originaux : ' + o.resumes + '/' + o.total + ' lus et résumés' + (o.nonLus.length ? ' · non lus : fiche(s) ' + o.nonLus.join(', ') : '')
-      + (o.echecs.length ? ' · ⚠️ résumé échoué : fiche(s) ' + o.echecs.join(', ') : ''));
+      + (o.echecs.length ? ' · ⚠️ résumé échoué : fiche(s) ' + o.echecs.join(', ') : '')
+      + (o.ecartees && o.ecartees.length ? ' · hypothèse écartée : fiche(s) ' + o.ecartees.join(', ') : ''));
   }
   const ecrit = sortieDe(() => $('Écrire le fichier'));
   if (ecrit && !ecrit.err.length) lignes.push('📄 ' + prep.fichier + ' écrit dans le dossier d\'export');
