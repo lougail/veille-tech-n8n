@@ -16,6 +16,10 @@
 //    (« Is Jev a Good Multilingual Judge? », « UltraBERT-JEV: … ») y compte, comme les autres.
 // 6. Un événement, une ligne : la source primaire en tête, « couvert aussi par » ensuite ; un article non primaire
 //    n'entre que si l'original manque, marqué « à recouper ».
+//    Deux sources d'un même éditeur (le blog de Google et le journal de l'API Gemini, ou le catalogue d'OpenRouter pour
+//    un modèle de Google), publiées à un jour près, qui nomment le même produit, sont un seul événement : la semaine 47
+//    avait proposé deux fois la Decisions API de Google (fiches 1 et 6). Deux versions différentes d'un même produit
+//    (« Gemini Omni 1.1 Flash », « Gemini Omni 1.2 Flash ») restent deux événements.
 // 8. Hors thème : jamais.
 // Les règles 1 et 2 passent avant les plafonds, jamais avant le maximum. La règle 7 (les points « à surveiller »
 // des séances précédentes, en tête et hors quota) ne passe pas par ici : la préparation les reprend des notes de
@@ -60,21 +64,72 @@ for (const a of fenetre) {
 }
 
 // ---- Un événement, une ligne ----
+const sansAccents = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 const VIDES = new Set(['dans', 'avec', 'pour', 'from', 'with', 'that', 'this', 'your', 'about', 'their', 'sont', 'nouveau',
-  'nouvelle', 'nouveaux', 'notes', 'version', 'release', 'model', 'models', 'modèle', 'modèles', 'what', 'have', 'will']);
-const mots = (t) => new Set(String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-  .split(/[^a-z0-9.]+/).filter((m) => m.length >= 4 && !VIDES.has(m)));
-// Deux articles de deux sources différentes parlent du même événement s'ils ont la même adresse, ou deux mots
-// longs en commun pour un quart de leurs mots : « OpenAI launches the Decisions API for classification » et
-// « Build more responsive apps with the Decisions API for classification ».
+  'nouvelle', 'nouveaux', 'notes', 'version', 'release', 'model', 'models', 'modele', 'modeles', 'what', 'have', 'will']);
+// Les mois et les années ne disent pas de quoi parle un texte : « November 11, 2026 », « le 11 novembre 2026 ».
+const MOIS_OU_ANNEE = /^((19|20)\d\d|january|february|march|april|june|july|august|september|october|november|december|janvier|fevrier|mars|avril|juin|juillet|aout|septembre|octobre|novembre|decembre)$/;
+const mots = (t) => new Set(sansAccents(t).split(/[^a-z0-9.]+/).map((m) => m.replace(/^\.+|\.+$/g, ''))
+  .filter((m) => m.length >= 4 && !VIDES.has(m) && !MOIS_OU_ANNEE.test(m)));
+// Le sujet d'un titre : sans le nom de sa source en tête (« Google, journal de l'API Gemini — … »), ni, au catalogue
+// d'OpenRouter, la formule du bot (« Nouveau modèle au catalogue d'OpenRouter : Google: Gemini 4 Carbon »).
+const sujet = (a) => {
+  let t = String(a.t || '');
+  if (a.s && t.startsWith(a.s + ' — ')) t = t.slice(a.s.length + 3);
+  return a.sid === 'A02' ? t.replace(/^[^:]*:\s+/, '') : t;
+};
+// Les numéros de version d'un titre (« 1.2 » dans « Gemini Omni 1.2 Flash ») ; une date (11.11.2026) n'en est pas un.
+const versions = (t) => new Set((sansAccents(t).match(/(?<![\d.])\d+(?:\.\d+)+/g) || []).filter((v) => !/\d{4}/.test(v)));
+const autresVersions = (a, b) => {
+  const A = versions(sujet(a));
+  const B = versions(sujet(b));
+  return A.size > 0 && B.size > 0 && ![...A].some((v) => B.has(v));
+};
+// L'éditeur d'un article : le nom de sa source avant la virgule (« Google, blog … »), ou, au catalogue d'OpenRouter
+// et sur Hugging Face, le compte qui publie le modèle (openrouter.ai/google/…, huggingface.co/perplexity-ai/…).
+const ALIAS_EDITEURS = { mistralai: 'mistral', liquidai: 'liquid', typesafeai: 'typesafe', perplexityai: 'perplexity' };
+const editeurDe = (a) => {
+  const compte = /^https?:\/\/(?:openrouter\.ai|huggingface\.co)\/(?!blog\/|papers\/|spaces\/|datasets\/|docs\/)([\w-]+)\/[\w.:-]+/i.exec(String(a.u || ''));
+  const nom = sansAccents(compte ? compte[1] : String(a.s || '').split(',')[0]).replace(/[^a-z0-9]/g, '');
+  return ALIAS_EDITEURS[nom] || nom;
+};
+// Les mots des annonces et des résumés du tri qui ne nomment aucun produit.
+const GENERIQUES = new Set(['available', 'availability', 'generally', 'developers', 'developer', 'introducing', 'introduces',
+  'launch', 'launches', 'launched', 'released', 'releases', 'releasing', 'support', 'supports', 'update', 'updates', 'updated',
+  'today', 'access', 'using', 'build', 'faster', 'better', 'latest', 'newest', 'feature', 'features', 'pricing', 'price',
+  'catalogue', 'changement', 'prix', 'suivi', 'retrait', 'annonce', 'annoncent', 'ajoute', 'depot', 'disponible', 'sortie',
+  'entree', 'jetons', 'million', 'pourrait', 'comparatif', 'parlia', 'louis', 'etiquetage', 'questions', 'ecrites', 'senat',
+  'developpeurs', 'nouvelles', 'offre', 'lance', 'publie', 'propose', 'permet', 'openrouter']);
+const jourPublie = (a) => a.d || jourDe(a.vu);
+const ecartJours = (x, y) => (x && y ? Math.abs(Date.parse(x + 'T12:00:00Z') - Date.parse(y + 'T12:00:00Z')) / J : Infinity);
+// Deux articles de deux sources différentes parlent du même événement s'ils ont la même adresse ; ou deux mots
+// longs en commun dans leurs titres, pour un quart de leurs mots : « OpenAI launches the Decisions API for
+// classification » et « Build more responsive apps with the Decisions API for classification » ; ou, de deux sources
+// d'un même éditeur, publiés à un jour près, deux mots en commun entre le titre de l'un et le titre ou le résumé de
+// l'autre, sans le nom de l'éditeur ni les mots des annonces (« Gemini Decisions API: Fast, calibrated multimodal
+// decisions » et « November 11, 2026 », résumé « Google annonce la sortie de la Decisions API et du modèle Gemini
+// Decision ») ; un même numéro de version compte pour un mot (« GPT-6.2 Astra »). Deux numéros de version
+// différents séparent deux articles, sauf à la même adresse.
 const proches = (a, b) => {
   if (a.sid === b.sid) return false;
   if (cleAdresse(a.u) && cleAdresse(a.u) === cleAdresse(b.u)) return true;
-  const A = mots(a.t);
-  const B = mots(b.t);
+  if (autresVersions(a, b)) return false;
+  const A = mots(sujet(a));
+  const B = mots(sujet(b));
   let communs = 0;
   for (const m of A) if (B.has(m)) communs++;
-  return communs >= 2 && communs / (A.size + B.size - communs) >= 0.25;
+  if (communs >= 2 && communs / (A.size + B.size - communs) >= 0.25) return true;
+  if (a.ax || b.ax || a.axe === 'hors_theme' || b.axe === 'hors_theme') return false;
+  const editeur = editeurDe(a);
+  if (!editeur || editeur !== editeurDe(b) || ecartJours(jourPublie(a), jourPublie(b)) > 1) return false;
+  const garder = (s) => new Set([...s].filter((m) => m !== editeur && !GENERIQUES.has(m)));
+  const TA = garder(A);
+  const TB = garder(B);
+  const WA = new Set([...TA, ...garder(mots(a.r))]);
+  const WB = new Set([...TB, ...garder(mots(b.r))]);
+  const partages = new Set([...TA].filter((m) => WB.has(m)).concat([...TB].filter((m) => WA.has(m))));
+  const memeVersion = [...versions(sujet(a))].some((v) => versions(sujet(b)).has(v));
+  return partages.size + (memeVersion ? 1 : 0) >= 2;
 };
 const ordre = (x, y) => (y.p - x.p) || ((y.pr ? 1 : 0) - (x.pr ? 1 : 0)) || ((y.v ? 1 : 0) - (x.v ? 1 : 0))
   || String(y.d || '').localeCompare(String(x.d || ''));
@@ -83,7 +138,8 @@ const PRESENTE_UN_SUIVI = new RegExp('^\\W*' + PARLIA.NOMS_SUIVIS.source + '(?:[
 // Un modèle suivi, pour la règle 2 : vérifié par le programme (catalogue d'OpenRouter), nommé dans le titre, ou, pour
 // un retrait, dans le résumé (« Planned model deprecations on Workers AI » ne dit pas lesquels). Un résumé qui cite
 // GPT-6 Luna pour comparer un prix ne fait pas d'un nouveau modèle un modèle suivi (Muse Ember, essai du 16 novembre
-// 2026).
+// 2026). Le drapeau et le nom viennent d'un même article de l'événement : la Decisions API de Google, couverte aussi
+// par le journal de l'API Gemini qui parlait de tarification, n'est pas le prix d'un modèle suivi.
 const nommeUnSuivi = (m) => !!m.v || nomsSuivisDans(m.t).size > 0 || (!!(m.f && m.f.retrait_modele) && nomsSuivisDans(m.r).size > 0);
 const evenements = [];
 for (const a of fenetre.slice().sort((x, y) => ((y.pr ? 1 : 0) - (x.pr ? 1 : 0)) || ordre(x, y))) {
@@ -96,7 +152,8 @@ const candidats = evenements.map((e) => {
   const p = Math.max(...e.membres.map((m) => (m.axe === 'hors_theme' ? 0 : m.p)));
   const f = {};
   for (const m of e.membres) for (const [k, v] of Object.entries(m.f || {})) if (v) f[k] = true;
-  const suivi = e.membres.some(nommeUnSuivi);
+  const touche = e.membres.find((m) => m.f && (m.f.retrait_modele || m.f.changement_prix) && nommeUnSuivi(m));
+  const suivi = touche ? (touche.f.retrait_modele ? 'retrait' : 'prix') : '';
   return {
     id: tete.id, titre: tete.t, url: tete.u, source: tete.s, sid: tete.sid, kind: tete.k || '', axe: tete.axe, p,
     primaire: !!tete.pr, nature: tete.na || 'inconnu', resume: tete.r || '', aChercher: tete.c || '', hypothese: tete.h || '',
@@ -138,7 +195,7 @@ if (cnil && !cnil.horsTheme && cnil.p >= 6) ajouter(cnil, 'la CNIL et le CEPD ce
 // Règle 2.
 for (const c of dansLeTheme) {
   const f = c.drapeaux;
-  if ((f.retrait_modele || f.changement_prix) && c.suivi) ajouter(c, f.retrait_modele ? "retrait d'un modèle suivi" : "prix d'un modèle suivi", true);
+  if (c.suivi) ajouter(c, c.suivi === 'retrait' ? "retrait d'un modèle suivi" : "prix d'un modèle suivi", true);
   else if (f.nouveau_modele_decision && c.primaire) ajouter(c, 'nouveau modèle de décision', true);
   else if (f.echeance_reglementaire && c.dateEffet && c.dateEffet >= aujourdhui && c.dateEffet <= FIN_FORMATION) ajouter(c, 'échéance réglementaire', true);
 }

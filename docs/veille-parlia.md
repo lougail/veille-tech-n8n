@@ -160,7 +160,14 @@ résumés d'arXiv étaient coupés au milieu, comme celui de la fiche 9 de la se
    nom d'un modèle suivi, suivi d'un deux-points, présente ce modèle lui-même (« Zuse: A Decision Model for European
    Languages ») et ne compte dans aucun de ces deux plafonds (16 novembre 2026 : au rejeu de la semaine 46, ils
    laissaient Zuse en réserve). Une étude sur un modèle suivi (« Is Jev a Good Multilingual Judge? ») y compte ;
-6. un événement, une ligne : la source primaire en tête, « couvert aussi par » ensuite ;
+6. un événement, une ligne : la source primaire en tête, « couvert aussi par » ensuite. Deux articles sont un même
+   événement s'ils ont la même adresse ou des titres proches ; ou, depuis le 18 novembre 2026, s'ils viennent de deux
+   sources d'un même éditeur (le blog de Google, le journal de l'API Gemini, le catalogue d'OpenRouter pour un
+   modèle de Google), publiés à un jour près, et nomment le même produit : deux mots du titre de l'un dans le titre
+   ou le résumé de l'autre, hors nom de l'éditeur et mots des annonces, un même numéro de version comptant pour un
+   mot. La semaine 47 avait proposé deux fois la Decisions API de Google (fiches 1 et 6). Deux numéros de version
+   différents (« Gemini Omni 1.1 Flash », « Gemini Omni 1.2 Flash ») restent deux événements. Le drapeau de prix ou
+   de retrait d'un événement ne compte pour la règle 2 que sur un article qui nomme lui-même le modèle suivi ;
 7. les points « à surveiller » de la dernière séance reviennent en tête, hors quota (lus dans les notes, voir plus
    bas) ;
 8. hors thème : jamais.

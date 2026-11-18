@@ -177,6 +177,64 @@ test("un événement, une ligne : la source primaire en tête, « couvert aussi 
   assert.equal(s.candidats.find((c) => c.sid === 'A14').aRecouper, true);
 });
 
+// Les articles de Google et du catalogue d'OpenRouter, tels que le registre les gardait (semaines 46 et 47). Les
+// intertitres du journal de l'API Gemini n'étaient alors qu'une date, suivie d'une balise Markdoc.
+const SOURCES_GOOGLE = { F15: 'Google, blog « Developer tools »', F12: "Google, journal de l'API Gemini", F13: 'Google, retraits de modèles Gemini' };
+const google = (sid, p, d, t, resume, extra = {}) => r('fournisseurs', p, Object.assign({ sid, s: SOURCES_GOOGLE[sid], d, r: resume,
+  t: sid === 'F15' ? t : SOURCES_GOOGLE[sid] + ' — ' + t,
+  u: sid === 'F15' ? 'https://blog.google/innovation-and-ai/technology/developers-tools/' + d + '/' : 'https://aistudio.google.com/docs/changelog?hl=en' }, extra));
+const auCatalogue = (fournisseur, nom, p, d, resume) => r('fournisseurs', p, { sid: 'A02', s: 'OpenRouter, catalogue des modèles', pr: false, na: 'agregateur', d,
+  t: "Nouveau modèle au catalogue d'OpenRouter : " + fournisseur + ': ' + nom, r: resume,
+  u: 'https://openrouter.ai/' + fournisseur.toLowerCase() + '/' + nom.toLowerCase().replace(/ /g, '-') });
+
+test("deux sources d'un même éditeur, à un jour près, sur le même produit : un seul événement (fiches 1 et 6 de la semaine 47)", async () => {
+  const blog = google('F15', 9, '2026-11-11', 'Gemini Decisions API: Fast, calibrated multimodal decisions',
+    'Google lance la Gemini Decisions API, basée sur le modèle Gemini Decision, pour des décisions rapides et calibrées (binaires, '
+    + 'catégorielles, rubriques) sur des données multimodales, sans génération de texte.', { f: { nouveau_modele_decision: true } });
+  const journal = google('F12', 6, '2026-11-11', 'November 11, 2026 {% id="11-11-2026" %}',
+    "Google annonce la sortie de la Decisions API et du modèle Gemini Decision (gemini-decision-1) le 11 novembre 2026, avec "
+    + "tarification et limites d'usage à consulter.", { pr: false, f: { changement_prix: true, nouveau_modele_decision: true } });
+  const s = await choisir([journal, blog]);
+  assert.equal(s.candidats.length, 1);
+  assert.deepEqual([s.candidats[0].sid, s.candidats[0].aussi], ['F15', [{ s: "Google, journal de l'API Gemini", u: journal.u }]]);
+  // Le drapeau de prix du journal et le nom « Decisions API » du blog ne font pas le prix d'un modèle suivi.
+  assert.equal(s.candidats[0].raison, 'nouveau modèle de décision');
+});
+
+test("Gemini 4 Carbon (10 novembre) : le blog, le journal de l'API et le catalogue d'OpenRouter ; GPT-6.2 Astra, par son numéro de version", async () => {
+  const s = await choisir([
+    google('F15', 5, '2026-11-10', 'Gemini 4 Carbon is now available for developers.',
+      'Google annonce la disponibilité de Gemini 4 Carbon, un modèle avancé optimisé pour la cybersécurité et les tâches à long terme.'),
+    google('F12', 6, '2026-11-10', 'November 10, 2026 {% id="11-10-2026" %}',
+      "Google a sorti Gemini 4 Carbon, un modèle pour le raisonnement complexe, à 2 $/M tokens en entrée et 10 $/M en sortie jusqu'au "
+      + '30 novembre 2026.', { pr: false }),
+    auCatalogue('Google', 'Gemini 4 Carbon', 6, '2026-11-10', 'OpenRouter a ajouté Gemini 4 Carbon à son catalogue, avec les mêmes prix que ceux annoncés par Google.'),
+    r('fournisseurs', 6, { sid: 'F01', s: "OpenAI, journal de l'API", d: '2026-11-17', u: 'https://developers.openai.com/api/docs/changelog',
+      t: "OpenAI, journal de l'API — Use GPT-6.2 Astra for demanding reasoning and coding tasks, or GPT-6.2 Sol for everyday work.",
+      r: 'OpenAI publie GPT-6.2 en deux tailles, Astra pour le raisonnement et Sol pour les tâches courantes.' }),
+    auCatalogue('OpenAI', 'GPT-6.2 Astra', 5, '2026-11-17', "OpenRouter ajoute GPT-6.2 Astra, un modèle flagship d'OpenAI, avec un prix de 8 $ en entrée."),
+  ]);
+  const lignes = s.candidats.map((c) => [c.sid, c.aussi.map((x) => x.s)]).sort();
+  assert.deepEqual(lignes, [
+    ['F01', ['OpenRouter, catalogue des modèles']],
+    ['F15', ["Google, journal de l'API Gemini", 'OpenRouter, catalogue des modèles']],
+  ]);
+});
+
+test("deux annonces différentes d'un même éditeur, le même jour, et deux versions d'un même modèle restent séparées", async () => {
+  const s = await choisir([
+    google('F12', 6, '2026-11-05', 'November 5, 2026 {% id="11-05-2026" %}',
+      "Google étend le support des fichiers Office et OpenDocument dans l'API Gemini, incluant PPT, ODP et ODS, avec traitement d'images pour DOC."),
+    google('F15', 7, '2026-11-05', 'Gemini Omni 1.2 Flash: Fast and cost-effective with longer clips',
+      'Google annonce un nouveau modèle multimodal (Gemini Omni 1.2 Flash) avec génération vidéo native et une baisse de prix de 30%.'),
+    auCatalogue('Google', 'Gemini Omni 1.2 Flash', 7, '2026-11-05', 'OpenRouter ajoute Gemini Omni 1.2 Flash à son catalogue, à 1,5 $ en entrée et 9 $ en sortie.'),
+    auCatalogue('Google', 'Gemini Omni 1.1 Flash', 6, '2026-11-04', 'OpenRouter ajoute Gemini Omni 1.1 Flash avec un prix de 1,5 $ en entrée et 9 $ en sortie.'),
+  ]);
+  // Le blog et le catalogue pour Gemini Omni 1.2 Flash ; seuls, le journal (fichiers Office) et Gemini Omni 1.1 Flash.
+  assert.deepEqual(Object.fromEntries(s.candidats.map((c) => [c.sid, c.aussi.length])), { F15: 1, F12: 0, A02: 0 });
+  assert.match(s.candidats.find((c) => c.sid === 'A02').titre, /Gemini Omni 1\.1 Flash$/);
+});
+
 test('la fenêtre : depuis la dernière préparation, 14 jours au plus ; 7 jours la première fois et en mode essai', async () => {
   const reg = [r('fournisseurs', 9, { vu: ms('2026-10-20T10:00') }), r('qualite', 9, { vu: ms('2026-10-27T10:00') }), r('conformite', 9, { vu: ms('2026-10-30T10:00') })];
   const ids = (s) => s.candidats.map((c) => c.axe).sort();
