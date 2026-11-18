@@ -1,7 +1,7 @@
 # Veille Tech N8N + Discord
 
 Automatisation de veille technologique avec N8N (self-hosted) et Discord.
-**v3 prête, pas encore en service** (branche `veille/refonte`, essais dans n8n le 28 octobre 2026) : les publications des labos, les radars de nouveaux modèles, les capteurs de bruit et le brief du matin — `docs/veille-v3.md`. Elle remplacera la v2 quand Louis l'aura validée. Architecture de base (stories, chaleur, Components V2) : `docs/veille-pro-v2.md`.
+**v3 en service** : le workflow `VeilleProV2story` contient la v3 depuis son import du 5 novembre 2026 (vérifié le 18 novembre : identique au build du dépôt), sous l'ancien nom « Veille Pro v2 — Stories & Tendances » : les publications des labos, les radars de nouveaux modèles, les capteurs de bruit et le brief du matin — `docs/veille-v3.md`. Architecture de base (stories, chaleur, Components V2) : `docs/veille-pro-v2.md`.
 
 **Stack** : N8N 2.48.5 depuis le 18 novembre 2026 (Docker, image pinnée, TZ Europe/Paris, planificateur en mémoire), Discord Webhooks (Components V2), OpenRouter (Mistral Small 3.2 + Mistral Large), JavaScript
 
@@ -35,10 +35,10 @@ Automatisation de veille technologique avec N8N (self-hosted) et Discord.
 
 | Workflow | ID | État |
 |----------|----|------|
-| Veille Pro v2, avec le rattrapage du résumé et du bilan | `VeilleProV2story` | **actif** — 8 h, 13 h et 18 h 30, en retard quand le Mac dort ; la v3 (59 nœuds : collecte au réveil du Mac, brief après 8 h 30, bilan le dimanche) la remplacera |
+| Veille perso v3 (nom dans n8n : « Veille Pro v2 — Stories & Tendances », 59 nœuds) | `VeilleProV2story` | **actif** depuis le 5 novembre 2026 — passage toutes les 30 min de 7 h à 22 h 30, collecte au plus toutes les 3 h quand le Mac est allumé, brief après 8 h 30, bilan le dimanche |
 | Veille Stack (26 nœuds) | `VeilleStackHlmr1` | **actif** — 9h30 Paris, digest lundi ; org via `GITHUB_STACK_ORG`, token `GITHUB_STACK_TOKEN`, sortie `DISCORD_WEBHOOK_STACK` |
 | Error Handler - Discord Alert | `yrUX1IcjTyIwpWqG` | actif |
-| Veille ParlIA (39 nœuds) | `VeilleParlIAprod` | **actif** depuis le 4 novembre 2026 ; la version du 16 novembre (consigne, extraits et dates, lecture des originaux, 8 fiches au plus, modèles suivis, bilan des sources, contrôle des hypothèses) en service depuis le 16 novembre ; essai : `VeilleParlIAtest` — `docs/veille-parlia.md` |
+| Veille ParlIA (39 nœuds) | `VeilleParlIAprod` | **actif** depuis le 4 novembre 2026 ; la version du 18 novembre (arXiv sur 14 jours, matière de la synthèse mensuelle, et les trois erreurs de la semaine 47 : annonces anciennes des pages, prix des modèles suivis, doublons d'un même éditeur) en service depuis le 18 novembre ; essai : `VeilleParlIAtest` — `docs/veille-parlia.md` |
 | Veille Pro v1 | `OfUjCc9fcrInTX3M` | désactivé (rollback) |
 | Brief Simplon phases 1-2 | — | désactivés (archive) |
 

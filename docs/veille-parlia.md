@@ -1,6 +1,6 @@
 # Veille ParlIA — la séance de la semaine, préparée par le bot
 
-Mise à jour du 16 novembre 2026. Le workflow « Veille ParlIA » (`VeilleParlIAprod`, 39 nœuds) prépare chaque
+Mise à jour du 18 novembre 2026. Le workflow « Veille ParlIA » (`VeilleParlIAprod`, 39 nœuds) prépare chaque
 semaine la séance de veille du projet ParlIA : Louis la tient pour l'épreuve E2 de sa certification (une heure de
 veille par semaine, une note datée par séance). Le bot collecte, trie, lit l'original des fiches retenues et
 prépare ; Louis lit les originaux, classe chaque point (rien, à surveiller, décision à ouvrir) et écrit la note.
@@ -15,7 +15,12 @@ publication, une échéance repoussée par sa source et restée à l'ancienne da
 corrige ces défauts, lit l'original des fiches retenues, en propose 8 au plus, suit Mistral Large 4, Kev et Zuse,
 montre ce que chaque source a apporté aux séances et contrôle les hypothèses. Vérifiée par `npm test` (182 tests),
 par un rejeu de la semaine 46 et par un essai complet dans n8n (section « Les essais du 16 novembre 2026 »), elle est
-en service depuis le 16 novembre 2026.
+en service depuis le 16 novembre 2026. Le 18 novembre, la séance 04 a relevé trois erreurs de la semaine 47 : deux
+annonces d'octobre présentées comme nouvelles (fiche 3), une hausse de prix qui n'existait pas (fiche 5), la
+Decisions API de Google proposée deux fois (fiches 1 et 6). La version du 18 novembre 2026 les corrige, prend la
+nature d'une source dans la liste des sources, relit arXiv sur 14 jours et prépare la matière de la synthèse
+mensuelle. Vérifiée par `npm test` (200 tests) et rejouée sur la mémoire du bot et sur les vraies pages, elle est
+en service depuis le 18 novembre 2026, sur n8n 2.48.5 (section « La mise à jour de n8n, le 18 novembre 2026 »).
 
 Thème : « Étiqueter les questions écrites du Sénat avec un modèle de langage commercial : choisir, mesurer et pouvoir
 remplacer le fournisseur, dans le respect du RGPD et du règlement européen sur l'IA. » Quatre axes : fournisseurs et
@@ -311,7 +316,8 @@ dans le journal que reprend le fichier de la semaine.
 - **#status** (`DISCORD_WEBHOOK_STATUS`, le même que la veille personnelle) : quelques lignes à chaque passage
   utile, à l'heure de Paris, en silence. Le message sonne s'il y a un problème : une source en échec trois fois de
   suite (une seule alerte, puis « de retour » au premier succès), le fichier non écrit, un envoi refusé par Discord.
-  Il compte aussi les hypothèses écartées par le contrôle, au tri et dans les résumés.
+  Il compte aussi les hypothèses écartées par le contrôle, au tri et dans les résumés, les blocs de pages de plus de
+  14 jours écartés et les offres d'OpenRouter illisibles.
 - **Plantage** : le workflow d'erreur déjà en place (`yrUX1IcjTyIwpWqG`) est désigné dans les réglages, sans
   être modifié ; il poste dans #status.
 - **Mémoire** : elle n'est enregistrée qu'après une exécution réussie ; une exécution qui échoue ne perd rien, la
@@ -320,7 +326,8 @@ dans le journal que reprend le fichier de la semaine.
 La mémoire du workflow garde : la date de la dernière collecte, les adresses déjà vues (45 jours), la santé des
 sources, le registre des articles triés (400 au plus, 16 jours), les échéances (jusqu'à 14 jours après leur date,
 avec l'empreinte du texte de leur article), les empreintes des pages sans flux et leur format,
-l'état du catalogue d'OpenRouter, de data.gouv.fr et de Hugging Face, la dernière archive lue du Journal officiel,
+l'état du catalogue d'OpenRouter (pour chaque modèle suivi, le prix des offres suivies et celui qui attend d'être
+revu), de data.gouv.fr et de Hugging Face, la dernière archive lue du Journal officiel,
 les alertes envoyées et la préparation de la semaine.
 
 ## Installer
@@ -532,6 +539,8 @@ GHSA-q8rc-7m84-mfvj, jugé élevé, GHSA-g333-hr44-g82p). La liste des changemen
   séance, des sources à espacer ou à retirer.
 - Lire les réponses et les réactions dans Discord : il faudrait un bot Discord et son jeton, un webhook ne lit rien.
 - Les sources à l'essai de l'étude (§4.2), hors Élysée.
+- Avant n8n 3 : donner à la veille Stack un passage toutes les 30 minutes, puis revenir au planificateur par défaut
+  (section « La mise à jour de n8n, le 18 novembre 2026 »).
 
 ## Tests
 
@@ -541,4 +550,7 @@ originaux, préparation, notes de séance, envois Discord et #status, outils com
 connexions et ordre d'exécution, aucun secret ni chemin personnel, mode test). Les cas de la semaine 46 y sont
 repris : la ligne de tableau de la fiche 4, la date de la fiche 1, l'échéance repoussée de la fiche 3, une consigne
 qui ne dit jamais qu'un modèle est utilisé par ParlIA ; et ceux du 16 novembre : les hypothèses fautives du rejeu,
-la page Markdown de TypeSafe, la fiche d'un dépôt Hugging Face de Perplexity.
+la page Markdown de TypeSafe, la fiche d'un dépôt Hugging Face de Perplexity ; et ceux de la semaine 47 : les
+annonces d'octobre remontées sur la page de Liquid AI, le prix « par défaut » d'OpenRouter et les offres de
+l'éditeur (GPT-6 Luna), la Decisions API de Google comptée deux fois, la nature de la source du journal de l'API
+Gemini.
