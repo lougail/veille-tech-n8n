@@ -31,10 +31,13 @@ const modele = (id, extra = {}) => Object.assign({ id, name: id, created: 179000
 const BOURRE = Array.from({ length: 60 }, (_, i) => modele('autre/modele-' + i));
 const SUIVIS = ['openai/gpt-6-luna', 'anthropic/claude-haiku-5.5', 'mistralai/mistral-small-3.2-24b-instruct', 'openai/gpt-4o-mini', 'openai/gpt-6.1-terra', 'google/gemini-4-argon', 'mistralai/mistral-large-4-0'];
 const catalogue = (extra = [], modifier = (m) => m) => ({ data: BOURRE.concat(SUIVIS.map((id) => modifier(modele(id))), extra) });
-// Les offres des hébergeurs d'un modèle (API « endpoints » d'OpenRouter) ; par défaut, celle de son éditeur, au prix du catalogue.
+// Les offres des hébergeurs d'un modèle (API « endpoints » d'OpenRouter) ; par défaut, celle de son éditeur, au prix du
+// catalogue, avec son repère (tag) tel qu'OpenRouter l'écrit : « openai », « anthropic », « mistral », « google-ai-studio ».
 const ENDPOINTS = (id) => 'https://openrouter.ai/api/v1/models/' + id + '/endpoints';
 const offre = (provider_name, tag, prompt, completion) => ({ provider_name, tag, pricing: { prompt, completion } });
 const offres = (...liste) => ({ statusCode: 200, body: { data: { endpoints: liste } } });
+const EDITEURS = { openai: ['OpenAI', 'openai'], anthropic: ['Anthropic', 'anthropic'], mistralai: ['Mistral', 'mistral'], google: ['Google AI Studio', 'google-ai-studio'] };
+const offreEditeur = (id, prompt = '0.0000001', completion = '0.0000005') => offre(...EDITEURS[id.split('/')[0]], prompt, completion);
 const fiche = (ressources, lm = '2026-03-25T10:00:00') => ({ page: 'https://www.data.gouv.fr/fr/datasets/questions-du-senat/', last_modified: lm,
   last_update: new Date().toISOString(), resources: ressources.map(([id, title, format]) => ({ id, title, format, last_modified: new Date().toISOString() })) });
 const RESSOURCES = [['r1', 'Questions écrites', 'csv'], ['r2', 'Réponses', 'csv']];
@@ -43,7 +46,7 @@ function table(modifs = {}) {
   const t = {};
   for (const u of PAGES) t[u] = { statusCode: 200, body: u.endsWith('.md') ? pageMd(BASE_MD) : page(BASE) };
   t[OPENROUTER] = { statusCode: 200, body: catalogue() };
-  for (const id of SUIVIS) t[ENDPOINTS(id)] = offres(offre('Éditeur', 'editeur', '0.0000001', '0.0000005'));
+  for (const id of SUIVIS) t[ENDPOINTS(id)] = offres(offreEditeur(id));
   t[DATAGOUV] = { statusCode: 200, body: fiche(RESSOURCES) };
   t[hf('Cloudflare')] = { statusCode: 200, body: [{ id: 'Cloudflare/clef', createdAt: '2026-10-09T08:00:00.000Z', tags: [] }] };
   t[hf('perplexity-ai')] = { statusCode: 200, body: [{ id: 'perplexity-ai/decider-v1', createdAt: '2026-10-01T08:00:00.000Z', tags: [] }] };
@@ -151,7 +154,7 @@ test("OpenRouter : les nouveaux modèles des fournisseurs suivis, et pour la lis
   };
   const cat = catalogue(nouveaux, modifie);
   cat.data = cat.data.filter((m) => m.id !== 'google/gemini-4-argon');
-  const hausse = table({ [OPENROUTER]: { statusCode: 200, body: cat }, [ENDPOINTS('openai/gpt-4o-mini')]: offres(offre('OpenAI', 'openai', '0.0000002', '0.0000006')) });
+  const hausse = table({ [OPENROUTER]: { statusCode: 200, body: cat }, [ENDPOINTS('openai/gpt-4o-mini')]: offres(offreEditeur('openai/gpt-4o-mini', '0.0000002', '0.0000006')) });
   const { articles } = await passer(sd, hausse, {}, '2026-11-03T09:15');
   const parCle = Object.fromEntries(articles.map((a) => [a._cle.split(':').slice(0, 2).join(':'), a]));
   assert.deepEqual(Object.keys(parCle).sort(), ['or:absent', 'or:nouveau', 'or:retrait']); // le nouveau prix attend d'être revu
@@ -162,8 +165,10 @@ test("OpenRouter : les nouveaux modèles des fournisseurs suivis, et pour la lis
   assert.match(parCle['or:absent'].title, /google\/gemini-4-argon/);
   const revu = await passer(sd, hausse, {}, '2026-11-04T09:15');
   assert.deepEqual(revu.articles.map((a) => a._cle), ['or:prix:openai/gpt-4o-mini:2026-11-03']);
-  assert.equal(revu.articles[0].contentSnippet, 'Prix chez OpenRouter, par million de jetons : 0,1 $ → 0,2 $ en entrée, 0,5 $ → 0,6 $ en sortie'
-    + ' (Éditeur, puis OpenAI ; vu le 3 novembre 2026, revu le 4 novembre 2026).');
+  // L'offre de l'éditeur est aussi la moins chère : son changement n'est dit qu'une fois.
+  assert.equal(revu.articles[0].contentSnippet, 'Prix chez OpenRouter, par million de jetons (nouveau prix vu le 3 novembre 2026, revu le'
+    + " 4 novembre 2026). Offre de l'éditeur, OpenAI : 0,1 $ → 0,2 $ en entrée, 0,5 $ → 0,6 $ en sortie. Offres du jour (entrée /"
+    + ' sortie) : OpenAI 0,2 $ / 0,6 $.');
   assert.deepEqual(revu.articles[0]._verifie, { changement_prix: true, date_effet: '2026-11-03' });
   const encore = await passer(sd, hausse, {}, '2026-11-05T09:15');
   assert.equal(encore.articles.length, 0);
@@ -371,13 +376,13 @@ test("une page servie en Markdown sans qu'on l'attende est lue comme du Markdown
 
 // La séance 04 (18 novembre 2026) : le prix « par défaut » de Mistral Small 3.2 au catalogue était passé de 0,075 $ à
 // 0,10 $ le 10 novembre, puis revenu le 18, sans qu'aucun hébergeur change le sien (fiche 5 de la semaine 47, « hausse
-// du prix »). Le prix suivi est désormais celui de l'offre la moins chère, revue deux jours de suite.
+// du prix »). Mistral ne le sert pas lui-même chez OpenRouter : le prix suivi est celui de l'offre la moins chère.
 test("OpenRouter : le prix suivi est l'offre la moins chère ; ni le prix par défaut ni un hébergeur absent un jour ne comptent", async () => {
   const MS = 'mistralai/mistral-small-3.2-24b-instruct';
   const P075 = { prompt: '0.000000075', completion: '0.0000002' };
   const P010 = { prompt: '0.0000001', completion: '0.0000003' };
-  const deepinfra = (prompt) => offre('DeepInfra', 'deepinfra/fp8', prompt, '0.0000002');
-  const parasail = offre('Parasail', 'parasail/bf16', '0.00000009', '0.0000003');
+  const deepinfra = (prompt) => offre('DeepInfra', 'deepinfra', prompt, '0.0000002');
+  const parasail = offre('Parasail', 'parasail', '0.00000009', '0.0000003');
   const sd = {};
   const jour = async (date, defaut, ...liste) => (await passer(sd, table({
     [OPENROUTER]: { statusCode: 200, body: catalogue([], (m) => Object.assign(m, m.id === MS ? { pricing: defaut } : {})) },
@@ -385,23 +390,42 @@ test("OpenRouter : le prix suivi est l'offre la moins chère ; ni le prix par d�
   }), {}, date + 'T09:15')).articles;
   // Une mémoire sans offre, comme celle d'avant le 19 novembre 2026 : la première lecture des offres la retient, sans article.
   assert.deepEqual(await jour('2026-11-09', P075), []);
-  assert.equal(sd.openrouter.suivi[MS].m, undefined);
+  assert.equal(sd.openrouter.suivi[MS].ref, undefined);
   assert.equal(sd._passage.pages.offresIllisibles, 1);
   assert.deepEqual(await jour('2026-11-10', P010, parasail, deepinfra('0.000000075')), []); // le prix par défaut change : rien
-  assert.deepEqual(sd.openrouter.suivi[MS].m, { p: 0.075, c: 0.2, chez: 'DeepInfra', d: '2026-11-10' });
+  assert.deepEqual(sd.openrouter.suivi[MS].ref, { '*': { p: 0.075, c: 0.2, chez: 'DeepInfra', tag: 'deepinfra' } });
   assert.equal(sd.openrouter.suivi[MS].h, 2);
   assert.deepEqual(await jour('2026-11-11', P010, parasail), []); // DeepInfra absent un jour : à revoir…
-  assert.equal(sd.openrouter.suivi[MS].n.p, 0.09);
+  assert.equal(sd.openrouter.suivi[MS].att['*'].p, 0.09);
   assert.deepEqual(await jour('2026-11-12', P075, parasail, deepinfra('0.000000075')), []); // … revenu le lendemain : oublié
-  assert.equal(sd.openrouter.suivi[MS].n, undefined);
+  assert.equal(sd.openrouter.suivi[MS].att, undefined);
   assert.deepEqual(await jour('2026-11-13', P075, parasail, deepinfra('0.00000008')), []); // une hausse, vue une fois
   assert.deepEqual(await jour('2026-11-14', P075), []); // offres illisibles : la comparaison attend
   const articles = await jour('2026-11-15', P075, parasail, deepinfra('0.00000008')); // revue : signalée
   assert.equal(articles.length, 1);
   assert.equal(articles[0].title, "Changement de prix d'un modèle suivi : " + MS);
-  assert.equal(articles[0].contentSnippet, 'Offre la moins chère parmi les 2 hébergeurs de ce modèle chez OpenRouter, par million de jetons :'
-    + ' 0,075 $ → 0,08 $ en entrée, 0,2 $ en sortie (inchangé) (DeepInfra ; vu le 13 novembre 2026, revu le 15 novembre 2026).'
-    + ' Offres du jour (entrée / sortie) : DeepInfra 0,08 $ / 0,2 $ ; Parasail 0,09 $ / 0,3 $.');
+  assert.equal(articles[0].contentSnippet, 'Prix chez OpenRouter, par million de jetons (nouveau prix vu le 13 novembre 2026, revu le'
+    + ' 15 novembre 2026). Offre la moins chère parmi les 2 hébergeurs, DeepInfra : 0,075 $ → 0,08 $ en entrée, 0,2 $ en sortie'
+    + ' (inchangé). Offres du jour (entrée / sortie) : DeepInfra 0,08 $ / 0,2 $ ; Parasail 0,09 $ / 0,3 $.');
   assert.deepEqual(articles[0]._verifie, { changement_prix: true, date_effet: '2026-11-13' });
   assert.equal(articles[0]._cle, 'or:prix:' + MS + ':2026-11-13');
+});
+
+// GPT-6 Luna, le 18 novembre 2026 : l'offre « flex » d'OpenAI, à 0,05 $, est la moins chère, à côté de son offre
+// normale, à 0,10 $, et de celles d'Azure et d'Amazon Bedrock. Une hausse de l'offre normale ne change pas la moins chère.
+test("OpenRouter : chaque offre de l'éditeur est suivie ; le prix d'un autre hébergeur, plus cher, ne compte pas", async () => {
+  const LUNA = 'openai/gpt-6-luna';
+  const offresLuna = (normale, azure) => offres(offre('OpenAI', 'openai/flex', '0.00000005', '0.00000025'), offre('OpenAI', 'openai', normale, '0.0000005'),
+    offre('Azure', 'azure', azure, '0.0000005'), offre('Amazon Bedrock', 'amazon-bedrock/global', '0.0000001', '0.0000005'));
+  const sd = {};
+  const jour = async (date, normale, azure) => (await passer(sd, table({ [ENDPOINTS(LUNA)]: offresLuna(normale, azure) }), {}, date + 'T09:15')).articles;
+  assert.deepEqual(await jour('2026-11-18', '0.0000001', '0.0000001'), []);
+  assert.deepEqual(Object.keys(sd.openrouter.suivi[LUNA].ref).sort(), ['*', 'openai', 'openai/flex']);
+  assert.deepEqual(await jour('2026-11-19', '0.0000001', '0.00000012'), []); // Azure augmente : rien, ni aujourd'hui…
+  assert.deepEqual(await jour('2026-11-20', '0.00000012', '0.00000012'), []); // … ni demain ; OpenAI augmente, à revoir
+  const articles = await jour('2026-11-21', '0.00000012', '0.00000012');
+  assert.equal(articles.length, 1);
+  assert.equal(articles[0].contentSnippet, 'Prix chez OpenRouter, par million de jetons (nouveau prix vu le 20 novembre 2026, revu le'
+    + " 21 novembre 2026). Offre de l'éditeur, OpenAI : 0,1 $ → 0,12 $ en entrée, 0,5 $ en sortie (inchangé). Offres du jour (entrée /"
+    + ' sortie) : OpenAI (flex) 0,05 $ / 0,25 $ ; Amazon Bedrock (global) 0,1 $ / 0,5 $ ; OpenAI 0,12 $ / 0,5 $ ; Azure 0,12 $ / 0,5 $.');
 });

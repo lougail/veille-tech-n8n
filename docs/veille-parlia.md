@@ -79,14 +79,15 @@ Markdown (`models.md`), comme les pages Gemini, et toute réponse sans HTML est 
 Le catalogue d'OpenRouter donne les nouveaux modèles des fournisseurs du thème et, pour la liste de suivi (GPT-6
 Luna, Claude Haiku 5.5, Mistral Small 3.2, GPT-4o mini, GPT-6.1 Terra, Gemini 4 Argon et, depuis le 16 novembre
 2026, Mistral Large 4), les changements de prix, les retraits annoncés et les disparitions : ces drapeaux sont
-calculés par le programme, le tri ne peut pas les oublier. Le prix suivi est celui de l'offre la moins chère parmi
-les hébergeurs du modèle (API « endpoints » d'OpenRouter), pas le prix « par défaut » du catalogue : celui-ci suit
-un seul hébergeur, et celui de Mistral Small 3.2 était passé de 0,075 $ à 0,10 $ le 10 novembre 2026 avant de
-revenir le 18, sans qu'aucun hébergeur change le sien (fiche 5 de la semaine 47, « hausse du prix »). Une nouvelle
-offre la moins chère n'est signalée que si elle se voit deux jours de suite : un hébergeur absent un jour ne fait
-pas une hausse. Des offres illisibles sont comptées dans #status, et la comparaison attend le jour suivant (depuis
-le 18 novembre 2026). Les modèles de décision suivis (Jev, Kev, Clef, Zuse, d1,
-Decider) sont reconnus par leur nom dans les titres et les extraits (`NOMS_SUIVIS`) ; un nom prolongé en modèle de
+calculés par le programme, le tri ne peut pas les oublier. Les prix suivis sont ceux des offres de l'éditeur du
+modèle chez OpenRouter (pour GPT-6 Luna, les offres « flex », normale et « fast » d'OpenAI) et celui de l'offre la
+moins chère parmi tous ses hébergeurs (API « endpoints » d'OpenRouter) ; pas le prix « par défaut » du catalogue,
+qui suit un seul hébergeur : celui de Mistral Small 3.2 était passé de 0,075 $ à 0,10 $ le 10 novembre 2026 avant de
+revenir le 18, sans qu'aucun hébergeur change le sien (fiche 5 de la semaine 47, « hausse du prix »). Un nouveau
+prix n'est signalé que s'il se voit à deux lectures de suite, un jour d'écart : un hébergeur absent un jour ne fait
+pas une hausse, et le prix d'un autre hébergeur, plus cher, ne compte pas. Des offres illisibles sont comptées dans
+#status, et la comparaison attend la lecture suivante (depuis le 18 novembre 2026). Les modèles de décision suivis
+(Jev, Kev, Clef, Zuse, d1, Decider) sont reconnus par leur nom dans les titres et les extraits (`NOMS_SUIVIS`) ; un nom prolongé en modèle de
 voix ou d'image n'est pas celui d'un modèle suivi : le retrait de gpt-4o-mini-tts ne sonne pas comme celui de
 gpt-4o-mini (`nomsSuivisDans`, dans `outils.js`, depuis le 16 novembre 2026).
 

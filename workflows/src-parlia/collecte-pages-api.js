@@ -21,11 +21,13 @@
 // - Le catalogue d'OpenRouter (A02) : les nouveaux modèles des fournisseurs suivis ; pour la liste de suivi
 //   (sources.md, 4.4), un changement de prix, une date de retrait annoncée, une disparition. Ces deux drapeaux
 //   sont calculés par le programme (_verifie) : le tri ne peut pas les oublier.
-//   Le prix suivi est celui de l'offre la moins chère parmi les hébergeurs du modèle (API « endpoints »), pas le prix
-//   « par défaut » du catalogue : celui-ci suit un seul hébergeur et change sans que l'éditeur change le sien (Mistral
-//   Small 3.2 : 0,075 $ → 0,10 $ le 10 novembre 2026, retour le 18 ; fiche 5 de la semaine 47, « hausse du prix »).
-//   Une nouvelle offre la moins chère n'est signalée que si elle se voit deux jours de suite : un hébergeur absent un
-//   jour ne fait pas une hausse. Des offres illisibles : la comparaison attend le jour suivant (#status les compte).
+//   Les prix suivis sont ceux des offres de l'éditeur du modèle chez OpenRouter (OpenAI, « openai » et « openai/flex »,
+//   pour GPT-6 Luna) et celui de l'offre la moins chère parmi tous ses hébergeurs (API « endpoints ») ; pas le prix
+//   « par défaut » du catalogue, qui suit un seul hébergeur et change sans qu'aucun change le sien (Mistral Small 3.2 :
+//   0,075 $ → 0,10 $ le 10 novembre 2026, retour le 18 ; fiche 5 de la semaine 47, « hausse du prix »). Un nouveau
+//   prix n'est signalé que s'il se voit à deux lectures de suite : un hébergeur absent un jour ne fait pas une hausse.
+//   Le prix d'un autre hébergeur, plus cher, ne compte pas. Des offres illisibles : la comparaison attend la lecture
+//   suivante (#status les compte).
 // - La fiche data.gouv.fr des questions du Sénat (A11) : sa date de modification et la liste de ses fichiers.
 //   Les fichiers sont republiés chaque nuit : leurs dates ne comptent pas, seuls leurs noms et formats. Elle a
 //   parfois mis plus de 20 secondes à répondre (essai du 16 novembre 2026) : elle en a 45.
@@ -86,17 +88,25 @@ const prixM = (v) => {
   return Number.isFinite(n) && n >= 0 ? Math.round(n * 1e6 * 10000) / 10000 : null;
 };
 const dollars = (n) => (n == null ? '?' : String(n).replace('.', ',') + ' $');
-// Les offres des hébergeurs d'un modèle chez OpenRouter, de la moins chère à la plus chère : « DeepInfra (flex) »,
-// prix d'entrée et de sortie par million de jetons. null si la réponse est illisible.
+// Les offres des hébergeurs d'un modèle chez OpenRouter, de la moins chère à la plus chère : leur repère (tag :
+// « openai/flex »), leur nom (« OpenAI (flex) »), si elles sont de l'éditeur du modèle, leurs prix d'entrée et de
+// sortie par million de jetons. null si la réponse est illisible. Le repère d'une offre de l'éditeur commence par le
+// nom de son compte : openai, anthropic, mistral (mistralai/…), google (google-ai-studio, google-vertex).
+const COMPTES_EDITEURS = { mistralai: 'mistral' };
 async function offres(id) {
+  const compte = COMPTES_EDITEURS[id.split('/')[0]] || id.split('/')[0];
   try {
     const d = jsonDe(await lire('https://openrouter.ai/api/v1/models/' + id + '/endpoints'));
     const liste = d && d.data && Array.isArray(d.data.endpoints) ? d.data.endpoints : null;
     if (!liste) return null;
     return liste.map((e) => {
-      const variante = String(e.tag || '').split('/').slice(2).join('/');
-      return { nom: String(e.provider_name || '?') + (variante ? ' (' + variante + ')' : ''), hebergeur: String(e.provider_name || '?'),
-        p: prixM(e.pricing && e.pricing.prompt), c: prixM(e.pricing && e.pricing.completion) };
+      const morceaux = String(e.tag || '').split('/');
+      const variante = morceaux.slice(1).join('/');
+      return {
+        tag: String(e.tag || e.provider_name || '?'), nom: String(e.provider_name || '?') + (variante ? ' (' + variante + ')' : ''),
+        hebergeur: String(e.provider_name || '?'), editeur: !!morceaux[0] && morceaux[0].startsWith(compte),
+        p: prixM(e.pricing && e.pricing.prompt), c: prixM(e.pricing && e.pricing.completion),
+      };
     }).filter((o) => o.p != null && o.c != null).sort((x, y) => x.p - y.p || x.c - y.c);
   } catch (e) {
     return null;
@@ -280,35 +290,48 @@ async function openrouter() {
     }
     const p = m.pricing || {};
     const maintenant = { p: prixM(p.prompt), c: prixM(p.completion), e: /^\d{4}-\d{2}-\d{2}/.test(String(m.expiration_date || '')) ? String(m.expiration_date).slice(0, 10) : '' };
-    // m : l'offre la moins chère retenue ; n : une autre, vue une seule fois, à revoir au passage suivant ; h : le
-    // nombre d'hébergeurs. La première lecture retient l'offre sans rien signaler.
+    // Les offres de référence : la moins chère (« * ») et chacune de celles de l'éditeur, par leur repère. ref : leur
+    // prix retenu ; att : un autre prix, vu une seule fois, à revoir à la lecture suivante ; h : le nombre
+    // d'hébergeurs. Une offre lue pour la première fois est retenue sans rien signaler ; une offre absente garde son prix.
     const o = offresDe[id];
-    let confirmee = null;
+    const changements = [];
     if (o && o.length) {
-      const jour = { p: o[0].p, c: o[0].c, chez: o[0].nom, d: aujourdhui };
       maintenant.h = new Set(o.map((x) => x.hebergeur)).size;
-      if (!avant || !avant.m) maintenant.m = jour;
-      else if (memePrix(jour, avant.m)) maintenant.m = avant.m;
-      else if (memePrix(jour, avant.n)) maintenant.m = confirmee = Object.assign(jour, { d: avant.n.d });
-      else Object.assign(maintenant, { m: avant.m, n: jour });
+      const lues = { '*': o[0] };
+      for (const x of o) if (x.editeur) lues[x.tag] = x;
+      const ref = Object.assign({}, avant && avant.ref);
+      const att = {};
+      for (const [k, x] of Object.entries(lues)) {
+        const vu = { p: x.p, c: x.c, chez: x.nom, tag: x.tag };
+        const attendu = avant && avant.att ? avant.att[k] : null;
+        if (!ref[k] || memePrix(vu, ref[k])) ref[k] = vu;
+        else if (memePrix(vu, attendu)) {
+          changements.push({ k, avant: ref[k], apres: vu, d: attendu.d });
+          ref[k] = vu;
+        } else att[k] = Object.assign(vu, { d: aujourdhui });
+      }
+      maintenant.ref = ref;
+      if (Object.keys(att).length) maintenant.att = att;
     } else {
       offresIllisibles++;
-      if (avant) for (const k of ['m', 'n', 'h']) if (avant[k] != null) maintenant[k] = avant[k];
+      if (avant) for (const k of ['ref', 'att', 'h']) if (avant[k] != null) maintenant[k] = avant[k];
     }
     suivi[id] = maintenant;
     if (!avant || avant.absent) continue;
-    if (confirmee) {
-      const ancienne = avant.m;
-      const plusieurs = maintenant.h > 1;
-      const chez = ancienne.chez && ancienne.chez !== confirmee.chez ? ancienne.chez + ', puis ' + confirmee.chez : confirmee.chez;
+    // L'offre la moins chère qui répète le changement d'une offre de l'éditeur n'est pas redite.
+    const dits = changements.filter((x) => x.k !== '*' || !changements.some((y) => y.k !== '*' && memePrix(y.avant, x.avant) && memePrix(y.apres, x.apres)));
+    if (dits.length) {
+      const depuis = dits.map((x) => x.d).sort()[0];
+      const qui = (x) => (x.k !== '*' ? "Offre de l'éditeur, " + x.apres.chez
+        : 'Offre la moins chère' + (maintenant.h > 1 ? ' parmi les ' + maintenant.h + ' hébergeurs' : '') + ', '
+          + (x.avant.chez && x.avant.chez !== x.apres.chez ? x.avant.chez + ', puis ' + x.apres.chez : x.apres.chez));
       items.push(article(
         'Changement de prix d\'un modèle suivi : ' + (m.name || id),
         'https://openrouter.ai/' + id,
-        (plusieurs ? "Offre la moins chère parmi les " + maintenant.h + " hébergeurs de ce modèle chez OpenRouter" : 'Prix chez OpenRouter')
-          + ', par million de jetons : ' + evolution(ancienne.p, confirmee.p, 'entrée') + ', ' + evolution(ancienne.c, confirmee.c, 'sortie')
-          + ' (' + chez + ' ; vu le ' + dateLongue(confirmee.d) + ', revu le ' + dateLongue(aujourdhui) + ').'
-          + (plusieurs ? ' Offres du jour (entrée / sortie) : ' + o.map((x) => x.nom + ' ' + dollars(x.p) + ' / ' + dollars(x.c)).join(' ; ') + '.' : ''),
-        'or:prix:' + id + ':' + confirmee.d, { changement_prix: true, date_effet: confirmee.d }, $now.toUTC().toISO(),
+        'Prix chez OpenRouter, par million de jetons (nouveau prix vu le ' + dateLongue(depuis) + ', revu le ' + dateLongue(aujourdhui) + '). '
+          + dits.map((x) => qui(x) + ' : ' + evolution(x.avant.p, x.apres.p, 'entrée') + ', ' + evolution(x.avant.c, x.apres.c, 'sortie') + '.').join(' ')
+          + ' Offres du jour (entrée / sortie) : ' + o.map((x) => x.nom + ' ' + dollars(x.p) + ' / ' + dollars(x.c)).join(' ; ') + '.',
+        'or:prix:' + id + ':' + depuis, { changement_prix: true, date_effet: depuis }, $now.toUTC().toISO(),
       ));
     }
     if (maintenant.e && maintenant.e !== avant.e) {
