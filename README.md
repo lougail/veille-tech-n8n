@@ -39,7 +39,7 @@ Toutes les 30 min, de 7 h à 23 h : une collecte est-elle due ? (au plus toutes 
 
 ## Stack
 
-- **N8N** 2.10.3 self-hosted (Docker) — orchestration
+- **N8N** 2.48.5 self-hosted (Docker) — orchestration
 - **OpenRouter** — Mistral Small 3.2 (classification, $0.075/M) + Mistral Large 2512 (digests, avec Mistral Small en secours quand OpenRouter refuse Mistral Large) — ~0,60 $/mois
 - **Discord Webhooks** — messages Components V2 (containers, boutons-liens, flags silencieux)
 - **JavaScript** — 19 Code nodes versionnés dans `workflows/src/`, testés avec `npm test`

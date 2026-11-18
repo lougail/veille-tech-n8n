@@ -1,6 +1,9 @@
 services:
   n8n:
-    image: n8nio/n8n:2.10.3
+    # 2.48.5, la version « stable » de n8n le 18 novembre 2026 : elle corrige les avis de sécurité du 28 octobre
+    # (GHSA-prmc-fg87-r4gh, GHSA-f2cw-9483-7vcp) et du 13 novembre (GHSA-c772-hjfp-gfc2, GHSA-h59h-rf6m-7jp5,
+    # GHSA-q8rc-7m84-mfvj, GHSA-g333-hr44-g82p). Essayée d'abord sur une copie de la base (docs/veille-parlia.md).
+    image: n8nio/n8n:2.48.5
     ports:
       - "127.0.0.1:5678:5678"
     volumes:
@@ -29,4 +32,12 @@ services:
       - EXECUTIONS_TIMEOUT_MAX=1800
       - GENERIC_TIMEZONE=Europe/Paris
       - TZ=Europe/Paris
+      # Le planificateur « durable », par défaut depuis n8n 2.45, jette un passage manqué pendant que le Mac dort
+      # (plus d'une minute de retard). L'ancien, gardé ici, le lance au réveil : sans lui, la veille Stack de 9 h 30
+      # aurait perdu 5 de ses 7 passages du 11 au 18 novembre 2026, tous partis au réveil. n8n le déclare déprécié :
+      # avant qu'il disparaisse (n8n 3), donner à Stack un passage toutes les 30 minutes, comme ParlIA et la veille.
+      - N8N_SCHEDULER_ENABLED=false
+      # Le temps maximal d'un nœud Code : 300 secondes aujourd'hui, 60 dans une version future. La lecture des pages
+      # et des originaux de ParlIA peut dépasser la minute (délais de 20 à 45 secondes par page) : on garde 300.
+      - N8N_RUNNERS_TASK_TIMEOUT=300
     restart: unless-stopped

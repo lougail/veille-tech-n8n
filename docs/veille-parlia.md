@@ -475,6 +475,32 @@ La version est publiée le 16 novembre 2026, avec la mémoire de la précédente
 le matin, n'est pas refaite. À la première lecture des pages sans flux, chaque page est réapprise une fois, sans rien
 proposer (nouveau format des lignes).
 
+## La mise à jour de n8n, le 18 novembre 2026
+
+De 2.10.3 à 2.48.5, la version « stable » de n8n ce jour-là (sur Docker Hub, `stable` et `latest` désignent 2.48.5 ;
+la 3.x est une version majeure). Elle corrige les avis de sécurité du 28 octobre (GHSA-prmc-fg87-r4gh,
+GHSA-f2cw-9483-7vcp, GHSA-9p7v-45m2-wxgj) et du 13 novembre (GHSA-c772-hjfp-gfc2, GHSA-h59h-rf6m-7jp5,
+GHSA-q8rc-7m84-mfvj, jugé élevé, GHSA-g333-hr44-g82p). La liste des changements incompatibles de n8n
+(`BREAKING-CHANGES.md`) ne signale rien qui touche ces workflows.
+
+- **D'abord sur une copie.** La base copiée, les workflows désactivés, dans un second conteneur sur un autre port,
+  sans webhooks : 202 migrations sans erreur ; ParlIA en mode test, avec la vraie mémoire, a tout fait (18 flux,
+  16 pages et API, 46 nouveaux articles, 4 demandes de tri, 8 fiches, 7 originaux sur 8 lus et résumés, fichier
+  écrit). Deux appels à OpenRouter sont d'abord restés sans réponse (« Provider timed out ») : un appel s'arrête
+  désormais après 90 secondes, et n'est refait qu'une fois avant que le nœud le relance (`build_parlia.py`).
+- **Le planificateur.** Depuis 2.45, n8n planifie par défaut avec un planificateur « durable », qui jette un passage
+  en retard de plus d'une minute : le Mac endormi, la veille Stack de 9 h 30 aurait perdu 5 de ses 7 passages du 11
+  au 18 novembre. `N8N_SCHEDULER_ENABLED=false` (`docker-compose.yml`) garde l'ancien, qui lance le passage manqué au
+  réveil (vérifié sur la copie). n8n le déclare déprécié : avant n8n 3, donner à Stack un passage toutes les
+  30 minutes, comme ParlIA et la veille personnelle, puis revenir au planificateur par défaut.
+- **Le reste, vérifié** : une pause « Wait » de moins de 65 secondes reste en mémoire ; `retryOnFail` relance bien un
+  nœud qui continue en cas d'erreur ; le temps maximal d'un nœud Code reste de 300 secondes
+  (`N8N_RUNNERS_TASK_TIMEOUT`), la lecture des pages et des originaux pouvant dépasser la minute.
+- **La sauvegarde** : `sauvegardes/2026-11-18-avant-2.48.5/` (la base et le fichier `config`, copiés n8n arrêté),
+  ignorée par Git, à garder deux semaines. Pour revenir en arrière : `docker compose down`, mettre de côté la base
+  actuelle, recopier la sauvegarde dans `n8n-data/`, remettre `n8nio/n8n:2.10.3` dans `docker-compose.yml`, puis
+  `docker compose up -d`. Ne jamais lancer 2.10.3 sur la base migrée.
+
 ## Les décisions qui restent à Louis
 
 1. **Forum ou salon texte.** Avis : forum, un post par semaine, facile à retrouver et à montrer.
@@ -485,9 +511,9 @@ proposer (nouveau format des lignes).
 4. **La mention.** Avis : oui ; seuls l'ouverture, le rappel et les alertes notifient.
 5. **Les jours et heures** : préparation le lundi dès 6 h, rappel le jeudi dès 16 h 30. Avis : garder, et changer
    par `.env` si le rythme ne tient pas.
-6. **Quand mettre en service, et la mise à jour de n8n.** Avis : l'essai en mode test, puis la publication, un même
-   matin de semaine, sur n8n 2.10.3, où les nœuds ont été vérifiés ; la mise à jour vers 2.45.6 un autre matin, avec
-   un nouvel essai.
+6. **Quand mettre en service, et la mise à jour de n8n.** Fait : en service depuis le 4 novembre 2026, sur n8n
+   2.10.3 ; n8n mis à jour en 2.48.5 le 18 novembre, après un essai sur une copie de la base (section « La mise à
+   jour de n8n, le 18 novembre 2026 »).
 7. **Le modèle qui résume les originaux** (`MODEL_RESUMES` dans `build_parlia.py`). Au plus 8 demandes par
    semaine : le coût reste de l'ordre du centime, et le choix porte sur la justesse des résumés. Mistral Small 3.2
    par défaut ; Louis le garde (16 novembre 2026) et en jugera sur la préparation du 23 novembre.
