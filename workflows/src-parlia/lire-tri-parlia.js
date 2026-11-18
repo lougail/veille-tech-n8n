@@ -8,6 +8,9 @@
 // prête un retrait à un modèle suivi absent du titre et de l'extrait, est écartée ; le motif suit l'article jusqu'à
 // sa fiche (hypothese_ecartee).
 // Les drapeaux calculés par le programme (prix et retraits des modèles suivis) s'ajoutent à ceux du modèle.
+// La nature d'une source et son caractère primaire viennent de la liste des sources (sources.md, 4.1), pas du modèle :
+// le 16 novembre 2026, il avait classé le journal de l'API Gemini, écrit par Google, « agrégateur, non primaire »
+// (fiche 6 de la semaine 47), ce qui plafonnait sa note et le marquait « à recouper ». Sa réponse reste dans le brut.
 // La réponse brute et la version de la consigne sont gardées, pour pouvoir rejouer le tri.
 const lots = $('Consigne de tri').all().map((i) => i.json);
 const reponses = $input.all().map((i) => i.json || {});
@@ -65,9 +68,10 @@ function valider(a, p) {
     axe: p.axe,
     pertinence,
     hypothese: ecartee ? '' : hypothese,
-    source_primaire: typeof p.source_primaire === 'boolean' ? p.source_primaire : !!a.source.primaire,
-    // « inconnu », ou une nature hors de la liste : celle que la liste des sources donne pour cette source.
-    nature: PARLIA.NATURES.includes(p.nature) && p.nature !== 'inconnu' ? p.nature : (a.source.nature || 'inconnu'),
+    source_primaire: !!a.source.primaire,
+    // Celle de la liste des sources ; sans elle, celle du modèle, si elle est dans la liste des natures.
+    nature: PARLIA.NATURES.includes(a.source.nature) && a.source.nature !== 'inconnu' ? a.source.nature
+      : (PARLIA.NATURES.includes(p.nature) ? p.nature : 'inconnu'),
     resume: texteCourt(p.resume, 320),
     a_chercher: texteCourt(p.a_chercher, 320),
     drapeaux,

@@ -124,6 +124,9 @@ Le programme vérifie ce qu'il vérifie mieux que le modèle (`lire-tri-parlia.j
   rejetée, et l'article reçoit un tri de secours, marqué comme tel ;
 - les plafonds : 6 pour une source non primaire, 8 pour une prépublication arXiv, 2 pour une annonce d'éditeur
   publiée hors de son domaine officiel (un site qui imite TypeSafe, par exemple) ;
+- la nature d'une source et son caractère primaire viennent de la liste des sources, pas du modèle : le
+  16 novembre 2026, il avait classé le journal de l'API Gemini, écrit par Google, « agrégateur, non primaire »
+  (fiche 6 de la semaine 47), ce qui plafonnait sa note à 6 et le marquait « à recouper » ;
 - les drapeaux calculés par le programme l'emportent sur ceux du modèle ;
 - l'hypothèse : celle qui dit ParlIA équipé d'un service du marché (« les services d'OpenAI utilisés par ParlIA »),
   ou qui prête un retrait à un modèle suivi que le titre et l'extrait ne nomment pas, est écartée, et la fiche dit

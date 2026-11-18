@@ -225,3 +225,21 @@ test("une échéance changée par la source : la nouvelle date remplace l'ancien
   await executer('registre-parlia.js', { sd: ancienne, maintenant: MAINTENANT, input: [relu('2026-11-20')] });
   assert.deepEqual(ancienne.echeances.map((e) => [e.date, e.avant, e.id, e.cle]), [['2026-11-20', '2026-11-15', 'cf', 'k']]);
 });
+
+// La séance 04 (18 novembre 2026) : le journal de l'API Gemini, écrit par Google, était classé « agrégateur, non
+// primaire » par le tri (fiche 6 de la semaine 47), ce qui plafonnait sa note à 6 et le marquait « à recouper ».
+test("la nature de la source et son caractère primaire viennent de la liste des sources, pas du modèle", async () => {
+  const gemini = art('g1', { url: 'https://aistudio.google.com/docs/changelog?hl=en', source: Object.assign({}, art('x').source,
+    { id: 'F12', s: "Google, journal de l'API Gemini", nature: 'editeur', primaire: true, kind: 'page' }) });
+  const willison = art('w1', { url: 'https://simonwillison.net/2026/Nov/1/x/', source: Object.assign({}, art('x').source,
+    { id: 'A07', s: 'Simon Willison', nature: 'praticien', primaire: false }) });
+  const lot = { _articles: [gemini, willison], _version: 'v' };
+  const rep = { articles: [
+    avis('g1', { pertinence: 8, source_primaire: false, nature: 'agregateur' }),
+    avis('w1', { pertinence: 8, source_primaire: true, nature: 'editeur' }),
+  ] };
+  const [g, w] = await lire([lot], [{ text: JSON.stringify(rep) }]);
+  assert.deepEqual([g.tri.nature, g.tri.source_primaire, g.tri.pertinence, g.tri.plafonds], ['editeur', true, 8, []]);
+  assert.deepEqual([w.tri.nature, w.tri.source_primaire, w.tri.pertinence, w.tri.plafonds], ['praticien', false, 6, ['source non primaire']]);
+  assert.match(g.brut, /"nature":"agregateur"/); // la réponse du modèle reste dans le brut
+});
