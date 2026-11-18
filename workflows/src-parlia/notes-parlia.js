@@ -1,6 +1,6 @@
 // Les notes de séance, relues sans pouvoir les modifier : le dossier des notes est monté en lecture seule dans le
 // conteneur, et le nœud « Lire les notes » prend les fichiers AAAA-MM-JJ-seance-NN.md (docs/veille-parlia.md).
-// Le bot en tire quatre choses, pour la préparation et le rappel :
+// Le bot en tire cinq choses, pour la préparation et le rappel :
 // - les séances tenues. Une séance compte comme tenue quand la ligne « Date » de son tableau « Séance » porte une
 //   date AAAA-MM-JJ déjà passée, sans repère « [À REMPLIR …] », « [À COMPLÉTER …] » ni « [EN COURS …] » : une note
 //   préparée à l'avance ne compte pas. Elle appartient à la semaine de sa première date : la séance tenue les
@@ -16,6 +16,11 @@
 //   préparations » et « Texte des préparations ») ; sans lien, la dernière préparation du bot des sept jours d'avant
 //   la séance. Une séance préparée à la main (« à la main », ligne « Outil ») n'est pas comptée : ses candidats ne
 //   viennent pas des sources du bot. Le bot ne retire aucune source : la préparation montre les chiffres, Louis décide.
+// - la matière de la synthèse du mois, la semaine du dernier mercredi du mois (plan.semaine.synthese) : dans les
+//   séances de ce mois-là, les points classés « à surveiller » ou « décision à ouvrir », avec ce qu'ils changent et
+//   leurs sources, tels que les notes les écrivent ; et, pour la régularité, les séances tenues chaque semaine du
+//   mois. Une séance appartient au mois du mercredi de sa semaine : celle du jeudi 29 octobre 2026 à octobre. Sans
+//   modèle de langage : une liste exacte vaut mieux qu'un résumé qui pourrait inventer (technique.md).
 // Aucune note lisible (dossier non monté, vide, ou fichier illisible) : { lisibles: false }, et le rappel part
 // avec « si c'est fait, ignore ce message ». Le résultat va dans le carnet du passage (sd._passage.notes).
 const sd = $getWorkflowStaticData('global');
@@ -64,6 +69,13 @@ function sections(texte) {
 }
 const section = (liste, debut) => liste.find((s) => s.titre.startsWith(debut)) || { titre: '', lignes: [] };
 const lignesDuTableau = (s) => s.lignes.filter((l) => l.trim().startsWith('|') && !estSeparateur(l)).map(cellules);
+// Les sources d'un point retenu : la ligne « Sources : … » de son paragraphe, telle quelle (liens Markdown ou
+// adresses, avec ce qu'en dit la note) ; sans elle, les adresses que le paragraphe cite.
+function sourcesDu(lignes) {
+  const dites = lignes.map((l) => l.trim()).filter((l) => /^sources?\s*:/i.test(l)).map((l) => l.replace(/^sources?\s*:\s*/i, ''));
+  if (dites.length) return dites.join(' ; ').slice(0, 1500);
+  return [...new Set(lignes.join(' ').match(/https?:\/\/[^\s)<>\]]+/g) || [])].join(' ; ').slice(0, 1500);
+}
 
 function lireNote(texte, fichier) {
   const parties = sections(texte);
@@ -81,27 +93,40 @@ function lireNote(texte, fichier) {
   const lien = /preparations\/(\d{4}-\d{2}-\d{2}-preparation\.md)/.exec(section(parties, 'preparation').lignes.join('\n'));
   const aLaMain = /\ba la main\b/.test(simple(champ('outil')));
   // Les points retenus : « 1. **Titre** (candidat 2). Texte… » ; le titre en gras, sinon la première phrase. Les
-  // fiches qu'ils citent, dans leur première parenthèse : « (fiche 9) » ; « (alerte) » n'en cite aucune.
+  // fiches qu'ils citent, dans leur première parenthèse : « (fiche 9) » ; « (alerte) » n'en cite aucune. Le
+  // paragraphe de chacun, jusqu'au point suivant, pour ses sources.
   const retenus = {};
+  const paragraphes = {};
   const fiches = new Set();
+  let courant = '';
   for (const l of section(parties, 'points retenus').lignes) {
     const m = /^\s*(\d+)[.)]\s+(.+)$/.exec(l);
-    if (!m) continue;
+    if (!m) {
+      if (courant) paragraphes[courant].push(l);
+      continue;
+    }
+    courant = m[1];
+    paragraphes[courant] = [m[2]];
     const gras = /\*\*(.+?)\*\*/.exec(m[2]);
     retenus[m[1]] = tronquer(texteSimple(gras ? gras[1] : m[2].split(/(?<=\.)\s/)[0]).replace(/\*/g, ''), 160);
     const parenthese = (/\*\*[^*]+\*\*\s*\(([^)]*)\)/.exec(m[2]) || /\(([^)]*)\)/.exec(m[2]) || [])[1] || '';
     for (const k of fichesCitees(parenthese)) fiches.add(k);
   }
-  const aSurveiller = [];
+  // Les points classés « à surveiller » ou « décision à ouvrir » (tableau « Ce que ça change… », dernière colonne).
+  const classes = [];
   for (const c of lignesDuTableau(section(parties, 'ce que ca change'))) {
     if (c.length < 2 || simple(c[0]) === 'point') continue;
     const classement = c[c.length - 1];
-    if (!simple(classement).startsWith('a surveiller')) continue;
+    const type = simple(classement).startsWith('a surveiller') ? 'surveiller' : simple(classement).startsWith('decision') ? 'decision' : '';
+    if (!type) continue;
     const point = c[0].replace(/\*/g, '').trim();
-    aSurveiller.push({
+    classes.push({
       point,
-      titre: retenus[point] || tronquer(texteSimple(c.length > 2 ? c[1] : ''), 160),
+      type,
+      titre: retenus[point] || '',
+      effet: c.length > 2 ? tronquer(texteSimple(c[1]), 400) : '',
       classement: tronquer(texteSimple(classement), 220),
+      sources: paragraphes[point] ? sourcesDu(paragraphes[point]) : '',
     });
   }
   const pisteTexte = texteSimple(section(parties, 'prochaine piste').lignes.join(' '));
@@ -111,7 +136,9 @@ function lireNote(texte, fichier) {
     tenue: !aRemplir && dates.length > 0,
     debut: dates[0] || '',
     fin: dates[dates.length - 1] || '',
-    aSurveiller: aSurveiller.slice(0, 8),
+    classes: classes.slice(0, 12),
+    retenus,
+    sourcesParPoint: Object.fromEntries(Object.entries(paragraphes).map(([k, v]) => [k, sourcesDu(v)])),
     piste: A_REMPLIR.test(simple(pisteTexte)) ? '' : tronquer(pisteTexte, 500),
     preparation: lien ? lien[1] : '',
     aLaMain,
@@ -175,6 +202,20 @@ for (const item of $input.all()) {
   const fichier = String(j.fileName || '').split('/').pop();
   notes.push(lireNote(j.texte, fichier));
 }
+// Un point d'une séance précédente, reclassé (« Séance 02, point 2 ») : le titre et les sources du point d'origine.
+// Sans titre, l'effet en tient lieu. Puis les points « à surveiller », pour l'en-tête de la préparation.
+for (const n of notes) {
+  for (const p of n.classes) {
+    const ref = /^s[ée]ance\s*(?:n°\s*)?(\d+)\s*,\s*point\s*(?:n°\s*)?(\d+)$/i.exec(p.point);
+    const origine = ref ? notes.find((x) => x.numero === ref[1].padStart(2, '0')) : null;
+    if (origine) {
+      p.titre = p.titre || origine.retenus[ref[2]] || '';
+      p.sources = p.sources || origine.sourcesParPoint[ref[2]] || '';
+    }
+    if (!p.titre) [p.titre, p.effet] = [tronquer(p.effet, 160), ''];
+  }
+  n.aSurveiller = n.classes.filter((x) => x.type === 'surveiller').map((x) => ({ point: x.point, titre: x.titre, classement: x.classement })).slice(0, 8);
+}
 const ordre = (a, b) => a.debut.localeCompare(b.debut) || a.fin.localeCompare(b.fin) || a.numero.localeCompare(b.numero)
   || a.fichier.localeCompare(b.fichier);
 const tenues = notes.filter((n) => n.tenue).sort(ordre);
@@ -208,6 +249,24 @@ for (const n of tenues.filter((x) => x.debut >= debutQuatre && x.debut < lundi))
     if (n.fiches.includes(Number(k))) e.gardes++;
   }
 }
+
+// ---- La matière de la synthèse du mois ----
+// Le mercredi de la semaine d'une date (AAAA-MM-JJ).
+const mercrediDe = (iso) => jourAvant(iso, (new Date(iso + 'T12:00:00Z').getUTCDay() + 6) % 7 - 2);
+const mois = (plan.semaine && plan.semaine.synthese) || '';
+let synthese = null;
+if (mois) {
+  const dernierMercredi = mercrediDe(lundi);
+  const mercredis = [];
+  for (let m = dernierMercredi; m.slice(0, 7) === mois; m = jourAvant(m, 7)) mercredis.unshift(m);
+  const duMois = tenues.filter((n) => mercrediDe(n.debut).slice(0, 7) === mois);
+  synthese = {
+    mois,
+    mercredi: dernierMercredi,
+    seances: duMois.map((n) => Object.assign(resume(n), { points: n.classes })),
+    semaines: mercredis.map((m) => ({ mercredi: m, seances: duMois.filter((n) => mercrediDe(n.debut) === m).map(resume) })),
+  };
+}
 const bilan = {
   lisibles: notes.length > 0,
   motif: notes.length ? '' : (!erreurs.length || /no file/i.test(erreurs[0])
@@ -218,6 +277,7 @@ const bilan = {
   seancePrecedente: resume(semainePrecedente[semainePrecedente.length - 1]),
   derniere: derniere ? Object.assign(resume(derniere), { aSurveiller: derniere.aSurveiller, piste: derniere.piste }) : null,
   sources: { depuis: debutQuatre, seances: comptees, nonComptees, parSource },
+  synthese,
 };
 sd._passage = Object.assign(sd._passage || {}, { notes: bilan });
 return [{ json: { lues: bilan.lues, tenues: bilan.tenues, lisibles: bilan.lisibles } }];

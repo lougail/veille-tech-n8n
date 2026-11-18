@@ -292,3 +292,44 @@ test("les originaux : lus ou non, et pourquoi, fiche par fiche ; ce que l'origin
   assert.match(carte, /Ce que l'original contredit dans le tri/);
   assert.match(carte, /résumé d'après l'original/);
 });
+
+// La semaine du dernier mercredi du mois : la matière de la synthèse (nœud Notes), à la fin du fichier.
+const S48_SYN = { cle: '2026-S48', numero: 48, lundi: '2026-11-23', dimanche: '2026-11-29', mercredi: '2026-11-25', synthese: '2026-11' };
+const SYNTHESE = {
+  mois: '2026-11', mercredi: '2026-11-25',
+  seances: [
+    { numero: '02', debut: '2026-11-04', fin: '2026-11-04', fichier: '2026-11-04-seance-02.md', points: [
+      { point: '1', type: 'decision', titre: 'Un modèle devine à partir des noms', effet: 'Mesurer avec et sans la formule', classement: 'décision à ouvrir : D21',
+        sources: 'Wang et Song, arXiv, https://arxiv.org/abs/2611.02273' },
+    ] },
+    { numero: '03', debut: '2026-11-13', fin: '2026-11-16', fichier: '2026-11-13-seance-03.md', points: [
+      { point: 'Séance 02, point 2', type: 'surveiller', titre: 'Mistral Large 4', effet: 'À revoir', classement: 'à surveiller : reclassé', sources: '' },
+    ] },
+  ],
+  semaines: [
+    { mercredi: '2026-11-04', seances: [{ numero: '02', debut: '2026-11-04', fin: '2026-11-04' }] },
+    { mercredi: '2026-11-11', seances: [{ numero: '03', debut: '2026-11-13', fin: '2026-11-16' }] },
+    { mercredi: '2026-11-18', seances: [] },
+    { mercredi: '2026-11-25', seances: [] },
+  ],
+};
+
+test("la semaine du dernier mercredi du mois : la matière de la synthèse à la fin du fichier, et une ligne dans l'ouverture", async () => {
+  const sel = Object.assign({}, SEL, { semaine: S48_SYN });
+  const { s } = await preparer(sel, avecNotes(Object.assign({}, NOTES, { synthese: SYNTHESE })));
+  const md = s.markdown;
+  const matiere = md.slice(md.indexOf('## La matière de la synthèse de novembre'));
+  assert.ok(md.indexOf('### Classer en séance') < md.indexOf('## La matière de la synthèse de novembre'));
+  assert.match(matiere, /celle du mercredi 25 novembre 2026, d'après `GABARIT-SYNTHESE\.md`\. Elle ne reprend que les points classés « à surveiller » ou « décision à ouvrir » dans les notes du mois\. Les voici/);
+  assert.match(matiere, /### Séance 02, le 4 novembre 2026 \(2026-11-04-seance-02\.md\)\n\n- \*\*Point 1 : Un modèle devine à partir des noms\*\* — décision à ouvrir : D21\n  - Ce que ça change : Mesurer avec et sans la formule\n  - Sources : Wang et Song, arXiv, https:\/\/arxiv\.org\/abs\/2611\.02273\n/);
+  assert.match(matiere, /- \*\*Séance 02, point 2 : Mistral Large 4\*\* — à surveiller : reclassé\n  - Ce que ça change : À revoir\n  - Sources : aucune dans le paragraphe du point : voir la note\n/);
+  assert.match(matiere, /- Semaine du mercredi 11 novembre : séance 03, du 13 au 16 novembre 2026\.\n- Semaine du mercredi 18 novembre : aucune séance tenue\.\n- Semaine du mercredi 25 novembre : cette semaine, la dernière du mois\.\n$/);
+  assert.match(s.discord.ouverture.payload.content, /🗓️ Cette semaine, la synthèse de novembre : 2 points des notes du mois à reprendre, listés à la fin du fichier\./);
+  // Notes illisibles : à relever à la main. Les autres semaines : rien.
+  const illisibles = await preparer(sel, avecNotes({ lisibles: false, motif: 'aucune note trouvée : dossier des notes non monté, ou vide', lues: 0, tenues: 0, derniere: null }));
+  assert.match(illisibles.s.markdown, /## La matière de la synthèse de novembre\n\n.*\n\nLe bot n'a pas pu lire les notes de séance \(aucune note trouvée : dossier des notes non monté, ou vide\) : les points sont à relever à la main, dans les notes du mois\.\n$/);
+  assert.match(illisibles.s.discord.ouverture.payload.content, /🗓️ Cette semaine, la synthèse de novembre : le bot n'a pas pu lire les notes, les points sont à relever à la main\./);
+  const autre = await preparer(SEL, avecNotes(NOTES));
+  assert.doesNotMatch(autre.s.markdown, /La matière de la synthèse/);
+  assert.doesNotMatch(autre.s.discord.ouverture.payload.content, /🗓️/);
+});

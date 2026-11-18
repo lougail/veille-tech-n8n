@@ -114,6 +114,8 @@ if (sansCandidat.length) sources += ' Sans candidat cette semaine : ' + sansCand
 const notes = (sd._passage && sd._passage.notes) || null;
 const derniere = notes && notes.lisibles ? notes.derniere : null;
 const quandSeance = (s) => (s.debut === s.fin ? 'le ' + dateLongue(s.debut) : periode(s.debut, s.fin, true));
+// « Point 2 », ou, pour un point d'une séance précédente reclassé, « Séance 02, point 2 ».
+const nomDuPoint = (p) => (/^\d+$/.test(p.point) ? 'Point ' + p.point : p.point);
 const D = [];
 if (!notes || !notes.lisibles) {
   D.push("Le bot n'a pas pu lire les notes de séance (" + (notes ? notes.motif : 'notes non lues')
@@ -127,7 +129,7 @@ if (!notes || !notes.lisibles) {
   D.push('');
   if (derniere.aSurveiller.length) {
     D.push("Points « à surveiller », rappelés ici, hors quota, jusqu'à ce qu'une séance les classe autrement :");
-    derniere.aSurveiller.forEach((p) => D.push('- Point ' + p.point + ' : ' + p.titre + ' — ' + p.classement));
+    derniere.aSurveiller.forEach((p) => D.push('- ' + nomDuPoint(p) + ' : ' + p.titre + ' — ' + p.classement));
   } else {
     D.push('Aucun point « à surveiller » dans cette séance.');
   }
@@ -312,6 +314,56 @@ L.push('');
 L.push('### Classer en séance');
 L.push('');
 L.push("Pour chaque fiche ouverte : rien, à surveiller ou décision à ouvrir, et pourquoi. Dans Discord, une ligne par fiche, sous le message de la semaine : « 2 décision : … », « 5 rien », « 9 à surveiller : … ». Le bot propose ; Louis classe.");
+
+// ---- La matière de la synthèse du mois (nœud Notes), la semaine du dernier mercredi du mois ----
+// La synthèse ne reprend que les points classés « à surveiller » ou « décision à ouvrir » dans les notes du mois
+// (GABARIT-SYNTHESE.md) : le bot les relève tels quels, avec leurs sources, sans modèle de langage.
+const moisSynthese = semaine.synthese || '';
+const nomMois = moisSynthese ? MOIS_FR[Number(moisSynthese.slice(5, 7)) - 1] : '';
+const synthese = moisSynthese && notes && notes.lisibles ? notes.synthese : null;
+let pointsSynthese = 0;
+if (moisSynthese) {
+  L.push('');
+  L.push('## La matière de la synthèse de ' + nomMois);
+  L.push('');
+  const intro = 'La synthèse de ' + nomMois + " s'écrit à la dernière séance du mois, celle du mercredi " + dateLongue(semaine.mercredi)
+    + ", d'après `GABARIT-SYNTHESE.md`. Elle ne reprend que les points classés « à surveiller » ou « décision à ouvrir » dans les notes du mois.";
+  if (!synthese) {
+    L.push(intro);
+    L.push('');
+    L.push("Le bot n'a pas pu lire les notes de séance (" + (notes ? notes.motif || 'notes non lues' : 'notes non lues')
+      + ') : les points sont à relever à la main, dans les notes du mois.');
+  } else {
+    L.push(intro + ' Les voici, relevés par le programme tels que les notes les écrivent, sans modèle de langage ; la séance de cette semaine ajoutera les siens.');
+    for (const s of synthese.seances) {
+      L.push('');
+      L.push('### Séance ' + s.numero + ', ' + quandSeance(s) + ' (' + s.fichier + ')');
+      L.push('');
+      if (!s.points.length) {
+        L.push('Aucun point classé « à surveiller » ou « décision à ouvrir ».');
+        continue;
+      }
+      for (const p of s.points) {
+        pointsSynthese++;
+        L.push('- **' + nomDuPoint(p) + ' : ' + p.titre + '** — ' + p.classement);
+        if (p.effet) L.push('  - Ce que ça change : ' + p.effet);
+        L.push('  - Sources : ' + (p.sources || 'aucune dans le paragraphe du point : voir la note'));
+      }
+    }
+    if (!synthese.seances.length) {
+      L.push('');
+      L.push('Aucune séance de ' + nomMois + " n'est notée comme tenue pour l'instant.");
+    }
+    L.push('');
+    L.push("### La régularité, d'après les notes");
+    L.push('');
+    for (const w of synthese.semaines) {
+      const tenuesW = w.seances.map((s) => 'séance ' + s.numero + ', ' + quandSeance(s)).join(' ; ');
+      L.push('- Semaine du mercredi ' + dateLongue(w.mercredi).replace(/ \d{4}$/, '') + ' : '
+        + (tenuesW || (w.mercredi === semaine.mercredi ? 'cette semaine, la dernière du mois' : 'aucune séance tenue')) + '.');
+    }
+  }
+}
 const markdown = L.join('\n') + '\n';
 const nom = (essai ? 'essai-' : '') + aujourdhui + '-preparation.md';
 
@@ -344,6 +396,11 @@ if (sel.echeances && sel.echeances.length) {
   O.push('⏳ Dans les 90 jours : ' + sel.echeances.slice(0, 3).map((e) => dateLongue(e.date).replace(/ \d{4}$/, '') + ', ' + md(tronquer(e.titre, 70))).join(' ; '));
 }
 if (alertes.length) O.push('🚨 Alertes depuis la dernière fois : ' + alertes.length + ' (voir le fichier)');
+if (moisSynthese) {
+  O.push('🗓️ Cette semaine, la synthèse de ' + nomMois + ' : ' + (!synthese ? "le bot n'a pas pu lire les notes, les points sont à relever à la main."
+    : pointsSynthese ? pointsSynthese + ' point' + (pointsSynthese > 1 ? 's' : '') + ' des notes du mois à reprendre, listés à la fin du fichier.'
+      : 'aucun point « à surveiller » ou « décision à ouvrir » dans les notes du mois pour l\'instant.'));
+}
 O.push('Pour répondre : une ligne par fiche, ici, « 2 décision : … », « 5 rien », « 9 à surveiller : … ». Une seule fiche lue, c\'est déjà une séance courte.');
 O.push('-# Préparé par le bot le ' + instant($now) + " · résumés automatiques, à vérifier dans l'original · fichier " + nom);
 let contenu = O.join('\n');

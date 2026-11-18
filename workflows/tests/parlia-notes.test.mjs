@@ -229,3 +229,63 @@ test("les fiches citées : « fiches 6 à 8 » compte les trois ; « séance 02,
     'arXiv : textes parlementaires ou administratifs': { proposes: 1, gardes: 0 },
   });
 });
+
+// La matière de la synthèse de novembre 2026 (GABARIT-SYNTHESE.md), d'après les notes des séances 02 et 03 : la
+// séance 01, commencée le jeudi 29 octobre, est celle du mercredi 28, donc d'octobre.
+const NOTE_02_SYN = [
+  '# Veille — séance 02 — mercredi 4 novembre 2026', '', '## Séance', '', '| Champ | Valeur |', '|---|---|',
+  '| Date | 2026-11-04 |', '| Séance n° | 02 |', '',
+  '## Points retenus (trois à cinq)', '',
+  '1. **Un modèle de langage devine à partir des noms cités** (candidat 4). Une étude du 1er novembre 2026.',
+  '   Sources : Wenchang Wang et Yue Song, arXiv, https://arxiv.org/abs/2611.02273 ; lu en séance.', '',
+  '2. **Mistral publie les poids de Mistral Large 4** (candidat 1). Annoncé sur https://mistral.ai/news/mistral-large-4-oss/ le 29 octobre.', '',
+  '3. **Une étude sans suite** (candidat 5).', '',
+  '## Ce que ça change, ou pourrait changer, pour le projet', '',
+  '| Point | Effet | Classement |', '|---|---|---|',
+  "| 1 | Mesurer chaque service avec et sans la formule d'ouverture | décision à ouvrir : D21, choisie par Louis |",
+  "| 2 | Un candidat pour le banc d'essai | à surveiller : accepté par Louis |",
+  '| 3 | Rien pour ParlIA | rien |', '',
+].join('\n');
+const NOTE_03_SYN = [
+  '# Veille — séance 03 — vendredi 13 novembre 2026', '', '## Séance', '', '| Champ | Valeur |', '|---|---|',
+  '| Date | 2026-11-13, 2026-11-15 et 2026-11-16 |', '| Séance n° | 03 |', '',
+  '## Points retenus (trois à cinq)', '',
+  '1. **Un petit remaniement le 7 novembre** (alerte). Arnaud Viala est nommé ministre délégué.', '',
+  '   Sources : [Élysée, communiqué du 7 novembre 2026](https://www.elysee.fr/x) ; [Décret du 7 novembre 2026](https://www.legifrance.gouv.fr/y), lu par extrait.', '',
+  '## Ce que ça change, ou pourrait changer, pour le projet', '',
+  '| Point | Effet | Classement |', '|---|---|---|',
+  "| 1 | Vérifier le décret d'attributions | à surveiller : accepté par Louis (« ok ») |",
+  '| Séance 02, point 2 | Mistral Large 4, à revoir à la même recherche | à surveiller : reclassé le 16 novembre |', '',
+].join('\n');
+const S48_SYN = Object.assign({}, S48, { mercredi: '2026-11-25', synthese: '2026-11' });
+async function synthese(semaine) {
+  const sd = { _passage: {} };
+  const notes = [note('2026-10-28-seance-01.md', NOTE_01), note('2026-11-04-seance-02.md', NOTE_02_SYN), note('2026-11-13-seance-03.md', NOTE_03_SYN)];
+  await executer('notes-parlia.js', { input: notes, sd, maintenant: '2026-11-23T07:15', sorties: { 'Que faire ?': [plan({ semaine })] } });
+  return sd._passage.notes;
+}
+
+test("la synthèse du mois : les points « à surveiller » et « décision à ouvrir » des séances du mois, avec leurs sources, et la régularité", async () => {
+  const { synthese: s, derniere } = await synthese(S48_SYN);
+  assert.deepEqual([s.mois, s.mercredi], ['2026-11', '2026-11-25']);
+  assert.deepEqual(s.seances.map((x) => [x.numero, x.debut, x.fin]), [['02', '2026-11-04', '2026-11-04'], ['03', '2026-11-13', '2026-11-16']]);
+  const [s02, s03] = s.seances;
+  assert.deepEqual(s02.points.map((p) => [p.point, p.type, p.titre, p.sources]), [
+    ['1', 'decision', 'Un modèle de langage devine à partir des noms cités', 'Wenchang Wang et Yue Song, arXiv, https://arxiv.org/abs/2611.02273 ; lu en séance.'],
+    ['2', 'surveiller', 'Mistral publie les poids de Mistral Large 4', 'https://mistral.ai/news/mistral-large-4-oss/'],
+  ]);
+  assert.equal(s02.points[0].effet, "Mesurer chaque service avec et sans la formule d'ouverture");
+  assert.equal(s02.points[0].classement, 'décision à ouvrir : D21, choisie par Louis');
+  assert.equal(s03.points[0].sources, '[Élysée, communiqué du 7 novembre 2026](https://www.elysee.fr/x) ; [Décret du 7 novembre 2026](https://www.legifrance.gouv.fr/y), lu par extrait.');
+  // Un point d'une séance précédente, reclassé : le titre et les sources du point d'origine, l'effet de la nouvelle séance.
+  assert.deepEqual(s03.points[1], {
+    point: 'Séance 02, point 2', type: 'surveiller', titre: 'Mistral publie les poids de Mistral Large 4',
+    effet: 'Mistral Large 4, à revoir à la même recherche', classement: 'à surveiller : reclassé le 16 novembre',
+    sources: 'https://mistral.ai/news/mistral-large-4-oss/',
+  });
+  assert.deepEqual(derniere.aSurveiller.map((p) => [p.point, p.titre]), [['1', 'Un petit remaniement le 7 novembre'], ['Séance 02, point 2', 'Mistral publie les poids de Mistral Large 4']]);
+  assert.deepEqual(s.semaines.map((w) => [w.mercredi, w.seances.map((x) => x.numero)]),
+    [['2026-11-04', ['02']], ['2026-11-11', ['03']], ['2026-11-18', []], ['2026-11-25', []]]);
+  // Les autres semaines, pas de matière.
+  assert.equal((await synthese(Object.assign({}, S48_SYN, { synthese: '' }))).synthese, null);
+});

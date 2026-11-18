@@ -94,6 +94,22 @@ test('des réglages invalides reprennent les valeurs par défaut', async () => {
   assert.equal(p.reglages.forum, false);
 });
 
+// La synthèse du mois s'écrit à la séance du dernier mercredi du mois (DISPOSITIF.md) : la semaine de ce mercredi
+// porte le mois, et sa préparation en donne la matière.
+test('la semaine du dernier mercredi du mois porte la synthèse de ce mois', async () => {
+  const semaine = async (iso) => {
+    const p = await passage(iso, { lastCollectAt: ms(iso) - 3600 * 1000 }, { essai: '1' });
+    return [p.semaine.mercredi, p.semaine.synthese];
+  };
+  assert.deepEqual(await semaine('2026-11-23T07:15'), ['2026-11-25', '2026-11']);
+  assert.deepEqual(await semaine('2026-11-29T21:45'), ['2026-11-25', '2026-11']);
+  assert.deepEqual(await semaine('2026-11-16T07:15'), ['2026-11-18', '']);
+  assert.deepEqual(await semaine('2026-10-26T07:15'), ['2026-10-28', '2026-10']);
+  // Le mercredi 30 décembre, dans une semaine qui finit en 2027 ; le 2 décembre, dans une semaine qui commence en novembre.
+  assert.deepEqual(await semaine('2027-01-02T10:15'), ['2026-12-30', '2026-12']);
+  assert.deepEqual(await semaine('2026-11-30T07:15'), ['2026-12-02', '']);
+});
+
 test("en mode essai, tout est dû, et le carnet du passage est ouvert", async () => {
   const sd = { lastCollectAt: ms('2026-11-03T09:00'), pagesJour: '2026-11-03', prep: Object.assign(faite('2026-11-02T09:15'), { rappel: true }) };
   const p = await passage('2026-11-03T09:20', sd, { essai: '1' });

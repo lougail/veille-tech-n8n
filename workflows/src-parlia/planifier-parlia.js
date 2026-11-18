@@ -6,6 +6,8 @@
 //   semaine ; Mac éteint le lundi, elle part au premier réveil suivant, jusqu'au dimanche.
 // - Le rappel doux : au premier passage à partir du jeudi 16 h 30 (réglable), si la préparation de la
 //   semaine est partie avant cette heure ; jusqu'au dimanche (ergonomie.md, F1 et F2).
+// - La synthèse du mois s'écrit à la dernière séance du mois, celle du dernier mercredi (DISPOSITIF.md, section 2) :
+//   la semaine de ce mercredi porte le mois (semaine.synthese, AAAA-MM), et sa préparation en donne la matière.
 // Les réglages viennent du nœud Réglages (variables d'environnement, avec des valeurs par défaut).
 // En mode essai (build_parlia.py --test), tout est dû. Rien n'est enregistré ici, sauf sd._passage,
 // le carnet du passage en cours, que lit le message de #status.
@@ -40,11 +42,14 @@ const reglages = {
 };
 
 const lundi = $now.startOf('week');
+const mercredi = lundi.plus({ days: 2 });
 const semaine = {
   cle: $now.toFormat("kkkk-'S'WW"),
   numero: $now.weekNumber,
   lundi: lundi.toISODate(),
   dimanche: lundi.plus({ days: 6 }).toISODate(),
+  mercredi: mercredi.toISODate(),
+  synthese: mercredi.plus({ weeks: 1 }).month !== mercredi.month ? mercredi.toFormat('yyyy-MM') : '',
 };
 const moment = (jour, hm) => lundi.plus({ days: jour - 1 }).set({ hour: hm.h, minute: hm.mn, second: 0, millisecond: 0 });
 const maintenant = $now.toMillis();

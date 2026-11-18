@@ -208,6 +208,12 @@ la reprendre telle quelle :
 - avant « Classer en séance », les sources sur quatre semaines : une ligne par source du bot, avec les articles
   proposés aux séances tenues sur ses préparations et ceux qu'un point retenu cite (voir « Les notes de séance »).
   Le bot ne retire aucune source : Louis décide.
+- la semaine du dernier mercredi du mois, après « Classer en séance », **la matière de la synthèse du mois** : les
+  points classés « à surveiller » ou « décision à ouvrir » dans les notes du mois, séance par séance, avec ce qu'ils
+  changent et leurs sources, tels que les notes les écrivent ; puis la régularité, semaine par semaine (la séance
+  tenue, ou aucune). C'est tout ce que la synthèse peut reprendre (`GABARIT-SYNTHESE.md`) ; la séance de la
+  semaine ajoute les siens, et l'assistant écrit le premier jet. Le relevé se fait sans modèle de langage : une liste
+  exacte vaut mieux qu'un résumé qui pourrait inventer. L'ouverture, dans Discord, l'annonce en une ligne.
 
 Le fichier est signé et daté : c'est le travail du bot, pas une lecture. Le bot ne commite jamais : aucun dossier
 `.git` n'est monté dans le conteneur. Le fichier entre dans Git avec la note de séance, par le commit de Louis.
@@ -232,7 +238,7 @@ Tout passe par un webhook, `DISCORD_WEBHOOK_PARLIA`. Sans lui, rien n'est publi�
 ### Les notes de séance
 
 Le dossier des notes est monté en lecture seule. `notes-parlia.js` lit les fichiers `AAAA-MM-JJ-seance-NN.md`
-et n'en tire que quatre choses.
+et n'en tire que cinq choses.
 
 - **Les séances tenues.** Une séance compte comme tenue quand la ligne « Date » du tableau « Séance » porte une date
   AAAA-MM-JJ déjà passée, sans repère « [À REMPLIR …] », « [À COMPLÉTER …] » ni « [EN COURS …] » : une note
@@ -251,6 +257,12 @@ et n'en tire que quatre choses.
   dernière préparation du bot des sept jours d'avant. Une séance préparée à la main n'est pas comptée : ses
   candidats ne viennent pas des sources du bot (séances 01 et 02). Le Journal officiel et l'Élysée, qui ne donnent
   que des alertes, restent hors du tableau.
+- **La matière de la synthèse du mois**, la semaine du dernier mercredi du mois (le 25 novembre 2026, le
+  30 décembre) : dans les séances de ce mois, les lignes du tableau « Ce que ça change… » classées « à surveiller »
+  ou « décision à ouvrir », avec le titre du point retenu, l'effet et les sources : la ligne « Sources : … » du
+  paragraphe du point, telle quelle, sinon les adresses qu'il cite. Un point d'une séance précédente, reclassé
+  (« Séance 02, point 2 »), prend le titre et les sources du point d'origine. Une séance appartient au mois du
+  mercredi de sa semaine : la séance 01, commencée le jeudi 29 octobre, est celle d'octobre.
 
 Le rappel du jeudi ne part pas si une séance de la semaine est notée. Sans notes lisibles (dossier non monté ou
 vide), il part quand même, avec « si c'est fait, ignore ce message », et le fichier demande de reprendre les points
@@ -465,7 +477,6 @@ proposer (nouveau format des lignes).
 - Rejouer le jeu de contrôle du tri (étude, §5.5) à chaque changement de la consigne ou du modèle.
 - La revue des sources (règle 10) : la préparation en donne le bilan sur quatre semaines ; à Louis de décider, en
   séance, des sources à espacer ou à retirer.
-- La matière de la synthèse mensuelle.
 - Lire les réponses et les réactions dans Discord : il faudrait un bot Discord et son jeton, un webhook ne lit rien.
 - Les sources à l'essai de l'étude (§4.2), hors Élysée.
 
