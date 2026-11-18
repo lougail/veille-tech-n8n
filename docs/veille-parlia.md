@@ -98,6 +98,10 @@ Les dates :
 - sur une page sans flux, la date d'un bloc est sa première date déjà passée, sinon celle de son intertitre : une
   date à venir est une date d'effet (un arrêt annoncé), et une date collée à un nom de modèle
   (« gpt-image-2-2026-04-21 ») n'est pas une date ;
+- sur une page sans flux, un bloc nouveau dont toutes les dates ont plus de 14 jours n'est pas proposé : une page
+  remaniée, ou une ancienne annonce remontée. Le 16 novembre 2026, la page de Liquid AI avait fait proposer
+  « Introducing LFM3 » et d1-ultra, annoncés les 27 et 15 octobre (fiche 3 de la semaine 47). Un bloc sans date, ou
+  avec une date récente ou à venir (un arrêt annoncé), reste ; #status compte les blocs écartés (18 novembre 2026) ;
 - un candidat publié avant le premier jour de la période lue est signalé : un article ancien, ou la mise à jour
   d'un avis ancien. Une étude d'arXiv déposée avant la période ne l'est pas : la fiche dit le jour où le bot l'a vue ;
 - une étude d'arXiv est reconnue sans son numéro de version : sa version 2 n'est pas un nouvel article (les adresses

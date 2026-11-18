@@ -97,6 +97,27 @@ test("une page en Markdown (Gemini) : ses intertitres se lisent comme ceux d'une
   assert.equal(a.link, 'https://aistudio.google.com/docs/changelog?hl=en');
 });
 
+// Fiche 3 de la semaine 47 : le 16 novembre 2026, la page de Liquid AI, remaniée, avait fait proposer « Introducing
+// LFM3 » et d1-ultra, annoncés les 27 et 15 octobre. Ici, le 2 novembre : la limite est le 19 octobre.
+test("un bloc nouveau dont toutes les dates ont plus de 14 jours n'est pas proposé ; récent, à venir ou sans date, il l'est", async () => {
+  const sd = {};
+  await passer(sd, table());
+  const U = 'https://docs.mistral.ai/resources/changelogs';
+  const corps = page([
+    entree('Nov 1', 'Mistral Small 4 is now available, with calibrated scores for classification tasks.'), BASE[0],
+    entree('Oct 10', 'An older announcement, moved to the top of the page when the site was redesigned.'), BASE[1],
+    entree('Oct 9', 'Mistral Medium 3 will be retired on December 1, 2026; migrate to Mistral Medium 4 before then.'), BASE[2],
+    entree('Update', 'A change to the documentation of the batch API, without any date written in it.'),
+  ].concat(BASE.slice(3)));
+  const { articles } = await passer(sd, table({ [U]: { statusCode: 200, body: corps } }));
+  assert.deepEqual(articles.map((a) => a.title.replace('Mistral, journal des modifications — ', '')), [
+    'Mistral Small 4 is now available, with calibrated scores for classification tasks.',
+    'Mistral Medium 3 will be retired on December 1, 2026; migrate to Mistral Medium 4 before then.',
+    'Update',
+  ]);
+  assert.equal(sd._passage.pages.anciens, 1);
+});
+
 test('les garde-fous : un refus, une page vidée, une page refaite', async () => {
   const sd = {};
   await passer(sd, table());

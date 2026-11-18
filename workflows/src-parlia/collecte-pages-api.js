@@ -10,6 +10,10 @@
 //   2026 · Affected model : chatgpt-image-latest · Recommended replacement : gpt-image-2.6-sunburst ». Sans les
 //   en-têtes, le tri avait pris le 6 novembre 2026 les remplaçants pour les modèles arrêtés (fiche 4, semaine 46).
 //   La date de publication d'un bloc est sa première date déjà passée : une date à venir est une date d'effet.
+//   Un bloc nouveau dont toutes les dates ont plus de 14 jours n'est pas proposé : une page remaniée, ou une ancienne
+//   annonce remontée. Le 16 novembre 2026, la page de Liquid AI avait fait proposer « Introducing LFM3 » et d1-ultra,
+//   annoncés les 27 et 15 octobre (fiche 3 de la semaine 47). Un bloc sans date, ou avec une date récente ou à venir
+//   (un arrêt annoncé), reste ; #status compte les blocs écartés.
 //   Sur la page des retraits d'OpenAI (PARLIA.RETRAITS_TEXTE), une ligne qui ne nomme que des modèles d'image, de
 //   son, de vidéo, de plongements ou de modération n'entre dans aucun bloc, ni la section entière d'un intertitre
 //   qui ne nomme qu'eux (16 novembre 2026).
@@ -104,6 +108,11 @@ const evolution = (avant, apres, sens) => (avant === apres ? dollars(apres) + ' 
 // ---- Pages : lues en lignes par lecture-pages.js (lignesDe, lignesDuMarkdown, texteDuBloc), commun avec la
 // lecture des originaux ; ici, la comparaison avec la veille et la date de chaque bloc ----
 const MOIS_JOUR = /\b(jan|feb|mar|apr|may|jun|jul|aug|sept?|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})\b/i;
+// Une date sans année (« Oct 30 », journal d'OpenAI) prend l'année en cours, ou la précédente si elle tombait plus tard.
+const sansAnnee = (m) => {
+  const iso = (a) => a + '-' + String(MOIS_EN[m[1].toLowerCase()]).padStart(2, '0') + '-' + String(m[2]).padStart(2, '0');
+  return iso($now.year) > aujourdhui ? iso($now.year - 1) : iso($now.year);
+};
 // Un intertitre qui n'est qu'une date (« October 30 », « 27 octobre 2026 ») ne fait pas un bon titre.
 const estUneDate = (t) => t.length < 32 && (!!dateDansTexte(t) || MOIS_JOUR.test(t));
 // La date de publication d'un bloc : sa première date déjà passée, sinon celle de son intertitre ; sinon aucune
@@ -119,14 +128,21 @@ function dateDuBloc(texte, avant) {
       continue;
     }
     const m = MOIS_JOUR.exec(t);
-    if (!m) continue;
-    let annee = $now.year;
-    const iso = (a) => a + '-' + String(MOIS_EN[m[1].toLowerCase()]).padStart(2, '0') + '-' + String(m[2]).padStart(2, '0');
-    if (iso(annee) > aujourdhui) annee--;
-    return iso(annee);
+    if (m) return sansAnnee(m);
   }
   return '';
 }
+// Toutes les dates d'un bloc, écrites avec leur année ou sans (« Oct 30 ») ; un bloc sans date ni intertitre à lui
+// prend celles de la section où il est ajouté (avant).
+const SANS_ANNEE = new RegExp(MOIS_JOUR.source + '(?!,?\\s*20\\d{2})', 'gi');
+function datesDuBloc(texte, avant) {
+  for (const t of [texte, avant || '']) {
+    const dates = datesDansTexte(t).concat(Array.from(t.matchAll(SANS_ANNEE), sansAnnee));
+    if (dates.length) return dates;
+  }
+  return [];
+}
+const IL_Y_A_14_JOURS = $now.minus({ days: 14 }).toISODate();
 // Compare la page à la veille. etat : { h : empreintes des 400 premières lignes, n : nombre de lignes, v : format }.
 // ignorees : les lignes qui n'entrent dans aucun bloc (un booléen par ligne) ; elles restent dans l'empreinte de la
 // page. Un intertitre ignoré ferme le bloc en cours : sa section ne prolonge pas celle d'avant.
@@ -176,7 +192,7 @@ function comparer(lignes, etat, ignorees) {
     if (titre) dernierTitre = titre;
   });
   if (courant) blocs.push(courant);
-  return { nouveau, blocs: blocs.filter((b) => texteDuBloc(b.lignes).length >= 60).slice(0, 5) };
+  return { nouveau, blocs: blocs.filter((b) => texteDuBloc(b.lignes).length >= 60) };
 }
 async function page(p) {
   const corps = texteDe(await lire(p.u, p.anglais));
@@ -193,7 +209,11 @@ async function page(p) {
       if (e.page === p.id && Array.isArray(e.lignes) && e.lignes.length && !e.changee && !e.lignes.some((h) => presentes.has(h))) e.changee = aujourdhui;
     }
   }
-  const items = r.blocs.map((b) => {
+  const recents = r.blocs.filter((b) => {
+    const dates = datesDuBloc(texteDuBloc(b.lignes), b.titre ? '' : b.avant);
+    return !dates.length || dates.some((d) => d >= IL_Y_A_14_JOURS);
+  });
+  const items = recents.slice(0, 5).map((b) => {
     const texte = texteDuBloc(b.lignes);
     const tete = sansMarque((b.titre && !estUneDate(b.titre) ? b.titre : '') || b.lignes.find((l) => sansMarque(l).length >= 25) || b.lignes[0]);
     const date = dateDuBloc(texte, b.avant);
@@ -207,7 +227,7 @@ async function page(p) {
       _source: source(p, 'page'),
     } };
   });
-  return { items, note: r.premier ? 'premier passage' : (r.refaite ? 'page refaite' : '') };
+  return { items, note: r.premier ? 'premier passage' : (r.refaite ? 'page refaite' : ''), anciens: r.blocs.length - recents.length };
 }
 
 // ---- OpenRouter ----
@@ -359,16 +379,17 @@ const taches = PAGES.map((p) => ({ c: p, f: () => page(p) }))
   .concat([{ c: OPENROUTER, f: openrouter }, { c: DATAGOUV, f: datagouv }])
   .concat(HF.map((c) => ({ c, f: () => huggingface(c) })));
 const resultats = await Promise.all(taches.map((t) => t.f().then(
-  (r) => ({ c: t.c, ok: true, items: r.items, note: r.note, offresIllisibles: r.offresIllisibles || 0 }),
+  (r) => ({ c: t.c, ok: true, items: r.items, note: r.note, offresIllisibles: r.offresIllisibles || 0, anciens: r.anciens || 0 }),
   (e) => ({ c: t.c, ok: false, items: [], detail: String(e && e.message ? e.message : e).slice(0, 160) }),
 )));
-const bilan = { lues: resultats.length, echecs: [], nouveautes: 0, refaites: [], premiers: 0, offresIllisibles: 0 };
+const bilan = { lues: resultats.length, echecs: [], nouveautes: 0, refaites: [], premiers: 0, offresIllisibles: 0, anciens: 0 };
 for (const r of resultats) {
   sortie.push({ json: { _sante: { id: r.c.id, s: r.c.s, ok: r.ok, detail: r.detail || '' } } });
   if (!r.ok) bilan.echecs.push(r.c.id);
   if (r.note === 'page refaite') bilan.refaites.push(r.c.id);
   if (r.note === 'premier passage') bilan.premiers++;
   bilan.offresIllisibles += r.offresIllisibles || 0;
+  bilan.anciens += r.anciens || 0;
   bilan.nouveautes += r.items.length;
   for (const it of r.items) sortie.push(it);
 }
