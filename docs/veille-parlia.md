@@ -496,6 +496,12 @@ GHSA-q8rc-7m84-mfvj, jugé élevé, GHSA-g333-hr44-g82p). La liste des changemen
 - **Le reste, vérifié** : une pause « Wait » de moins de 65 secondes reste en mémoire ; `retryOnFail` relance bien un
   nœud qui continue en cas d'erreur ; le temps maximal d'un nœud Code reste de 300 secondes
   (`N8N_RUNNERS_TASK_TIMEOUT`), la lecture des pages et des originaux pouvant dépasser la minute.
+- **La base ne s'ouvre jamais depuis le Mac pendant que n8n tourne**, même en lecture seule. Le 18 novembre, à
+  11 h 32, une lecture faite depuis le Mac a fait tomber n8n (SIGBUS ; l'exécution en cours de la veille personnelle
+  notée « crashed », rien de perdu) : les verrous de SQLite ne traversent pas la machine virtuelle d'OrbStack, et le
+  sqlite du Mac, se croyant seul, a remis à zéro la mémoire partagée de la base (`-shm`). Lire depuis le conteneur, ou
+  une copie faite par le conteneur (`VACUUM INTO`, comme `outils/rendement-sources.py`), ou la base d'un n8n arrêté.
+  `n8n export:workflow` et les journaux `n8n-data/n8nEventLog*.log` se lisent sans risque.
 - **La sauvegarde** : `sauvegardes/2026-11-18-avant-2.48.5/` (la base et le fichier `config`, copiés n8n arrêté),
   ignorée par Git, à garder deux semaines. Pour revenir en arrière : `docker compose down`, mettre de côté la base
   actuelle, recopier la sauvegarde dans `n8n-data/`, remettre `n8nio/n8n:2.10.3` dans `docker-compose.yml`, puis

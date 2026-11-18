@@ -5,19 +5,71 @@ Pour chaque source : nombre de passages, d'erreurs et de passages vides, article
 fenêtre de collecte, nouveaux, pré-classés, présents dans un sujet classé, présents dans un sujet
 publié, et note moyenne des sujets où elle apparaît. Sert à la revue mensuelle des sources.
 
-Lecture seule : la base de n8n est ouverte en mode lecture, aucun secret n'est affiché.
+Lecture seule, aucun secret n'est affiché. La base de n8n n'est jamais ouverte depuis le Mac pendant que n8n
+tourne : les verrous de SQLite ne traversent pas la machine virtuelle de Docker (OrbStack), et le 18 novembre 2026
+une lecture de ce genre a fait tomber n8n (SIGBUS). Sans argument, le script fait faire au conteneur une copie
+cohérente de la base (VACUUM INTO), la lit, puis l'efface. Avec un chemin, il lit ce fichier : une copie, ou la
+base d'un n8n arrêté.
 
-Usage, depuis la racine du dépôt :
-    python3 outils/rendement-sources.py [chemin/vers/database.sqlite]
+Usage :
+    python3 outils/rendement-sources.py                       # copie faite par le conteneur, n8n lancé
+    python3 outils/rendement-sources.py chemin/vers/copie.sqlite
 """
+import atexit
 import collections
 import json
 import sqlite3
+import subprocess
 import sys
+from pathlib import Path
 
 sys.setrecursionlimit(20000)
-BASE = sys.argv[1] if len(sys.argv) > 1 else "n8n-data/database.sqlite"
 WORKFLOW = "VeilleProV2story"
+CONTENEUR = "veille-tech-n8n-n8n-1"
+DONNEES = Path(__file__).resolve().parent.parent / "n8n-data"
+BASE_EN_SERVICE = DONNEES / "database.sqlite"
+COPIE = "copie-rendement.sqlite"
+# Exécuté dans le conteneur, avec le module sqlite3 de n8n : là, les verrous de SQLite fonctionnent.
+COPIER = (
+    'const sqlite3 = require(require.resolve("sqlite3", { paths: ["/usr/local/lib/node_modules/n8n/node_modules/@n8n/db",'
+    ' "/usr/local/lib/node_modules/n8n"] }));'
+    'const db = new sqlite3.Database("/home/node/.n8n/database.sqlite", sqlite3.OPEN_READONLY);'
+    'db.run("VACUUM INTO ?", ["/home/node/.n8n/' + COPIE + '"], (e) => {'
+    ' if (e) { console.error(e.message); process.exitCode = 1; } db.close(); });'
+)
+
+
+def n8n_arrete():
+    """Vrai seulement si Docker répond que le conteneur de n8n est arrêté ; sans réponse, on le croit lancé."""
+    try:
+        r = subprocess.run(["docker", "inspect", "-f", "{{.State.Running}}", CONTENEUR], capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return r.returncode == 0 and r.stdout.strip() == "false"
+
+
+def copie_par_le_conteneur():
+    """Une copie cohérente de la base, faite par le conteneur dans n8n-data/, effacée à la fin du script."""
+    copie = DONNEES / COPIE
+    copie.unlink(missing_ok=True)
+    try:
+        r = subprocess.run(["docker", "exec", CONTENEUR, "node", "-e", COPIER], capture_output=True, text=True, timeout=600)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        sys.exit("Copie impossible par le conteneur : " + str(e))
+    if r.returncode != 0 or not copie.exists():
+        sys.exit("Copie impossible par le conteneur : " + (r.stderr.strip() or "n8n est-il lancé ?")
+                 + "\nn8n arrêté, la base se lit directement : python3 outils/rendement-sources.py " + str(BASE_EN_SERVICE))
+    atexit.register(lambda: copie.unlink(missing_ok=True))
+    return copie
+
+
+if len(sys.argv) > 1:
+    BASE = Path(sys.argv[1])
+    if BASE.resolve() == BASE_EN_SERVICE and not n8n_arrete():
+        sys.exit("n8n tourne (ou Docker ne répond pas) : sa base ne s'ouvre pas depuis le Mac."
+                 " Lancer le script sans argument : il en fait faire une copie par le conteneur.")
+else:
+    BASE = copie_par_le_conteneur()
 
 
 def revivre(tableau):

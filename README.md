@@ -93,7 +93,9 @@ docker exec -e N8N_RUNNERS_BROKER_PORT=5699 -e N8N_PORT=5698 \
   veille-tech-n8n-n8n-1 n8n execute --id VeilleProV2test01
 ```
 
-Rendement de chaque source sur les exécutions gardées par n8n, pour la revue mensuelle des sources :
+Rendement de chaque source sur les exécutions gardées par n8n, pour la revue mensuelle des sources. Le script fait
+copier la base par le conteneur, la lit, puis efface la copie : la base de n8n ne s'ouvre jamais depuis le Mac
+pendant que n8n tourne (voir `CLAUDE.md`).
 
 ```bash
 python3 outils/rendement-sources.py
