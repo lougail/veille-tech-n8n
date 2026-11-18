@@ -17,6 +17,11 @@
 // - Le catalogue d'OpenRouter (A02) : les nouveaux modèles des fournisseurs suivis ; pour la liste de suivi
 //   (sources.md, 4.4), un changement de prix, une date de retrait annoncée, une disparition. Ces deux drapeaux
 //   sont calculés par le programme (_verifie) : le tri ne peut pas les oublier.
+//   Le prix suivi est celui de l'offre la moins chère parmi les hébergeurs du modèle (API « endpoints »), pas le prix
+//   « par défaut » du catalogue : celui-ci suit un seul hébergeur et change sans que l'éditeur change le sien (Mistral
+//   Small 3.2 : 0,075 $ → 0,10 $ le 10 novembre 2026, retour le 18 ; fiche 5 de la semaine 47, « hausse du prix »).
+//   Une nouvelle offre la moins chère n'est signalée que si elle se voit deux jours de suite : un hébergeur absent un
+//   jour ne fait pas une hausse. Des offres illisibles : la comparaison attend le jour suivant (#status les compte).
 // - La fiche data.gouv.fr des questions du Sénat (A11) : sa date de modification et la liste de ses fichiers.
 //   Les fichiers sont republiés chaque nuit : leurs dates ne comptent pas, seuls leurs noms et formats. Elle a
 //   parfois mis plus de 20 secondes à répondre (essai du 16 novembre 2026) : elle en a 45.
@@ -77,6 +82,24 @@ const prixM = (v) => {
   return Number.isFinite(n) && n >= 0 ? Math.round(n * 1e6 * 10000) / 10000 : null;
 };
 const dollars = (n) => (n == null ? '?' : String(n).replace('.', ',') + ' $');
+// Les offres des hébergeurs d'un modèle chez OpenRouter, de la moins chère à la plus chère : « DeepInfra (flex) »,
+// prix d'entrée et de sortie par million de jetons. null si la réponse est illisible.
+async function offres(id) {
+  try {
+    const d = jsonDe(await lire('https://openrouter.ai/api/v1/models/' + id + '/endpoints'));
+    const liste = d && d.data && Array.isArray(d.data.endpoints) ? d.data.endpoints : null;
+    if (!liste) return null;
+    return liste.map((e) => {
+      const variante = String(e.tag || '').split('/').slice(2).join('/');
+      return { nom: String(e.provider_name || '?') + (variante ? ' (' + variante + ')' : ''), hebergeur: String(e.provider_name || '?'),
+        p: prixM(e.pricing && e.pricing.prompt), c: prixM(e.pricing && e.pricing.completion) };
+    }).filter((o) => o.p != null && o.c != null).sort((x, y) => x.p - y.p || x.c - y.c);
+  } catch (e) {
+    return null;
+  }
+}
+const memePrix = (x, y) => !!x && !!y && x.p === y.p && x.c === y.c;
+const evolution = (avant, apres, sens) => (avant === apres ? dollars(apres) + ' en ' + sens + ' (inchangé)' : dollars(avant) + ' → ' + dollars(apres) + ' en ' + sens);
 
 // ---- Pages : lues en lignes par lecture-pages.js (lignesDe, lignesDuMarkdown, texteDuBloc), commun avec la
 // lecture des originaux ; ici, la comparaison avec la veille et la date de chaque bloc ----
@@ -196,6 +219,7 @@ async function openrouter() {
   const maxCree = data.reduce((m, x) => Math.max(m, Number(x.created) || 0), 0);
   const suivi = {};
   const items = [];
+  let offresIllisibles = 0;
   const article = (titre, url, extrait, cle, verifie, quand) => ({ json: {
     title: titre, link: url, isoDate: quand, contentSnippet: extrait, _cle: cle,
     _verifie: verifie || undefined, _source: source(OPENROUTER, 'api'),
@@ -216,6 +240,9 @@ async function openrouter() {
       ));
     }
   }
+  // Les offres des modèles suivis présents au catalogue, lues ensemble.
+  const presents = PARLIA.SUIVI.filter((id) => data.some((x) => x.id === id));
+  const offresDe = Object.fromEntries(await Promise.all(presents.map(async (id) => [id, await offres(id)])));
   for (const id of PARLIA.SUIVI) {
     const m = data.find((x) => x.id === id);
     const avant = etat && etat.suivi ? etat.suivi[id] : null;
@@ -233,15 +260,35 @@ async function openrouter() {
     }
     const p = m.pricing || {};
     const maintenant = { p: prixM(p.prompt), c: prixM(p.completion), e: /^\d{4}-\d{2}-\d{2}/.test(String(m.expiration_date || '')) ? String(m.expiration_date).slice(0, 10) : '' };
+    // m : l'offre la moins chère retenue ; n : une autre, vue une seule fois, à revoir au passage suivant ; h : le
+    // nombre d'hébergeurs. La première lecture retient l'offre sans rien signaler.
+    const o = offresDe[id];
+    let confirmee = null;
+    if (o && o.length) {
+      const jour = { p: o[0].p, c: o[0].c, chez: o[0].nom, d: aujourdhui };
+      maintenant.h = new Set(o.map((x) => x.hebergeur)).size;
+      if (!avant || !avant.m) maintenant.m = jour;
+      else if (memePrix(jour, avant.m)) maintenant.m = avant.m;
+      else if (memePrix(jour, avant.n)) maintenant.m = confirmee = Object.assign(jour, { d: avant.n.d });
+      else Object.assign(maintenant, { m: avant.m, n: jour });
+    } else {
+      offresIllisibles++;
+      if (avant) for (const k of ['m', 'n', 'h']) if (avant[k] != null) maintenant[k] = avant[k];
+    }
     suivi[id] = maintenant;
     if (!avant || avant.absent) continue;
-    if (maintenant.p !== avant.p || maintenant.c !== avant.c) {
+    if (confirmee) {
+      const ancienne = avant.m;
+      const plusieurs = maintenant.h > 1;
+      const chez = ancienne.chez && ancienne.chez !== confirmee.chez ? ancienne.chez + ', puis ' + confirmee.chez : confirmee.chez;
       items.push(article(
         'Changement de prix d\'un modèle suivi : ' + (m.name || id),
         'https://openrouter.ai/' + id,
-        'Prix chez OpenRouter, par million de jetons : ' + dollars(avant.p) + ' → ' + dollars(maintenant.p) + ' en entrée, '
-          + dollars(avant.c) + ' → ' + dollars(maintenant.c) + ' en sortie (constaté le ' + dateLongue(aujourdhui) + ").",
-        'or:prix:' + id + ':' + maintenant.p + ':' + maintenant.c, { changement_prix: true, date_effet: aujourdhui }, $now.toUTC().toISO(),
+        (plusieurs ? "Offre la moins chère parmi les " + maintenant.h + " hébergeurs de ce modèle chez OpenRouter" : 'Prix chez OpenRouter')
+          + ', par million de jetons : ' + evolution(ancienne.p, confirmee.p, 'entrée') + ', ' + evolution(ancienne.c, confirmee.c, 'sortie')
+          + ' (' + chez + ' ; vu le ' + dateLongue(confirmee.d) + ', revu le ' + dateLongue(aujourdhui) + ').'
+          + (plusieurs ? ' Offres du jour (entrée / sortie) : ' + o.map((x) => x.nom + ' ' + dollars(x.p) + ' / ' + dollars(x.c)).join(' ; ') + '.' : ''),
+        'or:prix:' + id + ':' + confirmee.d, { changement_prix: true, date_effet: confirmee.d }, $now.toUTC().toISO(),
       ));
     }
     if (maintenant.e && maintenant.e !== avant.e) {
@@ -254,7 +301,7 @@ async function openrouter() {
     }
   }
   sd.openrouter = { dernierCree: Math.max(etat ? etat.dernierCree || 0 : 0, maxCree), suivi };
-  return { items, note: etat ? '' : 'premier passage' };
+  return { items, note: etat ? '' : 'premier passage', offresIllisibles };
 }
 
 // ---- data.gouv.fr ----
@@ -312,15 +359,16 @@ const taches = PAGES.map((p) => ({ c: p, f: () => page(p) }))
   .concat([{ c: OPENROUTER, f: openrouter }, { c: DATAGOUV, f: datagouv }])
   .concat(HF.map((c) => ({ c, f: () => huggingface(c) })));
 const resultats = await Promise.all(taches.map((t) => t.f().then(
-  (r) => ({ c: t.c, ok: true, items: r.items, note: r.note }),
+  (r) => ({ c: t.c, ok: true, items: r.items, note: r.note, offresIllisibles: r.offresIllisibles || 0 }),
   (e) => ({ c: t.c, ok: false, items: [], detail: String(e && e.message ? e.message : e).slice(0, 160) }),
 )));
-const bilan = { lues: resultats.length, echecs: [], nouveautes: 0, refaites: [], premiers: 0 };
+const bilan = { lues: resultats.length, echecs: [], nouveautes: 0, refaites: [], premiers: 0, offresIllisibles: 0 };
 for (const r of resultats) {
   sortie.push({ json: { _sante: { id: r.c.id, s: r.c.s, ok: r.ok, detail: r.detail || '' } } });
   if (!r.ok) bilan.echecs.push(r.c.id);
   if (r.note === 'page refaite') bilan.refaites.push(r.c.id);
   if (r.note === 'premier passage') bilan.premiers++;
+  bilan.offresIllisibles += r.offresIllisibles || 0;
   bilan.nouveautes += r.items.length;
   for (const it of r.items) sortie.push(it);
 }

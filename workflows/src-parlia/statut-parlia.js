@@ -41,7 +41,8 @@ if (p.collecte) {
   if (p.sommeilH && p.sommeilH > 12) extras.push('🕒 rattrapage : ' + Math.round(p.sommeilH) + ' h depuis la dernière collecte');
   if (p.pages) {
     extras.push('🌐 pages et API : ' + (p.pages.lues - p.pages.echecs.length) + '/' + p.pages.lues + ' lues, ' + p.pages.nouveautes + ' nouveauté(s)'
-      + (p.pages.refaites.length ? ', refaites : ' + p.pages.refaites.join(', ') : ''));
+      + (p.pages.refaites.length ? ', refaites : ' + p.pages.refaites.join(', ') : '')
+      + (p.pages.offresIllisibles ? ", offres d'OpenRouter illisibles pour " + p.pages.offresIllisibles + ' modèle(s) suivi(s)' : ''));
   }
   if (p.jorf) extras.push('⚖️ Journal officiel : ' + p.jorf.archives + ' archive(s), ' + p.jorf.decrets + ' décret(s)' + (p.jorf.erreur ? ' · ' + p.jorf.erreur : ''));
   if (extras.length) lignes.push(extras.join(' · '));
