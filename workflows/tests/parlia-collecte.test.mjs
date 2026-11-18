@@ -82,6 +82,31 @@ test('la fenêtre part de la dernière collecte, 48 heures au moins, 14 jours au
   assert.equal(loin.length, 4); // 14 jours au plus : celui de 20 jours est écarté
 });
 
+// Le 18 novembre 2026 : une étude porte la date de son dépôt, et n'apparaît dans l'API qu'à son annonce, un à quatre
+// jours plus tard. Avec 48 heures, le bot avait manqué 32 des 50 dernières études de la requête des modèles de décision.
+test("arXiv : toujours 14 jours de fenêtre ; la clé d'une étude n'a pas de version, même pour les clés déjà gardées", async () => {
+  const r2 = src('R2', { s: 'arXiv : modèles de décision et calibration', axe: 'qualite', nature: 'auteurs', arxiv: true });
+  const autre = src('A04');
+  const sd = {
+    lastCollectAt: ms(MAINTENANT) - 4 * 3600 * 1000,
+    vus: { 'arxiv.org/abs/2611.15592v1': ms(MAINTENANT) - 3 * JOUR, 'arxiv.org/abs/2611.00001': ms(MAINTENANT) - 9 * JOUR },
+  };
+  const sortie = await normaliser([
+    article('Is Jev a Good Multilingual Judge?', 'http://arxiv.org/abs/2611.14861v1', 4, r2),
+    article('Small Heads', 'http://arxiv.org/abs/2611.15592v2', 4, r2),
+    article('Une étude de 12 jours', 'http://arxiv.org/abs/2611.00003v1', 12, r2),
+    article('Une étude ancienne', 'http://arxiv.org/abs/2611.00002v1', 15, r2),
+    article('Un article de quatre jours', 'https://anthropic.com/a4', 4, autre),
+  ], sd);
+  assert.deepEqual(sortie.map((a) => [a.titre, a.cle]), [
+    ['Is Jev a Good Multilingual Judge?', 'arxiv.org/abs/2611.14861'], ['Une étude de 12 jours', 'arxiv.org/abs/2611.00003'],
+  ]);
+  assert.deepEqual([sd._passage.collecteStats.dejaVus, sd._passage.collecteStats.horsFenetre], [1, 2]);
+  assert.equal(sd.vus['arxiv.org/abs/2611.15592v1'], undefined);
+  assert.ok(sd.vus['arxiv.org/abs/2611.15592'] >= ms(MAINTENANT) - 3 * JOUR);
+  assert.equal(sd.vus['arxiv.org/abs/2611.00001'], ms(MAINTENANT) - 9 * JOUR);
+});
+
 test("un article déjà vu est écarté 45 jours, et l'adresse est comparée sans paramètres de suivi", async () => {
   const sd = {};
   const s = src('A01');

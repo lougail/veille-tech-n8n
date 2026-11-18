@@ -60,7 +60,11 @@ const hypothese = (c) => {
   return c.hypothese || "Pas d'hypothèse du tri : à formuler en séance.";
 };
 const titreHypothese = (c) => (deLOriginal(c) ? "L'hypothèse, d'après l'original" : "L'hypothèse du tri");
-const quand = (c) => (c.date ? dateLongue(c.date) + (c.avantPeriode ? ', avant la période lue' : '')
+// Une étude d'arXiv porte la date de son dépôt, et arXiv ne la montre qu'à son annonce, un à quatre jours plus tard :
+// déposée avant la période lue, elle n'est ni un article ancien ni la mise à jour d'un avis (18 novembre 2026).
+const avantLaPeriode = (c) => (!c.arxiv ? ', avant la période lue'
+  : ', déposée sur arXiv avant la période lue' + (c.vu ? ', vue par le bot le ' + dateLongue(c.vu) : ''));
+const quand = (c) => (c.date ? dateLongue(c.date) + (c.avantPeriode ? avantLaPeriode(c) : '')
   : 'date inconnue' + (c.vu ? ' (vu le ' + dateLongue(c.vu) + ')' : ''));
 const avecOriginaux = candidats.some((c) => c.original);
 const QUOI = {
@@ -236,7 +240,7 @@ for (const c of candidats) {
   if (c.secours) nonVerifie.push('Fiche ' + c.n + " : le tri automatique n'a pas répondu (" + c.secours + ') ; note de secours, à lire en entier.');
   if (!c.primaire) nonVerifie.push('Fiche ' + c.n + " : source non primaire ; l'original reste à trouver.");
   if (!c.date) nonVerifie.push('Fiche ' + c.n + ' : date de publication inconnue' + (c.vu ? " ; le bot l'a vue le " + dateLongue(c.vu) : '') + '.');
-  if (c.avantPeriode) {
+  if (c.avantPeriode && !c.arxiv) {
     nonVerifie.push('Fiche ' + c.n + ' : publiée le ' + dateLongue(c.date) + ', avant la période lue (qui commence le '
       + dateLongue(sel.jourDebut) + ") : un article ancien, ou la mise à jour d'un avis ancien.");
   }

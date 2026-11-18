@@ -3,7 +3,14 @@
 // - La fenêtre part de la dernière collecte réussie : 48 heures au moins, 14 jours au plus, 7 jours la première
 //   fois. staticData n'est enregistré qu'après une exécution réussie : si l'exécution échoue, la suivante repart
 //   de l'ancienne date et ne perd rien. Les pages sans flux et les API ne signalent que du neuf : pas de fenêtre.
-// - Un article déjà vu (même adresse, ou même bloc de page) est écarté pendant 45 jours.
+// - Pour arXiv, la fenêtre est toujours de 14 jours (18 novembre 2026). Une étude porte la date de son dépôt, mais
+//   l'API ne la montre qu'après son annonce, un à quatre jours plus tard (week-end compris) : avec 48 heures, le bot
+//   avait manqué 32 des 50 dernières études de la requête des modèles de décision (« Is Jev a Good Multilingual
+//   Judge? », « UltraBERT-JEV »…). Une source en panne à une collecte (arXiv répond parfois 429) n'y perd rien non
+//   plus. Les études déjà vues restent écartées par leur clé.
+// - Un article déjà vu (même adresse, ou même bloc de page) est écarté pendant 45 jours. La clé d'une étude d'arXiv
+//   n'a pas de numéro de version (cleAdresse) : sa version 2 n'est pas un nouvel article. Les clés gardées avant le
+//   18 novembre 2026 en ont un ; elles sont réécrites sans lui (inutile après le 2 janvier 2027 : oubliées).
 //   Sauf un article dont l'échéance est relevée (sd.echeances) quand sa source en change le texte : il est trié de
 //   nouveau, même ancien, pour reprendre sa date. Cloudflare a repoussé du 15 au 20 novembre 2026, dans le même
 //   billet, l'arrêt de la fiche 3 de la semaine 46 ; la préparation gardait le 15. La clé et l'empreinte du texte
@@ -28,8 +35,15 @@ const J = 24 * H;
 const derniere = Number(sd.lastCollectAt) || 0;
 const fenetre = derniere ? Math.min(14 * J, Math.max(2 * J, maintenant - derniere + 2 * H)) : 7 * J;
 const depuis = maintenant - fenetre;
+const depuisArxiv = maintenant - 14 * J;
 if (!sd.vus) sd.vus = {};
 for (const [cle, t] of Object.entries(sd.vus)) if (maintenant - t > 45 * J) delete sd.vus[cle];
+for (const [cle, t] of Object.entries(sd.vus)) {
+  const sans = /^arxiv\.org\/abs\/.+v\d+$/i.test(cle) ? cleAdresse('https://' + cle) : '';
+  if (!sans) continue;
+  delete sd.vus[cle];
+  sd.vus[sans] = Math.max(sd.vus[sans] || 0, t);
+}
 const echeances = sd.echeances || [];
 const echeanceDe = (cle) => echeances.find((e) => (e.id ? e.cle === cle && !!e.empreinte : cleAdresse(e.url) === cle));
 
@@ -87,7 +101,7 @@ for (const item of $input.all()) {
   const empreinte = hacher(extrait);
   const echeance = sd.vus[cle] ? echeanceDe(cle) : null;
   const maj = !!echeance && echeance.empreinte !== empreinte;
-  if (parFlux && pub && pub < depuis && !maj) { stats.horsFenetre++; continue; }
+  if (parFlux && pub && pub < (src.arxiv ? depuisArxiv : depuis) && !maj) { stats.horsFenetre++; continue; }
 
   if (src.role === 'detecteur') {
     if (/nomination du gouvernement|composition du gouvernement|nomination du premier ministre/i.test(titre)) {

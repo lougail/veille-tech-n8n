@@ -239,8 +239,9 @@ test("les dates : inconnue, avec le jour où le bot l'a vu ; avant la période l
     candidats: [
       cand(1, 'fournisseurs', { date: '', vu: '2026-10-28', titre: 'TypeSafe AI, blog — Un billet sans date' }),
       cand(2, 'fournisseurs', { date: '2026-10-23', avantPeriode: true, titre: 'Un article ancien' }),
+      cand(3, 'qualite', { date: '2026-10-23', vu: '2026-10-27', avantPeriode: true, arxiv: true, titre: 'Une étude annoncée après son dépôt' }),
     ],
-    aLaUne: [1, 2],
+    aLaUne: [1, 2, 3],
     echeances: [{ date: '2026-11-20', avant: '2026-11-15', titre: 'Workers AI - Planned model deprecations', url: 'https://exemple.org/cf', source: 'Cloudflare' }],
     echeancesChangees: [{ date: '2026-12-01', changee: '2026-10-30', titre: 'Une ligne changée', url: 'https://exemple.org/oa', source: 'OpenAI' }],
   });
@@ -251,6 +252,8 @@ test("les dates : inconnue, avec le jour où le bot l'a vu ; avant la période l
   assert.match(md, /- Fiche 1 : date de publication inconnue ; le bot l'a vue le 28 octobre 2026\./);
   assert.match(md, /\| 2 \| « Un article ancien » : Résumé 2\. 23 octobre 2026, avant la période lue \|/);
   assert.match(md, /- Fiche 2 : publiée le 23 octobre 2026, avant la période lue \(qui commence le 26 octobre 2026\) : un article ancien, ou la mise à jour d'un avis ancien\./);
+  assert.match(md, /\| 3 \| « Une étude annoncée après son dépôt » : Résumé 3\. 23 octobre 2026, déposée sur arXiv avant la période lue, vue par le bot le 27 octobre 2026 \|/);
+  assert.doesNotMatch(md, /- Fiche 3 : publiée le/);
   assert.match(md, /- 20 novembre 2026 : Workers AI - Planned model deprecations \(date changée par la source : c'était le 15 novembre 2026\) \(Cloudflare\)/);
   assert.match(md, /Changées ou retirées par la source depuis leur relevé, à vérifier dans l'original :\n- 1er décembre 2026 : Une ligne changée \(texte changé le 30 octobre 2026\)/);
   const carte = s.discord.fiches[0].payload.components[0].components;

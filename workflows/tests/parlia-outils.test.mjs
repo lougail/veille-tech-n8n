@@ -23,6 +23,10 @@ test("l'empreinte est stable et courte ; le domaine et la clé d'une adresse ign
   assert.equal(o.cleAdresse('https://www.openai.com/index/decisions-api/?utm_source=x&b=2&a=1#haut'), 'openai.com/index/decisions-api?a=1&b=2');
   assert.equal(o.cleAdresse('http://m.example.org/a/'), 'example.org/a');
   assert.equal(o.cleAdresse(''), '');
+  // Une étude d'arXiv, sans son numéro de version ; ailleurs, un « v2 » en fin d'adresse est gardé.
+  assert.equal(o.cleAdresse('http://arxiv.org/abs/2611.15592v2'), 'arxiv.org/abs/2611.15592');
+  assert.equal(o.cleAdresse('https://arxiv.org/abs/cs/0112017v1'), 'arxiv.org/abs/cs/0112017');
+  assert.equal(o.cleAdresse('https://example.org/api/v2'), 'example.org/api/v2');
 });
 
 test('une cellule de tableau Markdown, un texte pour Discord', () => {

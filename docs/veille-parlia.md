@@ -41,7 +41,12 @@ Toutes les 30 min, de 7 h 15 à 22 h 45, quand le Mac est allumé
 ~~~
 
 Le Mac dort souvent : rien n'a d'heure fixe. Mac éteint le lundi, la préparation part au premier réveil, jusqu'au
-dimanche ; la collecte reprend tout ce qui est paru depuis la dernière collecte réussie (14 jours au plus).
+dimanche ; la collecte reprend tout ce qui est paru depuis la dernière collecte réussie (14 jours au plus). Pour
+arXiv, elle relit toujours les 14 derniers jours : une étude porte la date de son dépôt, et arXiv ne la montre
+qu'à son annonce, un à quatre jours plus tard. Avec une fenêtre de 48 heures, le bot avait manqué 32 des 50
+dernières études de la requête des modèles de décision, dont « Is Jev a Good Multilingual Judge? » (vérifié le
+18 novembre 2026). Un flux en erreur est relu deux fois, 5 secondes plus tard : les trois requêtes d'arXiv se
+suivent, et l'API, qui demande trois secondes entre deux demandes, répondait parfois 429.
 
 ### Les sources
 
@@ -88,7 +93,9 @@ Les dates :
   date à venir est une date d'effet (un arrêt annoncé), et une date collée à un nom de modèle
   (« gpt-image-2-2026-04-21 ») n'est pas une date ;
 - un candidat publié avant le premier jour de la période lue est signalé : un article ancien, ou la mise à jour
-  d'un avis ancien ;
+  d'un avis ancien. Une étude d'arXiv déposée avant la période ne l'est pas : la fiche dit le jour où le bot l'a vue ;
+- une étude d'arXiv est reconnue sans son numéro de version : sa version 2 n'est pas un nouvel article (les adresses
+  déjà vues avant le 18 novembre 2026 sont réécrites sans lui) ;
 - une échéance relevée garde la clé et l'empreinte du texte de son article. Si la source change ce texte, l'article
   est trié de nouveau, même ancien : une autre date remplace l'ancienne, rappelée dans la préparation (« c'était le
   15 novembre »), et l'article revient parmi les candidats. Cloudflare avait repoussé du 15 au 20 novembre l'arrêt
@@ -161,7 +168,8 @@ Avant d'écrire la préparation, le bot lit l'original de chaque fiche retenue, 
 extrait ; la lecture des originaux de la semaine 46 avait corrigé huit fiches sur dix.
 
 - **Ce qui est lu** : pour une prépublication d'arXiv, le résumé de l'étude, par l'API d'arXiv (l'article entier
-  est un PDF) ; pour une page sans flux, la partie de la page où se trouve le bloc retenu, avec son intertitre et
+  est un PDF), toutes les études de la semaine en une seule demande, refaite une fois après une erreur 429 ou 503 ;
+  pour une page sans flux, la partie de la page où se trouve le bloc retenu, avec son intertitre et
   les en-têtes du tableau, la ligne retenue marquée ; pour la page d'un blog qui liste ses billets, le billet
   lui-même, retrouvé par le lien qui porte son titre (le blog de TypeSafe ne date pas ses billets, le billet, si) ;
   pour un dépôt Hugging Face, sa fiche (README), sans son en-tête : la page du dépôt n'a pas de texte lisible pour

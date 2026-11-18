@@ -209,6 +209,12 @@ def build(mode: str):
             "position": [1000, -160],
             "continueOnFail": True,
             "alwaysOutputData": True,
+            # Un flux en erreur est relu deux fois, 5 secondes plus tard : n8n relance aussi un nœud qui continue en
+            # cas d'erreur, quand son premier élément porte l'erreur (vérifié dans n8n 2.10.3). Les trois requêtes
+            # d'arXiv se suivent, et l'API demande trois secondes entre deux demandes : elle répondait parfois 429.
+            "retryOnFail": True,
+            "maxTries": 3,
+            "waitBetweenTries": 5000,
         },
         code_node("Étiqueter la source", "tag-source-parlia.js", [1200, -160]),
         code_node("Pages et API", "collecte-pages-api.js", [1000, 80]),

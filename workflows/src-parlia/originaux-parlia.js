@@ -3,7 +3,10 @@
 // du tri, qui ne voit que le titre et un extrait ; la lecture des originaux, le 13 novembre 2026, a corrigé huit des
 // dix fiches de la semaine 46.
 // Ce qui est lu :
-// - une prépublication d'arXiv : le résumé de l'étude, par l'API d'arXiv (l'article entier est un PDF) ;
+// - une prépublication d'arXiv : le résumé de l'étude, par l'API d'arXiv (l'article entier est un PDF). Toutes les
+//   études de la semaine sont lues en une seule demande (id_list) : l'API demande trois secondes entre deux demandes,
+//   et des demandes en parallèle pouvaient recevoir l'erreur 429. Après une erreur 429 ou 503, une seconde demande,
+//   quatre secondes plus tard (18 novembre 2026) ;
 // - une page sans flux : la page, puis la partie où se trouve le bloc retenu (son intertitre, les rangées de tableau
 //   avec leurs en-têtes) ; pour une page qui liste des billets (blog, actualités), le billet lui-même, retrouvé par
 //   le lien qui porte son titre : le blog de TypeSafe ne date pas ses billets, le billet, si ;
@@ -28,7 +31,7 @@ const http = (typeof helpers !== 'undefined' && helpers) || this.helpers;
 const aujourdhui = $now.toISODate();
 const VERSION_RESUME = "résumé de l'original, version du 16 novembre 2026";
 const MAX_TEXTE = 12000;
-const REFUS = [{ domaine: 'legifrance.gouv.fr', nom: 'Légifrance' }, { domaine: 'help.openai.com', nom: "L'aide d'OpenAI" }];
+const REFUS = [{ domaine: 'legifrance.gouv.fr', nom: 'Légifrance' }, { domaine: 'help.openai.com', nom: "L'aide d'OpenAI" }, { domaine: 'arxiv.org', nom: 'arXiv' }];
 // Les pages construites dans le navigateur : leur version Markdown porte le texte (comme pour la collecte).
 const MARKDOWN = {
   'https://aistudio.google.com/docs/changelog?hl=en': 'https://aistudio.google.com/docs/changelog.md',
@@ -65,7 +68,8 @@ const PDF = "l'original est un PDF, que le bot ne sait pas lire : l'ouvrir à la
 function refus(url, code) {
   const d = domaineDe(url);
   const site = REFUS.find((r) => d === r.domaine || d.endsWith('.' + r.domaine));
-  if ([401, 403, 429].includes(code)) return (site ? site.nom : 'Le site') + ' refuse les programmes (erreur ' + code + ')';
+  if (code === 429) return (site ? site.nom : 'Le site') + ' a reçu trop de demandes (erreur 429)';
+  if ([401, 403].includes(code)) return (site ? site.nom : 'Le site') + ' refuse les programmes (erreur ' + code + ')';
   return 'la page répond ' + (code ? 'par une erreur ' + code : 'sans code');
 }
 // Une adresse complète, à partir d'un lien de la page (new URL() n'existe pas dans le bac à sable de n8n).
@@ -143,23 +147,64 @@ function partieDuBloc(lignes, titre) {
   return { lignes: partie, retenue, par };
 }
 
-// Lit l'original d'un candidat : { lu, comment, adresse, texte, datePage, motif, retrouvePar }.
+// La lecture d'un candidat : { lu, comment, adresse, texte, datePage, motif, retrouvePar }.
+const rien = (c) => ({ n: c.n, lu: false, comment: '', adresse: c.url, texte: '', datePage: '', motif: '', retrouvePar: '' });
+const pasDeReponse = (e) => 'pas de réponse (' + String(e && e.message ? e.message : e).slice(0, 80) + ')';
+
+// Les études d'arXiv, en une seule demande : une lecture par candidat, rangée par numéro de fiche. Le numéro d'une
+// étude (2611.06655, ou cs/0112017 pour les plus anciennes) est comparé sans sa version : sans version, l'API donne
+// la dernière.
+const estArxiv = (c) => !!c.arxiv || /^https?:\/\/arxiv\.org\/abs\//i.test(c.url);
+const NUMERO_ARXIV = /^(?:\d{4}\.\d{4,5}|[a-z-]+(?:\.[a-z]{2})?\/\d{7})(?:v\d+)?$/i;
+const sansVersion = (id) => String(id).replace(/v\d+$/i, '');
+async function etudesArxiv(liste) {
+  const lues = {};
+  const numeros = {};
+  for (const c of liste) {
+    const id = String(c.url).split('/abs/').pop().replace(/[?#].*$/, '').replace(/\/+$/, '');
+    if (NUMERO_ARXIV.test(id)) numeros[c.n] = id;
+    else lues[c.n] = Object.assign(rien(c), { motif: "l'adresse ne donne pas le numéro de l'étude sur arXiv" });
+  }
+  const ids = Object.values(numeros);
+  if (!ids.length) return lues;
+  const adresse = 'https://export.arxiv.org/api/query?id_list=' + ids.join(',') + '&max_results=' + ids.length;
+  let r;
+  try {
+    r = await lire(adresse);
+    if (r.code === 429 || r.code === 503) {
+      await new Promise((fin) => setTimeout(fin, 4000));
+      r = await lire(adresse);
+    }
+  } catch (e) {
+    r = { code: 0, corps: '', erreur: pasDeReponse(e) };
+  }
+  const entrees = {};
+  for (const m of r.corps.matchAll(/<entry>([\s\S]*?)<\/entry>/g)) {
+    const id = (/<id>[^<]*?\/abs\/([^<\s]+)\s*<\/id>/.exec(m[1]) || [])[1];
+    if (id) entrees[sansVersion(id)] = m[1];
+  }
+  for (const c of liste.filter((x) => numeros[x.n])) {
+    if (r.code !== 200) {
+      lues[c.n] = Object.assign(rien(c), { motif: r.erreur || refus(c.url, r.code) });
+      continue;
+    }
+    const entree = entrees[sansVersion(numeros[c.n])] || '';
+    const champ = (nom) => texteSimple((new RegExp('<' + nom + '>([\\s\\S]*?)</' + nom + '>').exec(entree) || [])[1] || '');
+    const auteurs = Array.from(entree.matchAll(/<name>([\s\S]*?)<\/name>/g), (m) => texteSimple(m[1])).slice(0, 8).join(', ');
+    lues[c.n] = champ('summary')
+      ? Object.assign(rien(c), { lu: true, comment: 'arxiv', datePage: champ('published').slice(0, 10),
+        texte: 'Titre : ' + champ('title') + '\nAuteurs : ' + auteurs + '\nRésumé : ' + champ('summary') })
+      : Object.assign(rien(c), { motif: "l'API d'arXiv ne donne pas le résumé de l'étude" });
+  }
+  return lues;
+}
+
+// L'original d'un autre candidat.
 async function original(c) {
-  const base = { n: c.n, lu: false, comment: '', adresse: c.url, texte: '', datePage: '', motif: '', retrouvePar: '' };
+  const base = rien(c);
   if (c.sid === 'A02') return Object.assign(base, { sansObjet: true, motif: "la fiche vient du catalogue d'OpenRouter, relevé par le programme" });
   const kind = c.kind || (PAGES.includes(c.sid) ? 'page' : 'flux');
   try {
-    if (c.arxiv || /^https?:\/\/arxiv\.org\/abs\//i.test(c.url)) {
-      const id = String(c.url).split('/abs/').pop().replace(/[?#].*$/, '');
-      const r = await lire('https://export.arxiv.org/api/query?id_list=' + id + '&max_results=1');
-      if (r.code !== 200) return Object.assign(base, { motif: refus(c.url, r.code) });
-      const entree = (/<entry>([\s\S]*?)<\/entry>/.exec(r.corps) || [])[1] || '';
-      const champ = (nom) => texteSimple((new RegExp('<' + nom + '>([\\s\\S]*?)</' + nom + '>').exec(entree) || [])[1] || '');
-      const auteurs = Array.from(entree.matchAll(/<name>([\s\S]*?)<\/name>/g), (m) => texteSimple(m[1])).slice(0, 8).join(', ');
-      if (!champ('summary')) return Object.assign(base, { motif: "l'API d'arXiv ne donne pas le résumé de l'étude" });
-      return Object.assign(base, { lu: true, comment: 'arxiv', datePage: champ('published').slice(0, 10),
-        texte: 'Titre : ' + champ('title') + '\nAuteurs : ' + auteurs + '\nRésumé : ' + champ('summary') });
-    }
     const depot = DEPOT_HF.exec(String(c.url || ''));
     if (depot) {
       // Sans fiche lisible (code autre que 200, fiche presque vide, pas de réponse), la page du dépôt est lue comme les
@@ -196,7 +241,7 @@ async function original(c) {
     if (texte.length < 200) return Object.assign(base, { motif: 'la page est sans texte lisible (construite dans le navigateur ?)' });
     return Object.assign(base, { lu: true, comment: 'article', texte, datePage: dateDeLaPage(r.corps) || dateSousLeTitre(lignes, c.titre) });
   } catch (e) {
-    return Object.assign(base, { motif: 'pas de réponse (' + String(e && e.message ? e.message : e).slice(0, 80) + ')' });
+    return Object.assign(base, { motif: pasDeReponse(e) });
   }
 }
 
@@ -257,7 +302,8 @@ function demande(c, o) {
     .replace('{TEXTE}', () => tronquer(o.texte, MAX_TEXTE));
 }
 
-const lus = await Promise.all(candidats.map((c) => original(c)));
+const etudes = await etudesArxiv(candidats.filter(estArxiv));
+const lus = await Promise.all(candidats.map((c) => etudes[c.n] || original(c)));
 const lectures = lus.map((o) => ({ n: o.n, lu: o.lu, comment: o.comment, adresse: o.adresse, datePage: o.datePage, motif: o.motif,
   retrouvePar: o.retrouvePar, sansObjet: !!o.sansObjet, taille: o.texte.length, version: VERSION_RESUME }));
 const demandes = lus.filter((o) => o.lu).map((o) => ({ prompt: demande(candidats.find((c) => c.n === o.n), o), n: o.n }));

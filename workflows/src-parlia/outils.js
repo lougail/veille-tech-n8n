@@ -65,12 +65,14 @@ function domaineDe(url) {
   const m = /^https?:\/\/([^/?#:]+)/i.exec(String(url || ''));
   return m ? m[1].toLowerCase().replace(/^www\./, '') : '';
 }
-// La clé d'une adresse, pour le dédoublonnage : sans protocole, sans www, sans paramètres de suivi.
+// La clé d'une adresse, pour le dédoublonnage : sans protocole, sans www, sans paramètres de suivi. Pour une étude
+// d'arXiv, sans son numéro de version : arxiv.org/abs/2611.15592v2 est la même étude que …v1 (18 novembre 2026).
 function cleAdresse(url) {
   const m = /^https?:\/\/([^/?#]+)([^?#]*)(\?[^#]*)?/i.exec(String(url || '').trim());
   if (!m) return '';
   const hote = m[1].toLowerCase().replace(/^(www|m)\./, '');
-  const chemin = m[2].replace(/\/+$/, '');
+  let chemin = m[2].replace(/\/+$/, '');
+  if (hote === 'arxiv.org' && /^\/abs\//i.test(chemin)) chemin = chemin.replace(/v\d+$/i, '');
   let requete = '';
   if (m[3]) {
     const garde = m[3].slice(1).split('&').filter((p) => p && !/^(utm_|ref=|fbclid|gclid)/i.test(p)).sort();

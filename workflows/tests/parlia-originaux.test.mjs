@@ -67,6 +67,34 @@ test("arXiv : le résumé de l'étude, par l'API, en entier (fiche 9)", async ()
   assert.match(demandes[0].prompt, /Accuracy ranges from 68\.2% to 70\.3%, yet 24\.3% of questions receive different labels/);
 });
 
+// Le 18 novembre 2026 : les études partaient en parallèle, et l'API d'arXiv demande trois secondes entre deux demandes.
+test("arXiv : toutes les études en une seule demande, rapprochées sans leur version ; après une erreur 429, une seconde demande", async () => {
+  const api = 'https://export.arxiv.org/api/query?id_list=2611.14861v1,2611.15592&max_results=2';
+  const entree = (id, titre) => '<entry><id>http://arxiv.org/abs/' + id + '</id><published>2026-11-12T10:00:00Z</published><title>' + titre
+    + '</title><summary>' + titre + PHRASES + '</summary><author><name>A. Auteur</name></author></entry>';
+  let essais = 0;
+  const repondre = () => (++essais === 1 ? { statusCode: 429, body: 'Rate exceeded.' }
+    : { statusCode: 200, body: '<feed>' + entree('2611.15592v3', 'Small Heads') + entree('2611.14861v1', 'Is Jev a Good Multilingual Judge?') + '</feed>' });
+  const { demandes, lectures, appels } = await lire([
+    cand(1, { sid: 'R2', arxiv: true, url: 'https://arxiv.org/abs/2611.14861v1' }),
+    cand(2, { url: 'https://www.cnil.fr/fr/article-2' }),
+    cand(3, { sid: 'R2', arxiv: true, url: 'https://arxiv.org/abs/2611.15592' }),
+    cand(4, { sid: 'R1', arxiv: true, url: 'https://arxiv.org/abs/pas-un-numero' }),
+  ], { [api]: repondre, 'https://www.cnil.fr/fr/article-2': { statusCode: 200, body: page('<article><p>Un texte de la CNIL.' + PHRASES + '</p></article>') } });
+  assert.equal(appels.filter((u) => u === api).length, 2);
+  assert.deepEqual(lectures.map((l) => [l.n, l.lu, l.comment || l.motif]), [
+    [1, true, 'arxiv'], [2, true, 'article'], [3, true, 'arxiv'], [4, false, "l'adresse ne donne pas le numéro de l'étude sur arXiv"],
+  ]);
+  assert.match(demandes.find((d) => d.n === 1).prompt, /Titre : Is Jev a Good Multilingual Judge\?/);
+  assert.match(demandes.find((d) => d.n === 3).prompt, /Titre : Small Heads/);
+});
+
+test("arXiv : une erreur 429 qui dure est dite telle quelle sur chaque fiche", async () => {
+  const api = 'https://export.arxiv.org/api/query?id_list=2611.14861v1&max_results=1';
+  const { lectures } = await lire([cand(1, { sid: 'R2', arxiv: true, url: 'https://arxiv.org/abs/2611.14861v1' })], { [api]: { statusCode: 429, body: 'Rate exceeded.' } });
+  assert.deepEqual([lectures[0].lu, lectures[0].motif], [false, 'arXiv a reçu trop de demandes (erreur 429)']);
+});
+
 // Fiche 1 : la page du blog de TypeSafe ne date pas ses billets ; le billet du 3 novembre 2026, si.
 test("fiche 1 (semaine 46) : le billet est retrouvé sur la page du blog par le lien qui porte son titre, et lu", async () => {
   const liste = page('<a href="./blog/jev-1-14"><div><p>Company News</p></div><div><p>Jev: For the builders AND dreamers</p></div></a>'
