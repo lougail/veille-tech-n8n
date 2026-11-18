@@ -149,8 +149,11 @@ def chain_node(name, pos, fallback=False):
 
 
 def model_node(name, model, pos):
+    # Une demande sans réponse s'arrête après 90 secondes, au lieu de 360, et n'est refaite qu'une fois par le modèle :
+    # le nœud de la chaîne la relance ensuite (retryOnFail). Le 18 novembre 2026, à l'essai de n8n 2.48.5, deux appels
+    # sont restés sans réponse chez OpenRouter (« Provider timed out ») et ont bloqué l'exécution.
     return {
-        "parameters": {"model": model, "options": {"temperature": 0.1}},
+        "parameters": {"model": model, "options": {"temperature": 0.1, "timeout": 90000, "maxRetries": 1}},
         "id": slug(name),
         "name": name,
         "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
