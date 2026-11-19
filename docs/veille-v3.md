@@ -39,8 +39,10 @@ et les personnes (code de réponse, nombre d'éléments, date du plus récent, v
 
 ### Savoir au plus vite ce qui fait du bruit
 
-- **Collecte au réveil du Mac** (`collecte-due.js`) : n8n vérifie toutes les 30 minutes, de 7 h à 23 h, si une
-  collecte est due ; elle l'est au plus toutes les trois heures, et une collecte fraîche précède le brief du matin.
+- **Collecte au réveil du Mac** (`collecte-due.js`) : n8n vérifie toutes les 30 minutes, jour et nuit, si une
+  collecte est due ; elle ne l'est que de 7 h à 23 h, au plus toutes les trois heures, et une collecte fraîche précède
+  le brief du matin. Jour et nuit, parce qu'un minuteur de n8n ne compte que le temps où le Mac est allumé
+  (`docs/veille-parlia.md`, « Les passages, jour et nuit »).
 - **Hacker News par l'API d'Algolia** (`map-hn.js`) : les articles de plus de 100 points des dernières 48 heures,
   avec leurs points et leurs commentaires.
 - **AINews** (`normalize.js`) : chaque numéro, résumé quotidien de ce qui fait du bruit sur X et Reddit, est gardé ;

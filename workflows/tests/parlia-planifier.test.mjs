@@ -66,6 +66,14 @@ test('la collecte : au plus toutes les 4 heures, la marge du pas de 30 minutes c
   assert.equal(p.preparation, false);
 });
 
+test('la nuit, de 23 h à 7 h, rien ; le premier passage de 7 h 15 reprend, et un essai travaille à toute heure', async () => {
+  const sd = { lastCollectAt: ms('2026-11-03T18:00'), prep: faite('2026-11-02T09:15') };
+  assert.equal((await passage('2026-11-03T22:45', sd)).collecte, true);
+  for (const iso of ['2026-11-03T23:15', '2026-11-04T02:45', '2026-11-04T06:45']) assert.equal(await passage(iso, sd), null, iso);
+  assert.equal((await passage('2026-11-04T07:15', sd)).collecte, true);
+  assert.equal((await passage('2026-11-04T02:45', sd, { essai: '1' })).collecte, true);
+});
+
 test('les pages sans flux : une fois par jour, avec la collecte', async () => {
   const sd = { lastCollectAt: ms('2026-11-03T08:00'), pagesJour: '2026-11-03', prep: faite('2026-11-02T09:15') };
   assert.equal((await passage('2026-11-03T13:15', sd)).pages, false);

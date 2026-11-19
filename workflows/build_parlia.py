@@ -29,8 +29,11 @@ MODEL_TRI = "mistralai/mistral-small-3.2-24b-instruct"
 # Un autre que celui du tri reçoit Mistral Small 3.2 en secours (refus ou « too many requests » d'OpenRouter).
 MODEL_RESUMES = MODEL_TRI
 
-# Décalé de 15 minutes par rapport à la v3 (« 0 */30 7-22 * * * ») : les deux veilles ne tournent pas ensemble.
-CRON = "0 15,45 7-22 * * *"
+# Toutes les 30 minutes, jour et nuit, décalé de 15 minutes par rapport à la veille personnelle (« 0 */30 * * * * ») :
+# les deux veilles ne tournent pas ensemble. Jour et nuit, parce qu'un minuteur de n8n ne compte que le temps où le Mac
+# est allumé : avec un dernier passage à 22 h 45, le suivant attendait 8 h 30 de Mac allumé (le 19 novembre 2026, Mac
+# rallumé à 9 h 02, il serait parti vers 11 h 30). La nuit, de 23 h à 7 h, « Que faire ? » ne fait rien.
+CRON = "0 15,45 * * * *"
 
 # Les réglages, lus dans les variables d'environnement du conteneur (le nœud Code n'a pas accès à $env),
 # avec des valeurs par défaut prudentes : Discord n'est utilisé que si son webhook est réglé.

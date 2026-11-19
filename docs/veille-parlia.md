@@ -29,7 +29,7 @@ coûts, qualité de l'étiquetage, conformité, exploitation.
 ## Ce que fait le circuit
 
 ~~~text
-Toutes les 30 min, de 7 h 15 à 22 h 45, quand le Mac est allumé
+Toutes les 30 min, jour et nuit, quand le Mac est allumé (le travail : de 7 h 15 à 22 h 45)
   └─ Que faire ? (planifier-parlia.js) : chaque tâche part au premier passage après son heure, une seule fois
       ├─ Collecte : au plus toutes les 4 h, et juste avant la préparation
       │    18 flux RSS ; une fois par jour, 12 pages sans flux et 4 API (OpenRouter, data.gouv.fr, Hugging Face)
@@ -498,9 +498,10 @@ GHSA-q8rc-7m84-mfvj, jugé élevé, GHSA-g333-hr44-g82p). La liste des changemen
   désormais après 90 secondes, et n'est refait qu'une fois avant que le nœud le relance (`build_parlia.py`).
 - **Le planificateur.** Depuis 2.45, n8n planifie par défaut avec un planificateur « durable », qui jette un passage
   en retard de plus d'une minute : le Mac endormi, la veille Stack de 9 h 30 aurait perdu 5 de ses 7 passages du 11
-  au 18 novembre. `N8N_SCHEDULER_ENABLED=false` (`docker-compose.yml`) garde l'ancien, qui lance le passage manqué au
-  réveil (vérifié sur la copie). n8n le déclare déprécié : avant n8n 3, donner à Stack un passage toutes les
-  30 minutes, comme ParlIA et la veille personnelle, puis revenir au planificateur par défaut.
+  au 18 novembre. `N8N_SCHEDULER_ENABLED=false` (`docker-compose.yml`) garde l'ancien, qui lance le passage manqué
+  quand son minuteur arrive au bout (vérifié sur la copie) ; ce minuteur ne compte que le temps où le Mac est allumé
+  (section suivante). n8n le déclare déprécié : avant n8n 3, donner à Stack un passage toutes les 30 minutes, comme
+  ParlIA et la veille personnelle, puis revenir au planificateur par défaut.
 - **Le reste, vérifié** : une pause « Wait » de moins de 65 secondes reste en mémoire ; `retryOnFail` relance bien un
   nœud qui continue en cas d'erreur ; le temps maximal d'un nœud Code reste de 300 secondes
   (`N8N_RUNNERS_TASK_TIMEOUT`), la lecture des pages et des originaux pouvant dépasser la minute.
@@ -514,6 +515,22 @@ GHSA-q8rc-7m84-mfvj, jugé élevé, GHSA-g333-hr44-g82p). La liste des changemen
   ignorée par Git, à garder deux semaines. Pour revenir en arrière : `docker compose down`, mettre de côté la base
   actuelle, recopier la sauvegarde dans `n8n-data/`, remettre `n8nio/n8n:2.10.3` dans `docker-compose.yml`, puis
   `docker compose up -d`. Ne jamais lancer 2.10.3 sur la base migrée.
+
+## Les passages, jour et nuit, le 19 novembre 2026
+
+Le 19 novembre, Mac rallumé à 9 h 02, aucune des deux veilles n'était encore passée à 9 h 30 : leurs passages
+seraient partis vers 11 h 20 et 11 h 35. Un minuteur de n8n compte le temps de la machine virtuelle d'OrbStack, qui
+s'arrête quand le Mac dort : ce matin-là, elle comptait 12 heures depuis son démarrage, alors que n8n tournait depuis
+plus de 18 heures. Le dernier passage du soir réglait le suivant 8 h 30 plus tard, et ces 8 h 30 ne s'écoulaient que
+Mac allumé. Le calcul « minuteur arrêté pendant le sommeil », fait sur le journal de veille du Mac (`pmset -g log`),
+retrouve à la minute près les départs du 13 novembre (prévu à 7 h 15, parti à 14 h 29), du 14 (prévu à 8 h 45, parti
+à 11 h 35) et du 18 (prévu à 20 h 45, parti à 22 h 48). Le premier passage du 17 novembre de la veille personnelle
+est parti à 15 h 24.
+
+Depuis le 19 novembre, les deux veilles passent toutes les 30 minutes, jour et nuit : le premier passage suit le
+réveil de 30 minutes au plus. La nuit, de 23 h à 7 h, « Que faire ? » (ParlIA) et « Collecte due ? » (veille
+personnelle) ne font rien. La veille Stack, qui passe une fois par jour à 9 h 30, en souffre le plus : son passage du
+16 novembre est parti le 17 à 17 h 54.
 
 ## Les décisions qui restent à Louis
 
@@ -539,8 +556,8 @@ GHSA-q8rc-7m84-mfvj, jugé élevé, GHSA-g333-hr44-g82p). La liste des changemen
   séance, des sources à espacer ou à retirer.
 - Lire les réponses et les réactions dans Discord : il faudrait un bot Discord et son jeton, un webhook ne lit rien.
 - Les sources à l'essai de l'étude (§4.2), hors Élysée.
-- Avant n8n 3 : donner à la veille Stack un passage toutes les 30 minutes, puis revenir au planificateur par défaut
-  (section « La mise à jour de n8n, le 18 novembre 2026 »).
+- Si la veille Stack est gardée : lui donner un passage toutes les 30 minutes, jour et nuit (section « Les passages,
+  jour et nuit ») ; avant n8n 3, revenir au planificateur par défaut (section « La mise à jour de n8n »).
 
 ## Tests
 

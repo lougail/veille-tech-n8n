@@ -24,7 +24,8 @@ Automatisation de veille technologique avec N8N (self-hosted) et Discord.
 - staticData sauvegardé seulement en fin d'exécution réussie d'un workflow actif (les exécutions CLI persistent aussi)
 - Test CLI sans toucher l'instance : `docker exec -e N8N_RUNNERS_BROKER_PORT=5699 -e N8N_PORT=5698 veille-tech-n8n-n8n-1 n8n execute --id <ID>` (nécessite un Manual Trigger dans le workflow)
 - `docker compose restart` ne recharge PAS les env vars → `down && up -d`
-- Planificateur : l'ancien, en mémoire, gardé par `N8N_SCHEDULER_ENABLED=false` (docker-compose.yml) : au réveil du Mac, il lance le passage manqué ; le planificateur « durable », par défaut depuis 2.45, le jetterait (Stack, à 9 h 30, aurait perdu 5 passages sur 7). n8n le déclare déprécié : à revoir avant n8n 3
+- Planificateur : l'ancien, en mémoire, gardé par `N8N_SCHEDULER_ENABLED=false` (docker-compose.yml) : il lance le passage manqué quand son minuteur arrive au bout ; le planificateur « durable », par défaut depuis 2.45, le jetterait (Stack, à 9 h 30, aurait perdu 5 passages sur 7). n8n le déclare déprécié : à revoir avant n8n 3
+- ⚠️ Un minuteur de n8n ne compte que le temps où le Mac est allumé (la VM d'OrbStack s'arrête avec lui) : un déclencheur espacé de plusieurs heures part des heures après le réveil. Les déclencheurs passent donc toutes les 30 min, jour et nuit, et le code décide s'il y a du travail (de 7 h à 23 h) — `docs/veille-parlia.md`, « Les passages, jour et nuit »
 - Une pause « Wait » de moins de 65 s reste en mémoire (2.48.5) ; un nœud qui continue en cas d'erreur est relancé par `retryOnFail` quand son premier élément porte l'erreur
 - ⚠️ JAMAIS ouvrir `n8n-data/database.sqlite` depuis le Mac (sqlite3, python, DB Browser) pendant que n8n tourne, même en lecture seule : les verrous de SQLite ne traversent pas la VM d'OrbStack, le sqlite du Mac remet à zéro le fichier `-shm` et n8n meurt (SIGBUS, 18 novembre 2026). Lire depuis le conteneur (`docker exec … node` avec le module sqlite3 de n8n), une copie faite par le conteneur (`VACUUM INTO`, comme `outils/rendement-sources.py`), ou la base d'un n8n arrêté. Sans risque : `n8n export:workflow` et les journaux `n8n-data/n8nEventLog*.log`
 - Mettre n8n à jour : d'abord sur une copie de la base (`VACUUM INTO` fait par le conteneur, ou n8n arrêté ; workflows désactivés, second conteneur sur un autre port, sans webhooks) — `docs/veille-parlia.md`, « La mise à jour de n8n »
@@ -35,10 +36,10 @@ Automatisation de veille technologique avec N8N (self-hosted) et Discord.
 
 | Workflow | ID | État |
 |----------|----|------|
-| Veille perso v3 (nom dans n8n : « Veille Pro v2 — Stories & Tendances », 59 nœuds) | `VeilleProV2story` | **actif** depuis le 5 novembre 2026 — passage toutes les 30 min de 7 h à 22 h 30, collecte au plus toutes les 3 h quand le Mac est allumé, brief après 8 h 30, bilan le dimanche |
+| Veille perso v3 (nom dans n8n : « Veille Pro v2 — Stories & Tendances », 59 nœuds) | `VeilleProV2story` | **actif** depuis le 5 novembre 2026 — passage toutes les 30 min, jour et nuit (depuis le 19 novembre) ; collecte de 7 h à 23 h, au plus toutes les 3 h ; brief après 8 h 30, bilan le dimanche |
 | Veille Stack (26 nœuds) | `VeilleStackHlmr1` | **actif** — 9h30 Paris, digest lundi ; org via `GITHUB_STACK_ORG`, token `GITHUB_STACK_TOKEN`, sortie `DISCORD_WEBHOOK_STACK` |
 | Error Handler - Discord Alert | `yrUX1IcjTyIwpWqG` | actif |
-| Veille ParlIA (39 nœuds) | `VeilleParlIAprod` | **actif** depuis le 4 novembre 2026 ; la version du 18 novembre (arXiv sur 14 jours, matière de la synthèse mensuelle, et les trois erreurs de la semaine 47 : annonces anciennes des pages, prix des modèles suivis, doublons d'un même éditeur) en service depuis le 18 novembre ; essai : `VeilleParlIAtest` — `docs/veille-parlia.md` |
+| Veille ParlIA (39 nœuds) | `VeilleParlIAprod` | **actif** depuis le 4 novembre 2026 ; la version du 18 novembre (arXiv sur 14 jours, matière de la synthèse mensuelle, et les trois erreurs de la semaine 47 : annonces anciennes des pages, prix des modèles suivis, doublons d'un même éditeur) en service depuis le 18 novembre ; passages jour et nuit depuis le 19 novembre ; essai : `VeilleParlIAtest` — `docs/veille-parlia.md` |
 | Veille Pro v1 | `OfUjCc9fcrInTX3M` | désactivé (rollback) |
 | Brief Simplon phases 1-2 | — | désactivés (archive) |
 

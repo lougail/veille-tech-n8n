@@ -131,7 +131,10 @@ test('la collecte est due au réveil du Mac, au plus toutes les trois heures, et
   const due = noeud('collecte-due.js', '$now', '$getWorkflowStaticData');
   const a = (iso, sd) => due(paris(iso), () => sd).length > 0;
   const il = (iso) => paris(iso).toMillis();
-  assert.equal(a('2026-10-28T06:30', {}), false); // la nuit
+  // n8n passe jour et nuit (un minuteur ne compte que le temps où le Mac est allumé) ; la nuit, rien.
+  const [wf] = JSON.parse(readFileSync(new URL('../veille-pro-v2.json', import.meta.url), 'utf8'));
+  assert.equal(wf.nodes.find((n) => n.name === 'Toutes les 30 min').parameters.rule.interval[0].expression, '0 */30 * * * *');
+  for (const nuit of ['2026-10-28T23:00', '2026-10-29T02:30', '2026-10-28T06:30']) assert.equal(a(nuit, {}), false, nuit);
   assert.equal(a('2026-10-28T10:00', { lastCollectAt: il('2026-10-28T09:00'), lastDigestAt: il('2026-10-28T08:40') }), false);
   assert.equal(a('2026-10-28T12:00', { lastCollectAt: il('2026-10-28T09:00'), lastDigestAt: il('2026-10-28T08:40') }), true);
   assert.equal(a('2026-10-28T08:30', { lastCollectAt: il('2026-10-28T07:30'), lastDigestAt: il('2026-10-27T08:40') }), true);

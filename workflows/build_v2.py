@@ -176,8 +176,12 @@ def build(mode: str):
     discord_off = mode == "test"
     nodes = [
         {
+            # Jour et nuit : un minuteur de n8n ne compte que le temps où le Mac est allumé (la machine virtuelle
+            # d'OrbStack s'arrête avec lui). Avec un dernier passage à 22 h 30, le suivant attendait 8 h 30 de Mac
+            # allumé : le premier passage du 17 novembre 2026 est parti à 15 h 24. Toutes les 30 minutes, jour et nuit,
+            # le premier passage suit le réveil de 30 minutes au plus ; collecte-due.js ne travaille que de 7 h à 23 h.
             "parameters": {"rule": {"interval": [
-                {"field": "cronExpression", "expression": "0 */30 7-22 * * *"},
+                {"field": "cronExpression", "expression": "0 */30 * * * *"},
             ]}},
             "id": "schedule-v2",
             "name": "Toutes les 30 min",

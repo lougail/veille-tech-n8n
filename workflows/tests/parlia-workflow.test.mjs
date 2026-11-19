@@ -53,7 +53,8 @@ test("les connexions, et l'ordre d'exécution v1 : de haut en bas, le statut en 
   assert.ok(ordonne(enfants('Normaliser')));
   assert.ok(ordonne(enfants('Préparation')));
   assert.deepEqual(wf.connections['Flux ParlIA'].main.map((s) => s[0].node), ['Pages et API', 'Lire le flux']);
-  assert.equal(parNom['Toutes les 30 min'].parameters.rule.interval[0].expression, '0 15,45 7-22 * * *');
+  // Jour et nuit : un minuteur de n8n ne compte que le temps où le Mac est allumé (planifier-parlia.js fait la nuit).
+  assert.equal(parNom['Toutes les 30 min'].parameters.rule.interval[0].expression, '0 15,45 * * * *');
 });
 
 test('les notes de séance : lues dans le seul dossier monté, sans écriture, erreurs tolérées, nom du fichier gardé', () => {

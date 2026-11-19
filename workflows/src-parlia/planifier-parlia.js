@@ -1,4 +1,5 @@
-// Que faire à ce passage ? n8n passe toutes les 30 minutes, de 7 h 15 à 22 h 45, quand le Mac est allumé.
+// Que faire à ce passage ? n8n passe toutes les 30 minutes, jour et nuit, quand le Mac est allumé ; le bot ne
+// travaille que de 7 h à 23 h (build_parlia.py, CRON : un minuteur ne compte que le temps où le Mac est allumé).
 // Rien n'a d'heure fixe : chaque tâche part au premier passage après son heure, et une seule fois.
 // - La collecte : au plus toutes les 4 heures (réglable), et juste avant une préparation.
 // - Les pages sans flux : une fois par jour, avec la première collecte du jour.
@@ -40,6 +41,8 @@ const reglages = {
   // Le modèle qui résume les originaux (build_parlia.py) : la préparation le nomme.
   modeleResumes: String(r.modeleResumes || '').slice(0, 100),
 };
+// La nuit, rien : sauf en mode essai, où le déclencheur manuel travaille à toute heure.
+if (!reglages.essai && ($now.hour < 7 || $now.hour >= 23)) return [];
 
 const lundi = $now.startOf('week');
 const mercredi = lundi.plus({ days: 2 });
