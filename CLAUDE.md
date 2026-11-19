@@ -38,11 +38,14 @@ Automatisation de veille technologique avec N8N (self-hosted) et Discord.
 | Workflow | ID | État |
 |----------|----|------|
 | Veille Pro — labos, bruit et brief (la v3, 59 nœuds) | `VeilleProV2story` | **actif** depuis le 5 novembre 2026 — passage toutes les 30 min, jour et nuit (depuis le 19 novembre) ; collecte de 7 h à 23 h, au plus toutes les 3 h ; brief après 8 h 30, bilan le dimanche |
-| Veille Stack (26 nœuds) | `VeilleStackHlmr1` | **actif** — 9h30 Paris, digest lundi ; org via `GITHUB_STACK_ORG`, token `GITHUB_STACK_TOKEN`, sortie `DISCORD_WEBHOOK_STACK` |
+| Veille Stack (26 nœuds) | `VeilleStackHlmr1` | **actif mais en panne** depuis au moins le 12 novembre 2026 : GitHub refuse le jeton et Discord le webhook (401), et l'exécution se dit réussie (`continueOnFail`) ; à réparer ou à archiver, au choix de Louis — 9h30 Paris, digest lundi ; org via `GITHUB_STACK_ORG`, token `GITHUB_STACK_TOKEN`, sortie `DISCORD_WEBHOOK_STACK` |
 | Error Handler - Discord Alert | `yrUX1IcjTyIwpWqG` | actif |
 | Veille ParlIA (39 nœuds) | `VeilleParlIAprod` | **actif** depuis le 4 novembre 2026 ; la version du 18 novembre (arXiv sur 14 jours, matière de la synthèse mensuelle, et les trois erreurs de la semaine 47 : annonces anciennes des pages, prix des modèles suivis, doublons d'un même éditeur) en service depuis le 18 novembre ; passages jour et nuit depuis le 19 novembre ; essai : `VeilleParlIAtest` — `docs/veille-parlia.md` |
-| Veille Pro v1 | `OfUjCc9fcrInTX3M` | désactivé (rollback) |
-| Brief Simplon phases 1-2 | — | désactivés (archive) |
+| Veille Pro v1 | `OfUjCc9fcrInTX3M` | archivé le 18 novembre 2026 |
+| Brief Simplon phases 1-2 (« RSS -> Discord », « LLM Veille -> Discord ») | `4loivX52UgWdVVmf`, `yoigEpQm19BRiixF` | archivés le 18 novembre 2026 |
+| Copies d'essai, rejeu de la semaine 46 | `VeilleProV2test01`, `VeilleParlIAtest`, `VeilleParlIArejeu` | archivés le 18 novembre 2026 ; l'import d'un build `--test` ressort la copie d'essai |
+
+Les workflows archivés restent dans n8n (filtre « Show archived workflows »), et leur export dans `sauvegardes/2026-11-18-archives/` (ignoré par Git).
 
 ⚠️ Veille Stack : `workflows/src-stack/config-stack.js` et les JSON générés contiennent des détails
 internes de la plateforme surveillée → **gitignorés** (le repo est public). Template : `config-stack.example.js`.

@@ -399,10 +399,10 @@ publication le remet en service sans redémarrer n8n. Il utilise l'identifiant O
 
 ## Essayer en mode test
 
-Le mode test construit un second workflow, `VeilleParlIAtest`, avec sa propre mémoire : un déclencheur manuel, tout
-est dû (collecte, pages, Journal officiel, préparation, rappel), les nœuds Discord sont désactivés, le fichier
-s'appelle `essai-AAAA-MM-JJ-preparation.md`. Il demande les montages de l'étape 4 : sans eux, le fichier n'est pas
-écrit et les notes ne sont pas lues (le message de #status préparé le dit).
+Le mode test construit un second workflow, `VeilleParlIAtest` (archivé entre deux essais : l'import le ressort), avec
+sa propre mémoire : un déclencheur manuel, tout est dû (collecte, pages, Journal officiel, préparation, rappel), les
+nœuds Discord sont désactivés, le fichier s'appelle `essai-AAAA-MM-JJ-preparation.md`. Il demande les montages de
+l'étape 4 : sans eux, le fichier n'est pas écrit et les notes ne sont pas lues (le message de #status préparé le dit).
 
 ~~~bash
 python3 workflows/build_parlia.py --test               # workflows/veille-parlia.test.json, ignoré par Git
