@@ -76,7 +76,12 @@ test('les notes de séance : lues dans le seul dossier monté, sans écriture, e
   // s'exécute avant elle), dans le dossier où le bot les écrit, sans les essais.
   const preps = parNom['Lire les préparations'];
   assert.deepEqual([preps.type, preps.typeVersion, preps.parameters.operation], ['n8n-nodes-base.readWriteFile', 1.1, 'read']);
-  assert.equal(preps.parameters.fileSelector, '/home/node/.n8n-files/parlia/[0-9]*-preparation.md');
+  assert.equal(preps.parameters.fileSelector, '/home/node/.n8n-files/parlia/*-preparation.md');
+  // Depuis n8n 2.48.5, [ ] et ( ) sont des caractères ordinaires dans un sélecteur : « [0-9]*-preparation.md » ne
+  // trouvait plus rien (19 novembre 2026). Aucun sélecteur de lecture n'en contient.
+  for (const n of wf.nodes.filter((x) => x.type === 'n8n-nodes-base.readWriteFile' && x.parameters.operation === 'read')) {
+    assert.doesNotMatch(n.parameters.fileSelector, /[[\]()]/, n.name);
+  }
   assert.deepEqual([preps.continueOnFail, preps.alwaysOutputData], [true, true]);
   assert.ok(preps.position[1] < lire.position[1]);
   assert.deepEqual(wf.connections['Lire les préparations'].main[0].map((c) => c.node), ['Texte des préparations']);

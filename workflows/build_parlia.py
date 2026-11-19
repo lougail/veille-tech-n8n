@@ -238,12 +238,14 @@ def build(mode: str):
         # servent. Dossier absent ou vide : une erreur tolérée, que le nœud Notes traduit (« notes non lues »).
         code_node("Notes à lire ?", "notes-dues-parlia.js", [600, 440]),
         # Les préparations déjà écrites par le bot, relues pour le bilan des sources sur quatre semaines (nœud Notes ;
-        # sources.md, 6.2, règle 10) : les seuls fichiers datés, pas les essais. Cette branche est au-dessus de celle
-        # des notes : elle s'exécute avant elle, et une panne (dossier vide) ne touche pas la lecture des notes.
+        # sources.md, 6.2, règle 10). Le nœud Notes ne garde que les fichiers datés, pas les essais : le sélecteur n'a
+        # ni crochets ni parenthèses, que n8n lit comme des caractères ordinaires depuis 2.48.5 (« [0-9]*-preparation.md »
+        # ne trouvait plus rien, 19 novembre 2026). Cette branche est au-dessus de celle des notes : elle s'exécute avant
+        # elle, et une panne (dossier vide) ne touche pas la lecture des notes.
         {
             "parameters": {
                 "operation": "read",
-                "fileSelector": DOSSIER_PREPARATIONS + "/[0-9]*-preparation.md",
+                "fileSelector": DOSSIER_PREPARATIONS + "/*-preparation.md",
                 "options": {},
             },
             "id": slug("Lire les préparations"),

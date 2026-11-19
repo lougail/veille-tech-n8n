@@ -214,6 +214,17 @@ test("sans lien, la dernière préparation du bot des sept jours d'avant ; intro
   assert.deepEqual([tard.depuis, tard.seances, tard.nonComptees, tard.parSource], ['2026-11-16', [], [], {}]);
 });
 
+// Le nœud « Lire les préparations » relit tout « *-preparation.md », essais compris (n8n 2.48.5) : seuls comptent
+// les fichiers datés du bot.
+test('une préparation d\'essai relue avec les autres ne compte jamais, même plus récente', async () => {
+  const sansLien = NOTE_03.replace(/La préparation est le fichier du bot.*\n/, '');
+  const b = await bilan([note('2026-11-13-seance-03.md', sansLien)], [prep('2026-11-09-preparation.md', PREP_0911),
+    prep('essai-2026-11-10-preparation.md', PREP_0911.replace('TypeSafe AI, blog', 'Source de l\'essai'))]);
+  assert.deepEqual(b.seances, [{ numero: '03', preparation: '2026-11-09-preparation.md' }]);
+  assert.equal(b.parSource["Source de l'essai"], undefined);
+  assert.deepEqual(b.parSource['TypeSafe AI, blog'], { proposes: 1, gardes: 0 });
+});
+
 // La relecture du 16 novembre 2026 : « (fiches 6 à 8) » ne comptait que la fiche 6, et « (séance 02, candidat 1) »,
 // un point d'une autre séance, créditait la fiche 1 de cette préparation. Une date abrégée ou en chiffres n'est pas une
 // fiche : « 01/11/2026 » et « 1 nov. 2026 » créditaient la fiche 1.

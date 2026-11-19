@@ -505,6 +505,12 @@ GHSA-q8rc-7m84-mfvj, jugé élevé, GHSA-g333-hr44-g82p). La liste des changemen
 - **Le reste, vérifié** : une pause « Wait » de moins de 65 secondes reste en mémoire ; `retryOnFail` relance bien un
   nœud qui continue en cas d'erreur ; le temps maximal d'un nœud Code reste de 300 secondes
   (`N8N_RUNNERS_TASK_TIMEOUT`), la lecture des pages et des originaux pouvant dépasser la minute.
+- **Trouvé le lendemain** : depuis 2.48.5, le nœud de lecture de fichiers prend `[ ]` et `( )` pour des caractères
+  ordinaires (option « Treat Brackets and Parentheses as Literal », activée par défaut). « Lire les préparations »
+  (`[0-9]*-preparation.md`) ne trouvait plus rien, sans autre signe qu'une erreur tolérée : la préparation du
+  23 novembre aurait marqué chaque séance « préparation du bot introuvable » dans le bilan des sources. Le sélecteur
+  est devenu `*-preparation.md`, et le nœud Notes écarte les essais. C'est la seule régression : chaque nœud de ParlIA
+  et de la veille personnelle a été comparé, erreur par erreur, sur leurs exécutions du 11 au 19 novembre.
 - **La base ne s'ouvre jamais depuis le Mac pendant que n8n tourne**, même en lecture seule. Le 18 novembre, à
   11 h 32, une lecture faite depuis le Mac a fait tomber n8n (SIGBUS ; l'exécution en cours de la veille personnelle
   notée « crashed », rien de perdu) : les verrous de SQLite ne traversent pas la machine virtuelle d'OrbStack, et le

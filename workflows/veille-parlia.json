@@ -367,7 +367,7 @@
    {
     "parameters": {
      "operation": "read",
-     "fileSelector": "/home/node/.n8n-files/parlia/[0-9]*-preparation.md",
+     "fileSelector": "/home/node/.n8n-files/parlia/*-preparation.md",
      "options": {}
     },
     "id": "parlia-lire-les-preparations",
