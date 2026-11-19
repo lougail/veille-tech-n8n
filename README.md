@@ -48,7 +48,7 @@ Toutes les 30 min, jour et nuit : une collecte est-elle due ? (de 7 h à 23 h, a
 
 | Workflow | Description | Schedule |
 |----------|-------------|----------|
-| **Veille v3 — labos, bruit et brief** (59 nodes) | Labos, radars de modèles, capteurs de bruit, regroupement, notation, distribution, brief du matin | Passage toutes les 30 min, jour et nuit : collecte de 7 h à 23 h, au plus toutes les 3 h ; brief après 8 h 30, bilan le dimanche |
+| **Veille Pro — labos, bruit et brief** (la v3, 59 nodes) | Labos, radars de modèles, capteurs de bruit, regroupement, notation, distribution, brief du matin | Passage toutes les 30 min, jour et nuit : collecte de 7 h à 23 h, au plus toutes les 3 h ; brief après 8 h 30, bilan le dimanche |
 | **Veille Stack** (26 nodes) | Veille de dépendances d'une org GitHub : manifestes → OSV.dev (CVE) → alertes #stack, + digest hebdo (releases sous contrainte, EOL via endoflife.date) | 9h30 (+ hebdo lundi) |
 | **Veille ParlIA** (39 nodes, en service depuis le 4 novembre 2026) | Veille du projet ParlIA : flux, pages sans flux et API → tri par Mistral Small 3.2 → 8 fiches par semaine au plus, dont l'original est lu et résumé → fichier de préparation daté, avec le bilan des sources sur quatre semaines, #veille-parlia, alertes de remaniement | Toutes les 30 min, jour et nuit (travail de 7 h 15 à 22 h 45) : collecte toutes les 4 h au plus, préparation le lundi, rappel le jeudi |
 | **Veille Pro v1** (34 nodes, désactivé) | Ancien pipeline par articles (rollback possible) | — |

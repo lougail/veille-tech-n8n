@@ -380,7 +380,8 @@ def build(mode: str):
     suffix = {"test": " [TEST]", "preprod": " [PREPROD]", "prod": ""}[mode]
     workflow = {
         "id": WORKFLOW_ID_TEST if test_mode else WORKFLOW_ID_PROD,
-        "name": "Veille Pro v2 — Stories & Tendances" + suffix,
+        # Sans numéro de version : le nom suivait la v2 alors que la v3 tournait (renommé le 19 novembre 2026).
+        "name": "Veille Pro — labos, bruit et brief" + suffix,
         "active": False,
         "isArchived": False,
         "nodes": nodes,
