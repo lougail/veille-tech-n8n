@@ -1,8 +1,10 @@
 // L'outil « ce qui tourne » (outils/etat-prod.mjs, npm run etat) : la comparaison d'un workflow du dépôt à la version
-// publiée dans n8n, le dernier passage lu dans le journal, et les repères de la mémoire. Lance avec : npm test
+// publiée dans n8n, le dernier passage lu dans le journal, les repères de la mémoire, et le dossier du bot ParlIA.
+// Lance avec : npm test
 import assert from 'node:assert/strict';
+import { homedir } from 'node:os';
 import test from 'node:test';
-import { debutDuJournal, derniersPassages, differences, reperes } from '../../outils/etat-prod.mjs';
+import { debutDuJournal, derniersPassages, differences, dossierDuBot, reperes } from '../../outils/etat-prod.mjs';
 
 const noeud = (name, extra = {}) => Object.assign({ name, type: 'n8n-nodes-base.code', typeVersion: 2, parameters: { jsCode: 'return [];' } }, extra);
 const workflow = (nodes, extra = {}) => Object.assign({
@@ -64,4 +66,14 @@ test('les repères de la mémoire : seulement des dates, mémoire en texte compr
   assert.deepEqual(reperes(JSON.stringify({ global: { lastCollectAt: String(at) } })), [['dernière collecte', at]]);
   assert.deepEqual(reperes(null), []);
   assert.deepEqual(reperes({}), []);
+});
+
+test('le dossier du bot ParlIA : PARLIA_BOT_DIR, sinon PARLIA_NOTES_DIR suivi de /bot ; environnement, puis .env', () => {
+  const env = 'DISCORD_WEBHOOK_PARLIA=https://exemple.org/w\n# PARLIA_BOT_DIR=/ancien\nPARLIA_NOTES_DIR="/coffre/VEILLE"\n';
+  assert.equal(dossierDuBot(env, {}), '/coffre/VEILLE/bot');
+  assert.equal(dossierDuBot('PARLIA_NOTES_DIR=/coffre/VEILLE # les notes\n', {}), '/coffre/VEILLE/bot');
+  assert.equal(dossierDuBot(env + 'PARLIA_BOT_DIR=~/bot\n', {}), homedir() + '/bot');
+  assert.equal(dossierDuBot(env, { PARLIA_BOT_DIR: '/ailleurs' }), '/ailleurs');
+  assert.equal(dossierDuBot('PARLIA_NOTES_DIR=\n', {}), '');
+  assert.equal(dossierDuBot('', {}), '');
 });

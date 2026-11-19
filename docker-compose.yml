@@ -2,13 +2,14 @@ services:
   n8n:
     # 2.48.5, la version « stable » de n8n le 18 novembre 2026 : elle corrige les avis de sécurité du 28 octobre
     # (GHSA-prmc-fg87-r4gh, GHSA-f2cw-9483-7vcp) et du 13 novembre (GHSA-c772-hjfp-gfc2, GHSA-h59h-rf6m-7jp5,
-    # GHSA-q8rc-7m84-mfvj, GHSA-g333-hr44-g82p). Essayée d'abord sur une copie de la base (docs/veille-parlia.md).
+    # GHSA-q8rc-7m84-mfvj, GHSA-g333-hr44-g82p). Essayée d'abord sur une copie de la base (docs/n8n.md).
     image: n8nio/n8n:2.48.5
     ports:
       - "127.0.0.1:5678:5678"
     volumes:
       - ./n8n-data:/home/node/.n8n
-      # Veille ParlIA (docs/veille-parlia.md) : le dossier où le bot écrit ses préparations, et celui des notes de
+      # Veille ParlIA (son code et son mode d'emploi : projet ParlIA, Certification-active/04-apprentissage/VEILLE/bot,
+      # « 3. Les dossiers ») : le dossier où le bot écrit ses préparations, et celui des notes de
       # séance, qu'il relit sans pouvoir les modifier. n8n 2.x ne lit et n'écrit que sous ~/.n8n-files. Les vrais
       # chemins vont dans .env ; sans eux, deux dossiers du dépôt, ignorés par Git.
       - ${PARLIA_EXPORT_DIR:-./exports/veille-parlia}:/home/node/.n8n-files/parlia
@@ -36,9 +37,9 @@ services:
       # (plus d'une minute de retard). L'ancien, gardé ici, le lance quand son minuteur arrive au bout : sans lui, la
       # veille Stack de 9 h 30 aurait perdu 5 de ses 7 passages du 11 au 18 novembre 2026. Ce minuteur ne compte que le
       # temps où le Mac est allumé : ParlIA et la veille passent donc toutes les 30 minutes, jour et nuit
-      # (docs/veille-parlia.md, « Les passages, jour et nuit »). n8n le déclare déprécié : Stack est archivée depuis le
+      # (docs/n8n.md, « Les passages, jour et nuit »). n8n le déclare déprécié : Stack est archivée depuis le
       # 19 novembre 2026, et les deux veilles passent toutes les 30 minutes ; avant n8n 3, essayer le planificateur
-      # par défaut sur une copie de la base.
+      # par défaut sur une copie de la base (docs/n8n.md, « Avant n8n 3 »).
       - N8N_SCHEDULER_ENABLED=false
       # Le temps maximal d'un nœud Code : 300 secondes aujourd'hui, 60 dans une version future. La lecture des pages
       # et des originaux de ParlIA peut dépasser la minute (délais de 20 à 45 secondes par page) : on garde 300.

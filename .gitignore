@@ -8,8 +8,8 @@ node_modules
 # variantes generees pour les tests (rebuild via build_v2.py --test / --preprod)
 workflows/veille-pro-v2.test.json
 workflows/veille-pro-v2.preprod.json
-workflows/veille-parlia.test.json
-# veille ParlIA : les fichiers de préparation écrits par le bot (montés dans le conteneur, voir docs/veille-parlia.md)
+# veille ParlIA : les dossiers montés par défaut dans le conteneur, sans PARLIA_EXPORT_DIR ni PARLIA_NOTES_DIR
+# (README du bot ParlIA, « 3. Les dossiers »)
 exports/
 # veille de stack : config et artefacts contenant des details internes de la plateforme surveillee
 workflows/src-stack/config-stack.js

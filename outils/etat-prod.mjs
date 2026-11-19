@@ -1,18 +1,20 @@
 // Quelle version tourne dans n8n ? Une commande, qui ne modifie rien :   npm run etat
 //
-// 1. Reconstruit les workflows du dépôt dans un dossier temporaire (build_v2.py, build_parlia.py) ; l'Error Handler
-//    est le fichier workflows/error-handler.json.
+// 1. Reconstruit les workflows dans un dossier temporaire : la veille personnelle (workflows/build_v2.py) et le bot
+//    ParlIA, qui vit dans le projet ParlIA depuis le 19 novembre 2026 (son build_parlia.py, dans le dossier que donne
+//    dossierDuBot) ; l'Error Handler est le fichier workflows/error-handler.json.
 // 2. Exporte de n8n les versions publiées, celles qui tournent (n8n export:workflow --published, dans le conteneur :
 //    la base ne s'ouvre jamais depuis le Mac pendant que n8n tourne).
 // 3. Compare chaque version publiée à celle du dépôt : nom, nœuds (type, version, paramètres, identifiants, réglages
 //    d'erreur), connexions et réglages du workflow.
-// 4. Donne l'état du dépôt (branche, dernier commit, fichiers non enregistrés, commits absents de GitHub) et, pour
-//    chaque workflow, son dernier passage (journal de n8n) et ses repères (dernière collecte, dernier brief…).
+// 4. Donne l'état de ce dépôt et celui du dossier du bot (branche, dernier commit, fichiers non enregistrés, commits
+//    absents de GitHub) et, pour chaque workflow, son dernier passage (journal de n8n) et ses repères (dernière
+//    collecte, dernier brief…).
 // L'export contient la mémoire des workflows : seules les dates des repères en sont lues, et il est effacé à la fin.
 // Code de sortie : 0 si tout ce qui tourne est identique au dépôt, 1 sinon.
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -23,9 +25,27 @@ const CONTENEUR = 'veille-tech-n8n-n8n-1';
 // 19 novembre 2026 : elle ne tourne plus, et n'est plus suivie ici.
 export const WORKFLOWS = [
   { id: 'VeilleProV2story', construire: 'workflows/build_v2.py' },
-  { id: 'VeilleParlIAprod', construire: 'workflows/build_parlia.py' },
+  { id: 'VeilleParlIAprod', construire: 'build_parlia.py', dansLeBot: true },
   { id: 'yrUX1IcjTyIwpWqG', fichier: 'workflows/error-handler.json' },
 ];
+
+// Le dossier du bot ParlIA : PARLIA_BOT_DIR, sinon PARLIA_NOTES_DIR suivi de /bot (le bot vit dans VEILLE/, le
+// dossier des notes de séance), lus dans l'environnement, puis dans .env. Aucun chemin du Mac n'entre ainsi dans ce
+// dépôt public, et rien d'autre n'est lu de .env, qui garde aussi les webhooks. Vide : introuvable.
+export function dossierDuBot(texteEnv = '', env = process.env) {
+  const lire = (cle) => {
+    if (env[cle]) return env[cle];
+    const m = new RegExp('^[ \\t]*' + cle + '[ \\t]*=[ \\t]*(.*)$', 'm').exec(texteEnv);
+    if (!m) return '';
+    const v = m[1].trim();
+    return /^(['"]).*\1$/.test(v) ? v.slice(1, -1) : v.replace(/\s+#.*$/, '');
+  };
+  const complet = (chemin) => chemin.replace(/^~(?=\/|$)/, homedir());
+  const bot = lire('PARLIA_BOT_DIR');
+  if (bot) return complet(bot);
+  const notes = lire('PARLIA_NOTES_DIR');
+  return notes ? join(complet(notes), 'bot') : '';
+}
 
 // Ce qui compte dans un nœud : n8n ajoute à l'import un identifiant, une position ou un webhookId, sans effet.
 const CHAMPS = {
@@ -108,16 +128,21 @@ function sortie(cmd, args, options = {}) {
   return execFileSync(cmd, args, { cwd: RACINE, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, ...options }).trim();
 }
 
-function etatGit() {
-  const git = (...a) => { try { return sortie('git', a, { stdio: ['ignore', 'pipe', 'ignore'] }); } catch { return null; } };
-  const nonEnregistres = (git('status', '--porcelain') || '').split('\n').filter(Boolean).length;
-  const absents = git('rev-list', '--count', 'origin/master..HEAD');
+// L'état Git d'un dossier : sa branche, son dernier commit, ses fichiers non enregistrés (dans ce dossier seulement)
+// et ses commits absents de GitHub, comparés à la branche suivie, sinon à celle donnée.
+function etatGit(nom, dossier, parDefaut) {
+  const git = (...a) => { try { return sortie('git', ['-C', dossier, ...a], { stdio: ['ignore', 'pipe', 'ignore'] }); } catch { return null; } };
+  const branche = git('rev-parse', '--abbrev-ref', 'HEAD');
+  if (branche === null) return [nom + ' : pas de dépôt Git dans ce dossier.'];
+  const nonEnregistres = (git('status', '--porcelain', '--', '.') || '').split('\n').filter(Boolean).length;
+  const amont = git('rev-parse', '--abbrev-ref', '@{upstream}') || parDefaut;
+  const absents = git('rev-list', '--count', amont + '..HEAD');
   return [
-    'Dépôt : branche ' + git('rev-parse', '--abbrev-ref', 'HEAD') + ', dernier commit ' + git('log', '-1', '--format=%h « %s »')
+    nom + ' : branche ' + branche + ', dernier commit ' + git('log', '-1', '--format=%h « %s »')
       + (nonEnregistres ? ' ; ' + nonEnregistres + ' fichier(s) modifié(s) non enregistré(s)' : ' ; tout est enregistré'),
-    absents === null ? 'GitHub : branche origin/master inconnue.'
-      : Number(absents) ? 'GitHub : ' + absents + ' commit(s) du Mac absents de GitHub (origin/master, à la dernière synchronisation).'
-        : 'GitHub : à jour (origin/master, à la dernière synchronisation).',
+    absents === null ? '   GitHub : branche ' + amont + ' inconnue.'
+      : Number(absents) ? '   GitHub : ' + absents + ' commit(s) du Mac absents de GitHub (' + amont + ', à la dernière synchronisation).'
+        : '   GitHub : à jour (' + amont + ', à la dernière synchronisation).',
   ];
 }
 
@@ -131,14 +156,19 @@ function exporterN8n() {
   }
 }
 
-function construire(dossier) {
+function construire(dossier, bot) {
   const res = {};
   for (const w of WORKFLOWS) {
     try {
+      const builder = w.dansLeBot ? join(bot, w.construire) : w.construire;
+      if (w.dansLeBot && !(bot && existsSync(builder))) {
+        res[w.id] = { manque: 'bot ParlIA introuvable : régler PARLIA_BOT_DIR, ou PARLIA_NOTES_DIR, dans .env' };
+        continue;
+      }
       let chemin = w.fichier && join(RACINE, w.fichier);
       if (w.construire) {
         chemin = join(dossier, w.id + '.json');
-        sortie('python3', [w.construire, '-o', chemin]);
+        sortie('python3', [builder, '-o', chemin]);
       }
       res[w.id] = { wf: [].concat(JSON.parse(readFileSync(chemin, 'utf8')))[0] };
     } catch (e) {
@@ -149,11 +179,14 @@ function construire(dossier) {
 }
 
 function principal() {
-  const lignes = etatGit();
+  const env = existsSync(join(RACINE, '.env')) ? readFileSync(join(RACINE, '.env'), 'utf8') : '';
+  const bot = dossierDuBot(env);
+  const lignes = etatGit('Dépôt veille-tech-n8n', RACINE, 'origin/master');
+  if (bot && existsSync(bot)) lignes.push(...etatGit('Bot ParlIA (Certification-active, VEILLE/bot)', bot, 'origin/main'));
   const dossier = mkdtempSync(join(tmpdir(), 'etat-prod-'));
   let toutVa = true;
   try {
-    const depot = construire(dossier);
+    const depot = construire(dossier, bot);
     let publies;
     try {
       publies = exporterN8n();

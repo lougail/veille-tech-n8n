@@ -4,7 +4,7 @@ Système de veille technologique automatisé qui collecte, regroupe en **stories
 
 > **v3 (28 octobre 2026)** : les publications de tous les grands labos, ce qui fait du bruit, et un brief par jour. Pourquoi et comment : [docs/veille-v3.md](docs/veille-v3.md). La v2 de juillet (stories, sujets chauds) : [docs/veille-pro-v2.md](docs/veille-pro-v2.md).
 >
-> **Veille ParlIA (novembre 2026)** : un workflow à part prépare chaque semaine la séance de veille du projet ParlIA (32 sources, 8 fiches guidées au plus, un fichier de préparation daté, les alertes de remaniement du Journal officiel) : [docs/veille-parlia.md](docs/veille-parlia.md).
+> **Veille ParlIA (novembre 2026)** : un workflow à part prépare chaque semaine la séance de veille du projet ParlIA (32 sources, 8 fiches guidées au plus, un fichier de préparation daté, les alertes de remaniement du Journal officiel). Depuis le 19 novembre 2026, son code vit dans le projet ParlIA (dépôt privé, `04-apprentissage/VEILLE/bot/`) ; ce dépôt fait tourner n8n, qui l'exécute : [docs/n8n.md](docs/n8n.md).
 
 ## Architecture (Veille v3)
 
@@ -50,13 +50,14 @@ Toutes les 30 min, jour et nuit : une collecte est-elle due ? (de 7 h à 23 h, a
 |----------|-------------|----------|
 | **Veille Pro — labos, bruit et brief** (la v3, 59 nodes) | Labos, radars de modèles, capteurs de bruit, regroupement, notation, distribution, brief du matin | Passage toutes les 30 min, jour et nuit : collecte de 7 h à 23 h, au plus toutes les 3 h ; brief après 8 h 30, bilan le dimanche |
 | **Veille Stack** (26 nodes, archivée le 19 novembre 2026) | Veille de dépendances d'une org GitHub : manifestes → OSV.dev (CVE) → alertes #stack, + digest hebdo (releases sous contrainte, EOL via endoflife.date) | — |
-| **Veille ParlIA** (39 nodes, en service depuis le 4 novembre 2026) | Veille du projet ParlIA : flux, pages sans flux et API → tri par Mistral Small 3.2 → 8 fiches par semaine au plus, dont l'original est lu et résumé → fichier de préparation daté, avec le bilan des sources sur quatre semaines, #veille-parlia, alertes de remaniement | Toutes les 30 min, jour et nuit (travail de 7 h 15 à 22 h 45) : collecte toutes les 4 h au plus, préparation le lundi, rappel le jeudi |
+| **Veille ParlIA** (39 nodes, en service depuis le 4 novembre 2026 ; son code vit dans le projet ParlIA) | Veille du projet ParlIA : flux, pages sans flux et API → tri par Mistral Small 3.2 → 8 fiches par semaine au plus, dont l'original est lu et résumé → fichier de préparation daté, avec le bilan des sources sur quatre semaines, #veille-parlia, alertes de remaniement | Toutes les 30 min, jour et nuit (travail de 7 h 15 à 22 h 45) : collecte toutes les 4 h au plus, préparation le lundi, rappel le jeudi |
 | **Veille Pro v1** (34 nodes, archivé le 18 novembre 2026) | Ancien pipeline par articles | — |
 | **Error Handler** (3 nodes) | Alerte Discord si un workflow crash | Sur erreur |
 
-**Savoir ce qui tourne** : `npm run etat` compare chaque workflow publié dans n8n à celui que construit le dépôt,
-donne le dernier passage de chacun et le nombre de commits absents de GitHub. Il ne modifie rien ; un ✅ par
-workflow veut dire que ce qui tourne est la version du dépôt.
+**Savoir ce qui tourne** : `npm run etat` compare chaque workflow publié dans n8n à celui que construit son dépôt
+(ce dépôt, ou le dossier du bot ParlIA, trouvé par `.env`), donne le dernier passage de chacun, les fichiers non
+enregistrés et les commits absents de GitHub. Il ne modifie rien ; un ✅ par workflow veut dire que ce qui tourne est
+la version de son dépôt. Le détail : [docs/n8n.md](docs/n8n.md).
 
 ### Veille Stack (générique, réutilisable)
 
@@ -77,25 +78,28 @@ La configuration (watchlists) est locale et non versionnée : copier
 workflows/
 ├── build_v2.py          # Builder : assemble le JSON n8n depuis src/
 ├── src/*.js             # Code source des 19 Code nodes (la vraie logique)
-├── build_parlia.py      # Builder de la veille ParlIA (src-parlia/*.js → veille-parlia.json)
 ├── tests/*.test.mjs     # Tests du code des nœuds : npm install, puis npm test
 ├── veille-pro-v2.json   # Sortie du builder (import n8n)
 └── veille-pro.json      # v1 (archive)
 ```
 
-Modifier la veille = éditer `workflows/src/*.js` puis :
+Modifier la veille = éditer `workflows/src/*.js`, lancer `npm test`, puis construire le workflow, le copier dans le
+conteneur, l'importer (n8n le dépublie et garde sa mémoire), le publier (il tourne 15 secondes plus tard environ, sans
+redémarrer n8n) et vérifier qu'il est ✅, hors des minutes 0 et 30 de chaque heure, celles de ses passages :
 
 ```bash
 python3 workflows/build_v2.py
 docker cp workflows/veille-pro-v2.json veille-tech-n8n-n8n-1:/tmp/v2.json
 docker exec veille-tech-n8n-n8n-1 n8n import:workflow --input=/tmp/v2.json
+docker exec veille-tech-n8n-n8n-1 n8n publish:workflow --id=VeilleProV2story
+npm run etat
 ```
 
 Mode test (envois Discord désactivés, résumé et bilan forcés, Manual Trigger pour le CLI, identifiant distinct) :
+construire la copie d'essai, l'importer comme ci-dessus (`workflows/veille-pro-v2.test.json`), puis la lancer :
 
 ```bash
 python3 workflows/build_v2.py --test
-# puis import, et :
 docker exec -e N8N_RUNNERS_BROKER_PORT=5699 -e N8N_PORT=5698 \
   veille-tech-n8n-n8n-1 n8n execute --id VeilleProV2test01
 ```
