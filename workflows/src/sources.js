@@ -46,8 +46,6 @@ const FEEDS = [
   { u: 'https://the-decoder.com/feed/', s: 'The Decoder', c: 'ia', w: 1.0, k: 'news' },
   // Fuites et fonctions en préparation chez les labos ; près de la moitié des articles signés par un agent IA.
   { u: 'https://www.testingcatalog.com/rss/', s: 'TestingCatalog', c: 'ia', w: 0.8, k: 'news' },
-  // Une seule requête Reddit par exécution : Reddit n'en accepte qu'une par minute.
-  { u: 'https://www.reddit.com/r/LocalLLaMA+ClaudeAI+singularity+OpenAI+MachineLearning/top/.rss?t=day&limit=50', s: 'Reddit IA', c: 'ia', w: 1.0, k: 'reddit' },
   { u: 'https://mshibanami.github.io/GitHubTrendingRSS/daily/all.xml', s: 'GitHub Trending', c: 'tendances', w: 0.9, k: 'ghtrend' },
   // ---- Les personnes ----
   { u: 'https://simonwillison.net/atom/everything/', s: 'Simon Willison', c: 'ia', w: 1.3, k: 'blog', a: true },
@@ -109,4 +107,9 @@ const FEEDS = [
 // Databricks, dbt, JetBrains AI (peu pertinents) ; la copie des actualités de xAI reste, faute de mieux.
 // Retiré le 19 novembre 2026 : Baidu ERNIE, dont le blog n'a plus de flux (404 à chaque lecture depuis au moins le
 // 11 novembre) ; ses modèles restent suivis par les radars Hugging Face et OpenRouter.
+// Retiré le 19 novembre 2026 : le flux Reddit groupé (r/LocalLLaMA, ClaudeAI, singularity, OpenAI, MachineLearning).
+// Depuis le 17 novembre, Reddit répond « Not Found » à tous ses flux RSS (chaque forum seul, sans paramètres, avec
+// l'identité d'un navigateur, old.reddit.com renvoyé vers la connexion) et 403 à son API JSON sans compte. Les sujets
+// de Reddit arrivent encore par le résumé quotidien d'AINews (normalize.js). Pour le faire revenir : une application
+// Reddit (OAuth) au nom de Louis ; le code garde la nature « reddit » (normalize.js, cluster.js).
 return FEEDS.map(f => ({ json: f }));

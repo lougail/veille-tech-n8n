@@ -51,8 +51,10 @@ et les personnes (code de réponse, nombre d'éléments, date du plus récent, v
   avec leurs points et leurs commentaires.
 - **AINews** (`normalize.js`) : chaque numéro, résumé quotidien de ce qui fait du bruit sur X et Reddit, est gardé ;
   ses sujets du jour servent de capteur, et un sujet qu'il cite devient plus chaud (`cluster.js`).
-- **Techmeme**, **The Decoder**, **TestingCatalog** (fuites, poids bas), un **flux Reddit groupé** (Reddit n'accepte
-  qu'une requête par minute ; `old.reddit.com` renvoie désormais vers la connexion).
+- **Techmeme**, **The Decoder**, **TestingCatalog** (fuites, poids bas). Le **flux Reddit groupé** est retiré le
+  19 novembre 2026 : depuis le 17, Reddit répond « Not Found » à tous ses flux RSS et 403 à son API sans compte
+  (`sources.js`). Les sujets de Reddit arrivent encore par le résumé quotidien d'AINews ; une application Reddit
+  (OAuth) au nom de Louis le ramènerait.
 - **Des personnes** : Zvi Mowshowitz, Ethan Mollick, Sean Goedecke, Armin Ronacher, Geoffrey Huntley, en plus de
   Simon Willison, Latent Space et les autres déjà suivis.
 - Un sujet chaud ou cité par AINews est publié dès qu'il est noté 6, et rejoint la liste « 🔥 » de #tendances.

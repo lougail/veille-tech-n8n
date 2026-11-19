@@ -12,8 +12,8 @@ Système de veille technologique automatisé qui collecte, regroupe en **stories
 Toutes les 30 min, jour et nuit : une collecte est-elle due ? (de 7 h à 23 h, au plus toutes les 3 h, et avant le brief)
   │   collecte de tout ce qui a été publié depuis la dernière collecte réussie (24 h à 7 jours) :
   │   le Mac qui dort ne fait rien perdre
-  ├── 78 flux RSS : 22 flux officiels des labos, outils de code IA, AINews (via Latent Space),
-  │   Techmeme, The Decoder, Reddit groupé, des personnes, le dev, le cloud, la sécurité
+  ├── 77 flux RSS : 22 flux officiels des labos, outils de code IA, AINews (via Latent Space, avec son résumé
+  │   de Reddit), Techmeme, The Decoder, des personnes, le dev, le cloud, la sécurité
   ├── Radar OpenRouter : chaque nouveau modèle de chaque fournisseur, avec son prix ; les retraits annoncés
   ├── Radar Hugging Face : les nouveaux modèles ouverts de 25 organisations de labos, une annonce par famille
   ├── Hacker News (API Algolia) : plus de 100 points sur 48 h
