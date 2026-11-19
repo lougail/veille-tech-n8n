@@ -29,7 +29,6 @@ const FEEDS = [
   { u: 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_xainews.xml', s: 'xAI', c: 'ia', w: 1.0, k: 'lab' },
   { u: 'https://docs.cohere.com/changelog.rss', s: 'Cohere (notes de version)', c: 'ia', w: 1.0, k: 'lab' },
   { u: 'https://docs.z.ai/release-notes/new-released/rss.xml', s: 'Z.ai (GLM)', c: 'ia', w: 1.1, k: 'lab' },
-  { u: 'https://ernie.baidu.com/blog/index.xml', s: 'Baidu ERNIE', c: 'ia', w: 1.0, k: 'lab' },
   { u: 'https://allenai.org/rss.xml', s: 'Ai2', c: 'ia', w: 1.0, k: 'lab' },
   { u: 'https://machinelearning.apple.com/rss.xml', s: 'Apple (recherche)', c: 'ia', w: 0.9, k: 'lab' },
   { u: 'https://developer.nvidia.com/blog/tag/nemotron/feed/', s: 'NVIDIA Nemotron', c: 'ia', w: 1.0, k: 'lab' },
@@ -108,4 +107,6 @@ const FEEDS = [
 // (remplacé par le flux Reddit groupé) ; Numerama, Ars Technica, TLDR Tech, Fireship, ThePrimeTime,
 // Theo, bycloud, Karpathy sur YouTube (beaucoup lu, presque rien retenu, ou muets) ; Azure, HashiCorp,
 // Databricks, dbt, JetBrains AI (peu pertinents) ; la copie des actualités de xAI reste, faute de mieux.
+// Retiré le 19 novembre 2026 : Baidu ERNIE, dont le blog n'a plus de flux (404 à chaque lecture depuis au moins le
+// 11 novembre) ; ses modèles restent suivis par les radars Hugging Face et OpenRouter.
 return FEEDS.map(f => ({ json: f }));

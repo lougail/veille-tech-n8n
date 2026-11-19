@@ -24,10 +24,14 @@ et les personnes (code de réponse, nombre d'éléments, date du plus récent, v
 
 ### Suivre les labos au jour le jour
 
-- **23 flux officiels** (`k: 'lab'`) : OpenAI et OpenAI Developers, Anthropic (actualités, recherche, ingénierie,
+- **22 flux officiels** (`k: 'lab'`) : OpenAI et OpenAI Developers, Anthropic (actualités, recherche, ingénierie,
   blog Claude, notes de version de la plateforme Claude), Google (IA, DeepMind, développeurs, Gemini), Mistral,
-  Meta (newsroom IA et blog), xAI, Cohere, Z.ai, Baidu, Ai2, Apple, NVIDIA Nemotron, Hugging Face. Les plus
-  importants sont toujours examinés par le modèle, quel que soit le pré-classement.
+  Meta (newsroom IA et blog), xAI, Cohere, Z.ai, Ai2, Apple, NVIDIA Nemotron, Hugging Face. Les plus
+  importants sont toujours examinés par le modèle, quel que soit le pré-classement. Baidu, dont le blog n'a plus de
+  flux, est suivi par les deux radars depuis le 19 novembre 2026. Trois flux se taisent depuis des semaines sans
+  erreur, et restent : la copie des actualités de xAI (figée le 10 octobre), celle du blog de Meta AI (rien depuis
+  le 27 juillet ; la newsroom de Meta, à jour, la double) et les notes de version de Z.ai (rien depuis le 26 août,
+  alors que la page en montre une du 10 octobre). Leurs modèles passent par les radars.
 - **Radar OpenRouter** (`radar-openrouter.js`) : le catalogue public d'OpenRouter, sans clé, repère chaque nouveau
   modèle de chaque fournisseur, avec son prix et son contexte ; c'est la seule source fraîche pour Moonshot (Kimi),
   MiniMax ou DeepSeek, qui n'ont pas de flux. Il signale aussi les retraits de modèles (`expiration_date`).
