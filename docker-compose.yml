@@ -36,8 +36,9 @@ services:
       # (plus d'une minute de retard). L'ancien, gardé ici, le lance quand son minuteur arrive au bout : sans lui, la
       # veille Stack de 9 h 30 aurait perdu 5 de ses 7 passages du 11 au 18 novembre 2026. Ce minuteur ne compte que le
       # temps où le Mac est allumé : ParlIA et la veille passent donc toutes les 30 minutes, jour et nuit
-      # (docs/veille-parlia.md, « Les passages, jour et nuit »). n8n le déclare déprécié : avant qu'il disparaisse
-      # (n8n 3), donner à Stack un passage toutes les 30 minutes, comme ParlIA et la veille.
+      # (docs/veille-parlia.md, « Les passages, jour et nuit »). n8n le déclare déprécié : Stack est archivée depuis le
+      # 19 novembre 2026, et les deux veilles passent toutes les 30 minutes ; avant n8n 3, essayer le planificateur
+      # par défaut sur une copie de la base.
       - N8N_SCHEDULER_ENABLED=false
       # Le temps maximal d'un nœud Code : 300 secondes aujourd'hui, 60 dans une version future. La lecture des pages
       # et des originaux de ParlIA peut dépasser la minute (délais de 20 à 45 secondes par page) : on garde 300.

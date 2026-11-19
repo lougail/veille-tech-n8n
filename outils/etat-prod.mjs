@@ -1,7 +1,7 @@
 // Quelle version tourne dans n8n ? Une commande, qui ne modifie rien :   npm run etat
 //
-// 1. Reconstruit les workflows du dépôt dans un dossier temporaire (build_v2.py, build_parlia.py, build_stack.py) ;
-//    l'Error Handler est le fichier workflows/error-handler.json.
+// 1. Reconstruit les workflows du dépôt dans un dossier temporaire (build_v2.py, build_parlia.py) ; l'Error Handler
+//    est le fichier workflows/error-handler.json.
 // 2. Exporte de n8n les versions publiées, celles qui tournent (n8n export:workflow --published, dans le conteneur :
 //    la base ne s'ouvre jamais depuis le Mac pendant que n8n tourne).
 // 3. Compare chaque version publiée à celle du dépôt : nom, nœuds (type, version, paramètres, identifiants, réglages
@@ -19,11 +19,11 @@ import { fileURLToPath } from 'node:url';
 const RACINE = fileURLToPath(new URL('../', import.meta.url));
 const CONTENEUR = 'veille-tech-n8n-n8n-1';
 
-// Les workflows du dépôt, et comment les obtenir.
+// Les workflows qui tournent, et comment les obtenir. Veille Stack (VeilleStackHlmr1) est archivée depuis le
+// 19 novembre 2026 : elle ne tourne plus, et n'est plus suivie ici.
 export const WORKFLOWS = [
   { id: 'VeilleProV2story', construire: 'workflows/build_v2.py' },
   { id: 'VeilleParlIAprod', construire: 'workflows/build_parlia.py' },
-  { id: 'VeilleStackHlmr1', construire: 'workflows/build_stack.py', besoin: 'workflows/src-stack/config-stack.js' },
   { id: 'yrUX1IcjTyIwpWqG', fichier: 'workflows/error-handler.json' },
 ];
 
@@ -135,7 +135,6 @@ function construire(dossier) {
   const res = {};
   for (const w of WORKFLOWS) {
     try {
-      if (w.besoin && !existsSync(join(RACINE, w.besoin))) { res[w.id] = { manque: w.besoin + ' absent' }; continue; }
       let chemin = w.fichier && join(RACINE, w.fichier);
       if (w.construire) {
         chemin = join(dossier, w.id + '.json');

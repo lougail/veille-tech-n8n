@@ -49,7 +49,7 @@ Toutes les 30 min, jour et nuit : une collecte est-elle due ? (de 7 h à 23 h, a
 | Workflow | Description | Schedule |
 |----------|-------------|----------|
 | **Veille Pro — labos, bruit et brief** (la v3, 59 nodes) | Labos, radars de modèles, capteurs de bruit, regroupement, notation, distribution, brief du matin | Passage toutes les 30 min, jour et nuit : collecte de 7 h à 23 h, au plus toutes les 3 h ; brief après 8 h 30, bilan le dimanche |
-| **Veille Stack** (26 nodes) | Veille de dépendances d'une org GitHub : manifestes → OSV.dev (CVE) → alertes #stack, + digest hebdo (releases sous contrainte, EOL via endoflife.date) | 9h30 (+ hebdo lundi) |
+| **Veille Stack** (26 nodes, archivée le 19 novembre 2026) | Veille de dépendances d'une org GitHub : manifestes → OSV.dev (CVE) → alertes #stack, + digest hebdo (releases sous contrainte, EOL via endoflife.date) | — |
 | **Veille ParlIA** (39 nodes, en service depuis le 4 novembre 2026) | Veille du projet ParlIA : flux, pages sans flux et API → tri par Mistral Small 3.2 → 8 fiches par semaine au plus, dont l'original est lu et résumé → fichier de préparation daté, avec le bilan des sources sur quatre semaines, #veille-parlia, alertes de remaniement | Toutes les 30 min, jour et nuit (travail de 7 h 15 à 22 h 45) : collecte toutes les 4 h au plus, préparation le lundi, rappel le jeudi |
 | **Veille Pro v1** (34 nodes, archivé le 18 novembre 2026) | Ancien pipeline par articles | — |
 | **Error Handler** (3 nodes) | Alerte Discord si un workflow crash | Sur erreur |
@@ -59,6 +59,9 @@ donne le dernier passage de chacun et le nombre de commits absents de GitHub. Il
 workflow veut dire que ce qui tourne est la version du dépôt.
 
 ### Veille Stack (générique, réutilisable)
+
+Archivée le 19 novembre 2026 : son jeton GitHub et son webhook Discord étaient refusés depuis le 12 novembre, sans
+que l'exécution échoue. Le code reste ici, prêt à être relancé avec un jeton et un webhook valides.
 
 Scanne les manifestes (`requirements.txt`, `package.json`, `pubspec.yaml`/`.lock`, `Dockerfile`)
 de tous les repos d'une org GitHub (token fine-grained **lecture seule**, org via `GITHUB_STACK_ORG`),
