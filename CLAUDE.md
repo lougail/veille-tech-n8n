@@ -15,11 +15,12 @@ Automatisation de veille technologique avec N8N (self-hosted) et Discord.
 | `workflows/build_v2.py` | Builder → génère `veille-pro-v2.json` (`--test` / `--preprod`) |
 | `workflows/src-parlia/*.js`, `workflows/build_parlia.py` | Veille ParlIA : son code et son builder → `veille-parlia.json` (`--test`) — `docs/veille-parlia.md` |
 | `workflows/*.json` | Exports/artefacts d'import n8n |
+| `outils/etat-prod.mjs` (`npm run etat`) | Ce qui tourne dans n8n est-il la version du dépôt ? Compare les versions publiées aux builds, donne le dernier passage et l'état Git ; ne modifie rien |
 | `docs/veille-pro-v2.md` | Architecture v2, sources auditées, pièges connus |
 
 ## Règles N8N (v2.48.5, vérifiées le 18 novembre 2026)
 
-- Workflow v2 : ne JAMAIS éditer le JSON à la main → modifier `workflows/src/*.js` puis `python3 workflows/build_v2.py` et réimporter (`docker exec veille-tech-n8n-n8n-1 n8n import:workflow --input=...`)
+- Workflow v2 : ne JAMAIS éditer le JSON à la main → modifier `workflows/src/*.js` puis `python3 workflows/build_v2.py` et réimporter (`docker exec veille-tech-n8n-n8n-1 n8n import:workflow --input=...`), puis `n8n publish:workflow --id=<ID>` : appliqué en ~15 s sans redémarrage (2.48.5) ; l'import garde la mémoire (staticData) tant que le JSON n'en contient pas. Ensuite `npm run etat` : tout doit être ✅
 - Code nodes en **JavaScript** ; sandbox task runner : PAS de `new URL()`, pas de `$env`/`process.env` — `$now` (Luxon) et `$getWorkflowStaticData` OK
 - staticData sauvegardé seulement en fin d'exécution réussie d'un workflow actif (les exécutions CLI persistent aussi)
 - Test CLI sans toucher l'instance : `docker exec -e N8N_RUNNERS_BROKER_PORT=5699 -e N8N_PORT=5698 veille-tech-n8n-n8n-1 n8n execute --id <ID>` (nécessite un Manual Trigger dans le workflow)

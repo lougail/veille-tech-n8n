@@ -4,7 +4,8 @@
   "description": "Tests du code des nœuds Code du workflow de veille",
   "type": "module",
   "scripts": {
-    "test": "node --test \"workflows/tests/*.test.mjs\""
+    "test": "node --test \"workflows/tests/*.test.mjs\"",
+    "etat": "node outils/etat-prod.mjs"
   },
   "devDependencies": {
     "luxon": "3.7.2"

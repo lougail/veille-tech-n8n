@@ -54,6 +54,10 @@ Toutes les 30 min, jour et nuit : une collecte est-elle due ? (de 7 h à 23 h, a
 | **Veille Pro v1** (34 nodes, désactivé) | Ancien pipeline par articles (rollback possible) | — |
 | **Error Handler** (3 nodes) | Alerte Discord si un workflow crash | Sur erreur |
 
+**Savoir ce qui tourne** : `npm run etat` compare chaque workflow publié dans n8n à celui que construit le dépôt,
+donne le dernier passage de chacun et le nombre de commits absents de GitHub. Il ne modifie rien ; un ✅ par
+workflow veut dire que ce qui tourne est la version du dépôt.
+
 ### Veille Stack (générique, réutilisable)
 
 Scanne les manifestes (`requirements.txt`, `package.json`, `pubspec.yaml`/`.lock`, `Dockerfile`)

@@ -389,13 +389,13 @@ docker compose down && docker compose up -d
 python3 workflows/build_parlia.py
 docker cp workflows/veille-parlia.json veille-tech-n8n-n8n-1:/tmp/parlia.json
 docker exec veille-tech-n8n-n8n-1 n8n import:workflow --input=/tmp/parlia.json
-docker exec veille-tech-n8n-n8n-1 n8n publish:workflow --id=VeilleParlIAprod
-docker compose down && docker compose up -d           # la publication ne compte qu'au redémarrage
-docker logs veille-tech-n8n-n8n-1 2>&1 | grep -i "activated workflow"
+docker exec veille-tech-n8n-n8n-1 n8n publish:workflow --id=VeilleParlIAprod   # appliqué en 15 secondes environ
+npm run etat                                          # ✅ : ce qui tourne est la version du dépôt
 ~~~
 
-Le workflow importé arrive non publié. Il utilise l'identifiant OpenRouter de la veille personnelle (« OpenRouter
-account ») : rien à créer. Faire d'abord l'essai ci-dessous.
+L'import dépublie le workflow et garde sa mémoire, que le fichier ne contient pas ; depuis n8n 2.48.5, la
+publication le remet en service sans redémarrer n8n. Il utilise l'identifiant OpenRouter de la veille personnelle
+(« OpenRouter account ») : rien à créer. Faire d'abord l'essai ci-dessous.
 
 ## Essayer en mode test
 
@@ -426,11 +426,11 @@ officiel (de 0,1 à 6 Mo). Il peut être relancé autant de fois que nécessaire
 
 - **Avant la publication** : rien ne tourne. Le workflow importé se supprime dans l'interface, sans effet sur les
   autres.
-- **Après** : le dépublier dans l'interface (effet immédiat), ou en ligne de commande, jamais avec `--all` :
+- **Après** : le dépublier dans l'interface (effet immédiat), ou en ligne de commande (effet en 15 secondes
+  environ), jamais avec `--all` :
 
   ~~~bash
   docker exec veille-tech-n8n-n8n-1 n8n unpublish:workflow --id=VeilleParlIAprod
-  docker compose down && docker compose up -d
   ~~~
 
 - Les deux montages peuvent rester : sans le workflow, rien ne les lit ni ne les écrit. Pour les retirer, enlever

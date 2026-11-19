@@ -185,8 +185,9 @@ def build(test_mode):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--test", action="store_true")
+    ap.add_argument("-o", "--output", default=None)
     args = ap.parse_args()
     wf = build(args.test)
-    out = HERE / ("veille-stack.test.json" if args.test else "veille-stack.json")
+    out = Path(args.output) if args.output else HERE / ("veille-stack.test.json" if args.test else "veille-stack.json")
     out.write_text(json.dumps([wf], indent=1, ensure_ascii=False), encoding="utf-8")
     print(f"OK -> {out} ({len(wf['nodes'])} nodes, mode {'TEST' if args.test else 'PROD'})")
