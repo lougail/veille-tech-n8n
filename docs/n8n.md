@@ -107,3 +107,8 @@ les deux veilles passent toutes les 30 minutes, jour et nuit : avec le planifica
 pendant le sommeil du Mac devrait être suivi d'un autre au plus 30 minutes après le réveil. À vérifier sur une copie
 de la base, comme pour la mise à jour (section « La mise à jour de n8n »), avant de retirer cette variable de
 `docker-compose.yml`.
+
+Le task runner, qui exécute les nœuds Code, tourne dans le conteneur de n8n (mode interne). n8n annonce à chaque
+démarrage que ce mode sera retiré (`N8N_RUNNERS_MODE`, n8n 2.48.5, 21 novembre 2026). Le mode externe demande un
+second conteneur, l'image `n8nio/runners` de la même version, et un jeton partagé (`N8N_RUNNERS_AUTH_TOKEN`).
+À essayer aussi sur une copie de la base, avec les tests CLI des deux veilles.
